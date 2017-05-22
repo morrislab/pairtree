@@ -14,7 +14,7 @@ def parse(ssmfn):
   with open(ssmfn) as F:
     reader = csv.DictReader(F, delimiter='\t')
     for row in reader:
-      if False and len(variants) >= 3:
+      if True and len(variants) >= 3:
         break
       variant = {
         'name': row['gene'],
@@ -60,8 +60,7 @@ def generate_prob_phi(N, models):
 def _calc_model_prob(var1, var2, models):
   grid_step = 0.01
   num_grid_points = int(1/grid_step + 1)
-  grid_row = np.linspace(start=0, stop=1, num=num_grid_points)
-  grid = np.tile(grid_row, (num_grid_points, 1))
+  G = np.linspace(start=0, stop=1, num=num_grid_points)[:,np.newaxis]
 
   S = len(var1['total_reads']) # Number of samples
   prob_phi = generate_prob_phi(num_grid_points, models)
@@ -69,10 +68,10 @@ def _calc_model_prob(var1, var2, models):
 
   for s in range(S):
     for modelidx, model in enumerate(models):
-      factors = [scipy.stats.binom.pmf(V['var_reads'][s], V['total_reads'][s], grid / 2) for V in (var1, var2)]
-      factors.append(prob_phi[model])
-      phi_probs = np.prod(np.array(factors), axis=0)
-      prob_models[s,modelidx] = np.sum(phi_probs)
+      # Create Nx1 arrays
+      pv1, pv2 = [scipy.stats.binom.pmf(V['var_reads'][s], V['total_reads'][s], 0.5*G)[:,np.newaxis] for V in (var1, var2)]
+      P = np.dot(pv1, pv2.T) * prob_phi[model]
+      prob_models[s,modelidx] = np.sum(P)
 
   logpm = np.sum(np.log(prob_models), axis=0)
   logpm -= np.max(logpm)
