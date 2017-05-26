@@ -14,9 +14,10 @@ def parse(ssmfn):
   with open(ssmfn) as F:
     reader = csv.DictReader(F, delimiter='\t')
     for row in reader:
-      if True and len(variants) >= 3:
+      if False and len(variants) >= 3:
         break
       variant = {
+        'id': row['id'],
         'name': row['gene'],
         'ref_reads': np.array([float(V) for V in row['a'].split(',')]),
         'total_reads': np.array([float(V) for V in row['d'].split(',')]),
@@ -69,7 +70,7 @@ def _calc_model_prob(var1, var2, models):
   for s in range(S):
     for modelidx, model in enumerate(models):
       # Create Nx1 arrays
-      pv1, pv2 = [scipy.stats.binom.pmf(V['var_reads'][s], V['total_reads'][s], 0.5*G)[:,np.newaxis] for V in (var1, var2)]
+      pv1, pv2 = [scipy.stats.binom.pmf(V['var_reads'][s], V['total_reads'][s], 0.5*G) for V in (var1, var2)]
       P = np.dot(pv1, pv2.T) * prob_phi[model]
       prob_models[s,modelidx] = np.sum(P)
 

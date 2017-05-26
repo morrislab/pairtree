@@ -32,7 +32,7 @@ def create_matrix(model, model_probs, var_names):
 
   if model in ('cocluster', 'diff_branches'):
     # These should be symmetric.
-    assert np.all(mat == mat.T)
+    assert np.allclose(mat, mat.T)
 
   return mat
 

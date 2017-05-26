@@ -7,17 +7,17 @@ function main {
   SSMDIR=$BASEDIR/data/inputs/steph.xenos
   OUTDIR=$BASEDIR/data/pairwise
 
-  #rm -f $OUTDIR/*.{pairwise.json,stdout,stderr}
-  #rm -f $OUTDIR/*.pairwise.html
+  rm -f $OUTDIR/*.{pairwise.json,stdout,stderr}
+  rm -f $OUTDIR/*.pairwise.html
 
-  #for ssmfn in $SSMDIR/*.sampled.ssm; do
-  #  sampid=$(basename $ssmfn | cut -d . -f1)
-  #  echo "python3 $PROTDIR/pairwise.py "\
-  #    "$ssmfn" \
-  #    "$OUTDIR/$sampid.pairwise.json" \
-  #    "> $OUTDIR/$sampid.stdout" \
-  #    "2> $OUTDIR/$sampid.stderr"
-  #done #| parallel -j40 --halt 1 --joblog /tmp/pairwise.jobs.txt
+  for ssmfn in $SSMDIR/*.sampled.ssm; do
+    sampid=$(basename $ssmfn | cut -d . -f1)
+    echo "python3 $PROTDIR/pairwise.py "\
+      "$ssmfn" \
+      "$OUTDIR/$sampid.pairwise.json" \
+      "> $OUTDIR/$sampid.stdout" \
+      "2> $OUTDIR/$sampid.stderr"
+  done | parallel -j40
 
   for jsonfn in $OUTDIR/*.pairwise.json; do
     sampid=$(basename $jsonfn | cut -d . -f1)
@@ -26,14 +26,14 @@ function main {
     echo "$cmd           $sampid $jsonfn $OUTDIR/$sampid.unclustered.pairwise.html"
   done | parallel -j40 --halt 1
 
-  #cd $OUTDIR
-  #for status in clustered unclustered; do
-  #  for htmlfn in S*.$status.pairwise.html; do
-  #    sampid=$(basename $htmlfn | cut -d. -f1)
-  #    echo "<a href=$htmlfn>$sampid ($status)</a><br>"
-  #  done
-  #  echo "<br>"
-  #done > index.html
+  cd $OUTDIR
+  for status in clustered unclustered; do
+    for htmlfn in S*.$status.pairwise.html; do
+      sampid=$(basename $htmlfn | cut -d. -f1)
+      echo "<a href=$htmlfn>$sampid ($status)</a><br>"
+    done
+    echo "<br>"
+  done > index.html
 }
 
 main
