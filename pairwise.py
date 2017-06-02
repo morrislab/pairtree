@@ -1,7 +1,7 @@
 import argparse
 import csv
 import numpy as np
-import scipy.stats
+import scipy.stats, scipy.misc
 import json
 np.seterr(divide='raise')
 #from numba import jit
@@ -28,7 +28,7 @@ def parse(ssmfn):
 
   return variants
 
-def generate_prob_phi(N, models):
+def generate_logprob_phi(N, models):
   prob = {}
   for M in models:
     prob[M] = np.zeros((N, N))
@@ -53,29 +53,35 @@ def generate_prob_phi(N, models):
       if i + j < N:
         prob['diff_branches'][i,j] = 1. / (N*(N - 1)/2 + N)
 
+  logprob = {}
   for M in prob.keys():
     assert np.isclose(np.sum(prob[M]), 1)
+    logprob[M] = np.zeros(prob[M].shape)
+    logprob[M][prob[M] == 0] = -100
+    logprob[M][prob[M] != 0] = np.log(prob[M][prob[M] != 0])
+    assert np.sum(logprob[M] == 0) == 0
 
-  return prob
+  return logprob
 
 #@jit
 def _calc_model_prob(var1, var2, models):
   grid_step = 0.01
-  num_grid_points = int(1/grid_step + 1)
-  G = np.linspace(start=0, stop=1, num=num_grid_points)[:,np.newaxis]
+  N = int(1/grid_step + 1) # N: number of grid points
+  G = 0.5 * np.linspace(start=0, stop=1, num=N)[:,np.newaxis] # Nx1
 
-  S = len(var1['total_reads']) # Number of samples
-  prob_phi = generate_prob_phi(num_grid_points, models)
-  prob_models = np.zeros((S, len(models)))
+  S = len(var1['total_reads']) # S
+  logprob_phi = generate_logprob_phi(N, models) # MxNxN
+  logprob_models = np.zeros((S, len(models))) # SxM
 
   for s in range(S):
     for modelidx, model in enumerate(models):
-      # Create Nx1 arrays
-      pv1, pv2 = [scipy.stats.binom.pmf(V['var_reads'][s], V['total_reads'][s], 0.5*G) for V in (var1, var2)]
-      P = np.dot(pv1, pv2.T) * prob_phi[model]
-      prob_models[s,modelidx] = np.sum(P)
+      pv1, pv2 = [scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], G) for V in (var1, var2)] # Nx1
+      p1 = np.tile(pv1, N)   # pv1 vector tiled as columns
+      p2 = np.tile(pv2, N).T # pv1 vector tiled as rows
+      P = p1 + p2 + logprob_phi[model]
+      logprob_models[s,modelidx] = scipy.misc.logsumexp(P)
 
-  logpm = np.sum(np.log(prob_models), axis=0)
+  logpm = np.sum(logprob_models, axis=0)
   logpm -= np.max(logpm)
   normpm = np.exp(logpm) / np.sum(np.exp(logpm))
   return normpm
