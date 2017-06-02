@@ -110,7 +110,7 @@ def plot_individual(model_probs, should_cluster, outf):
       mat, ssmidxs = cluster_rows(mat)
       if model in ('cocluster', 'diff_branches'):
         # These should be symmetric.
-        assert np.all(mat == mat.T)
+        assert np.allclose(mat, mat.T)
     else:
       ssmidxs = list(range(len(mat)))
     colours = make_colour_matrix(mat, make_colour_from_intensity)
