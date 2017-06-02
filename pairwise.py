@@ -3,6 +3,7 @@ import csv
 import numpy as np
 import scipy.stats
 import json
+np.seterr(divide='raise')
 #from numba import jit
 
 def parse(ssmfn):
