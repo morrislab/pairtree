@@ -123,10 +123,15 @@ def write_legend(models, outf):
     print('<tr><td style="background-color: %s">%s</td></tr>' % (colour, model), file=outf)
   print('</tbody></table>', file=outf)
 
-def plot_joint(model_probs, outf):
+def plot_joint(model_probs, should_cluster, outf):
   mats = np.array([create_matrix(M, model_probs['model_probs'][M], model_probs['var_names']) for M in model_probs['models']])
   mle = np.argmax(mats, axis=0)
-  ssmidxs = list(range(len(mle)))
+
+  if should_cluster:
+    mle, ssmidxs = cluster_rows(mle)
+  else:
+    ssmidxs = list(range(len(mle)))
+
   colours = make_colour_matrix(mle, make_colour_from_category)
   write_table('joint', mle, ssmidxs, colours, outf)
   write_legend(model_probs['models'], outf)
@@ -135,7 +140,7 @@ def plot(sampid, model_probs, should_cluster, outfn):
   with open(outfn, 'w') as outf:
     write_header(sampid, should_cluster and 'clustered' or 'unclustered', outf)
     plot_individual(model_probs, should_cluster, outf)
-    plot_joint(model_probs, outf)
+    plot_joint(model_probs, should_cluster, outf)
 
 def load_model_probs(model_probs_fn):
   with open(model_probs_fn) as F:
