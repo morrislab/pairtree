@@ -80,23 +80,23 @@ def make_table_row(entries, visibilities, colours):
   return '<tr>' + ''.join(['<td style="background-color: %s">%s</td>' % (C, E) for E, C in zip(entries, colours)]) + '</tr>'
 
 def write_header(sampid, extra, outf):
+  print('<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">', file=outf)
   print('<h1>%s (%s)</h1>' % (sampid, extra), file=outf)
   print('<style>td, table { padding: 5px; margin: 0; border-collapse: collapse; } span { visibility: hidden; } td:hover > span { visibility: visible; }</style>', file=outf)
 
-def write_table(model, mat, ssmidxs, colours, outf):
+def write_table(model, mat, labels, colours, outf):
   print('<h2>%s</h2>' % model, file=outf)
-  print('<table><thead></thead><tbody>', file=outf)
+  print('<table class="matrix"><thead></thead><tbody>', file=outf)
 
   N = len(mat)
-  vids = ['s%s' % idx for idx in ssmidxs]
 
-  entries        = [''] + vids
+  entries        = [''] + labels
   visibility     = len(entries)*[True]
   header_colours = len(entries)*['transparent']
   print(make_table_row(entries, visibility, header_colours), file=outf)
 
-  for vid, row, row_colours in zip(vids, mat, colours):
-    entries     = [vid]           + ['%.2f' % P for P in row]
+  for label, row, row_colours in zip(labels, mat, colours):
+    entries     = [label]           + ['%.2f' % P for P in row]
     visibility  = [True]          + N*[False]
     row_colours = ['transparent'] + row_colours
     print(make_table_row(entries, visibility, row_colours), file=outf)
@@ -114,18 +114,29 @@ def plot_individual(model_probs, should_cluster, outf):
     else:
       ssmidxs = list(range(len(mat)))
     colours = make_colour_matrix(mat, make_colour_from_intensity)
-    write_table(model, mat, ssmidxs, colours, outf)
+    write_table(model, mat, ['s%s' % I for I in ssmidxs], colours, outf)
 
 def write_legend(models, outf):
-  print('<table><tbody>', file=outf)
+  print('<br><table class="table"><tbody>', file=outf)
   for midx, model in enumerate(models):
     colour = make_colour_from_category(midx)
     print('<tr><td style="background-color: %s">%s</td></tr>' % (colour, model), file=outf)
   print('</tbody></table>', file=outf)
 
-def plot_joint(model_probs, should_cluster, outf):
+def write_cluster_map(cmap, outf):
+  print('<br><table class="table"><thead><tr><th>Cluster</th><th>SSMs</th></tr></thead><tbody>', file=outf)
+  for cidx, ssmidxs in enumerate(cmap):
+    ssmidxs = ', '.join(['s%s' % I for I in sorted(ssmidxs)])
+    print('<tr><td style="font-weight: bold">C%s</td><td>%s</td></tr>' % (cidx, ssmidxs), file=outf)
+  print('</tbody></table>', file=outf)
+
+def calc_mle(model_probs):
   mats = np.array([create_matrix(M, model_probs['model_probs'][M], model_probs['var_names']) for M in model_probs['models']])
   mle = np.argmax(mats, axis=0)
+  return mle
+
+def plot_mle(model_probs, should_cluster, outf):
+  mle = calc_mle(model_probs)
 
   if should_cluster:
     mle, ssmidxs = cluster_rows(mle)
@@ -133,14 +144,93 @@ def plot_joint(model_probs, should_cluster, outf):
     ssmidxs = list(range(len(mle)))
 
   colours = make_colour_matrix(mle, make_colour_from_category)
-  write_table('joint', mle, ssmidxs, colours, outf)
   write_legend(model_probs['models'], outf)
+  write_table('mle', mle, ['s%s' % I for I in ssmidxs], colours, outf)
+
+def collapse_identical(mat):
+  '''Collapse identical rows & columns.'''
+  rowmap = {}
+  retained_idxs = []
+
+  for idx, row in enumerate(mat):
+    row = tuple(row)
+    if row in rowmap:
+      rowmap[row].append(idx)
+    else:
+      rowmap[row] = [idx]
+      retained_idxs.append(idx)
+
+  idxmap = []
+  for row in mat[retained_idxs,:]:
+    idxmap.append(rowmap[tuple(row)])
+  collapsed = mat[retained_idxs,:][:,retained_idxs]
+  return (collapsed, idxmap)
+
+def plot_mle_toposort(model_probs, outf):
+  mle = calc_mle(model_probs)
+  sidxs_toposort = toposort(mle, model_probs['models'])
+  # Sort rows by toposorted indexes.
+  mle_toposort = np.array([_reorder_row(mle[idx], sidxs_toposort) for idx in sidxs_toposort])
+
+  collapsed, idxmap = collapse_identical(mle_toposort)
+  row_to_sidx_map = dict(enumerate(sidxs_toposort))
+  clusters = [[row_to_sidx_map[rowidx] for rowidx in cluster] for cluster in idxmap]
+
+  colours = make_colour_matrix(collapsed, make_colour_from_category)
+  labels = ['C%s' % I for I in range(len(collapsed))]
+  write_cluster_map(clusters, outf)
+  write_table('mle_toposort', collapsed, labels, colours, outf)
+
+def extract_B_A_rels(mle, models):
+  ssmidxs = list(range(len(mle)))
+  A_B_rels, B_A_rels = set(), set()
+  B_A_adjlist = {}
+
+  for sidx1 in ssmidxs:
+    B_A_adjlist[sidx1] = set()
+
+    for sidx2 in ssmidxs:
+      rel = mle[sidx1,sidx2]
+      if models[rel] == 'A_B':
+        A_B_rels.add((sidx1, sidx2))
+      elif models[rel] == 'B_A':
+        B_A_rels.add((sidx1, sidx2))
+        B_A_adjlist[sidx1].add(sidx2)
+
+  assert len(A_B_rels) == len(B_A_rels)
+  reversed_B_A_rels = set([(S2, S1) for (S1, S2) in B_A_rels])
+  assert reversed_B_A_rels == A_B_rels
+
+  return B_A_adjlist
+
+def toposort(mle, models):
+  # Algorithm taken from https://en.wikipedia.org/w/index.php?title=Topological_sorting&oldid=779516160#Kahn.27s_algorithm.
+  B_A_rels = extract_B_A_rels(mle, models)
+  topo_sorted = []
+  indeg_zero = [vert for vert, ancs in B_A_rels.items() if len(ancs) == 0]
+
+  while len(indeg_zero) > 0:
+    indeg_zero.sort(reverse=True)
+    node = indeg_zero.pop()
+    topo_sorted.append(node)
+    for child, ancs in B_A_rels.items():
+      if node not in ancs:
+        continue
+      ancs.remove(node)
+      if len(ancs) == 0:
+        indeg_zero.append(child)
+
+  assert set([len(ancs) for ancs in B_A_rels.values()]) == set([0]), 'Graph has cycle'
+  if len(topo_sorted) != len(B_A_rels):
+    raise Exception('Graph has cycle')
+  return topo_sorted
 
 def plot(sampid, model_probs, should_cluster, outfn):
   with open(outfn, 'w') as outf:
     write_header(sampid, should_cluster and 'clustered' or 'unclustered', outf)
     plot_individual(model_probs, should_cluster, outf)
-    plot_joint(model_probs, should_cluster, outf)
+    plot_mle(model_probs, should_cluster, outf)
+    plot_mle_toposort(model_probs, outf)
 
 def load_model_probs(model_probs_fn):
   with open(model_probs_fn) as F:
