@@ -80,9 +80,11 @@ def make_table_row(entries, visibilities, colours):
   return '<tr>' + ''.join(['<td style="background-color: %s">%s</td>' % (C, E) for E, C in zip(entries, colours)]) + '</tr>'
 
 def write_header(sampid, extra, outf):
+  print('<script type="text/javascript" src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>', file=outf)
+  print('<script type="text/javascript" src="highlight_table_labels.js"></script>', file=outf)
   print('<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">', file=outf)
   print('<h1>%s (%s)</h1>' % (sampid, extra), file=outf)
-  print('<style>td, table { padding: 5px; margin: 0; border-collapse: collapse; } span { visibility: hidden; } td:hover > span { visibility: visible; }</style>', file=outf)
+  print('<style>td, table { padding: 5px; margin: 0; border-collapse: collapse; } span { visibility: hidden; } td:hover > span { visibility: visible; } .highlighted { background-color: black !important; color: white; font-weight: bold; }</style>', file=outf)
 
 def write_table(model, mat, labels, colours, outf):
   print('<h2>%s</h2>' % model, file=outf)
