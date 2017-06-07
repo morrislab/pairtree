@@ -183,7 +183,7 @@ def remove_small_clusters(mat, clusters, threshold=1):
 
   return (filtered_mat, filtered_clusters)
 
-def plot_mle_toposort(model_probs, outf):
+def plot_mle_toposort(model_probs, outf, remove_small=False):
   mle = calc_mle(model_probs)
   sidxs_toposort = toposort(mle, model_probs['models'])
   # Sort rows by toposorted indexes.
@@ -193,12 +193,14 @@ def plot_mle_toposort(model_probs, outf):
   row_to_sidx_map = dict(enumerate(sidxs_toposort))
   clusters = [[row_to_sidx_map[rowidx] for rowidx in cluster] for cluster in idxmap]
 
-  collapsed, clusters = remove_small_clusters(collapsed, clusters)
+  if remove_small:
+    collapsed, clusters = remove_small_clusters(collapsed, clusters)
 
   colours = make_colour_matrix(collapsed, make_colour_from_category)
   labels = ['C%s' % I for I in range(len(collapsed))]
   write_cluster_map(clusters, outf)
-  write_table('mle_toposort', collapsed, labels, colours, outf)
+  suffix = remove_small and 'small_excluded' or 'small_included'
+  write_table('mle_toposort_%s' % suffix, collapsed, labels, colours, outf)
 
 def extract_B_A_rels(mle, models):
   ssmidxs = list(range(len(mle)))
@@ -250,6 +252,7 @@ def plot(sampid, model_probs, should_cluster, outfn):
     plot_individual(model_probs, should_cluster, outf)
     plot_mle(model_probs, should_cluster, outf)
     plot_mle_toposort(model_probs, outf)
+    plot_mle_toposort(model_probs, outf, remove_small=True)
 
 def load_model_probs(model_probs_fn):
   with open(model_probs_fn) as F:
