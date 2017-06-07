@@ -164,9 +164,24 @@ def collapse_identical(mat):
 
   idxmap = []
   for row in mat[retained_idxs,:]:
+    # idxmap lists what rows of `collapsed` correspond to what rows of `mat`
+    # (one-to-many relation).
     idxmap.append(rowmap[tuple(row)])
   collapsed = mat[retained_idxs,:][:,retained_idxs]
   return (collapsed, idxmap)
+
+def remove_small_clusters(mat, clusters, threshold=1):
+  assert len(clusters) == len(mat)
+  N = len(mat)
+  to_remove = set([idx for idx, C in enumerate(clusters) if len(C) <= threshold])
+  to_keep = [idx for idx in range(N) if idx not in to_remove]
+  assert len(to_remove) + len(to_keep) == N
+
+  filtered_mat = mat[to_keep,:][:,to_keep]
+  filtered_clusters = [C for idx, C in enumerate(clusters) if idx not in to_remove]
+  assert len(filtered_clusters) == len(to_keep)
+
+  return (filtered_mat, filtered_clusters)
 
 def plot_mle_toposort(model_probs, outf):
   mle = calc_mle(model_probs)
@@ -177,6 +192,8 @@ def plot_mle_toposort(model_probs, outf):
   collapsed, idxmap = collapse_identical(mle_toposort)
   row_to_sidx_map = dict(enumerate(sidxs_toposort))
   clusters = [[row_to_sidx_map[rowidx] for rowidx in cluster] for cluster in idxmap]
+
+  collapsed, clusters = remove_small_clusters(collapsed, clusters)
 
   colours = make_colour_matrix(collapsed, make_colour_from_category)
   labels = ['C%s' % I for I in range(len(collapsed))]
