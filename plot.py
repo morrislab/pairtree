@@ -125,9 +125,10 @@ def write_legend(models, outf):
     print('<tr><td style="background-color: %s">%s</td></tr>' % (colour, model), file=outf)
   print('</tbody></table>', file=outf)
 
-def write_cluster_map(cmap, outf):
+def write_cluster_map(cmap, cidxs, outf):
+  assert len(cmap) == len(cidxs)
   print('<br><table class="table"><thead><tr><th>Cluster</th><th>SSMs</th></tr></thead><tbody>', file=outf)
-  for cidx, ssmidxs in enumerate(cmap):
+  for cidx, ssmidxs in zip(cidxs, cmap):
     ssmidxs = ', '.join(['s%s' % I for I in sorted(ssmidxs)])
     print('<tr><td style="font-weight: bold">C%s</td><td>%s</td></tr>' % (cidx, ssmidxs), file=outf)
   print('</tbody></table>', file=outf)
@@ -170,8 +171,9 @@ def collapse_identical(mat):
   collapsed = mat[retained_idxs,:][:,retained_idxs]
   return (collapsed, idxmap)
 
-def remove_small_clusters(mat, clusters, threshold=1):
-  assert len(clusters) == len(mat)
+def remove_small_clusters(mat, clusters, cidxs, threshold=1):
+  assert len(clusters) == len(mat) == len(cidxs)
+
   N = len(mat)
   to_remove = set([idx for idx, C in enumerate(clusters) if len(C) <= threshold])
   to_keep = [idx for idx in range(N) if idx not in to_remove]
@@ -179,9 +181,10 @@ def remove_small_clusters(mat, clusters, threshold=1):
 
   filtered_mat = mat[to_keep,:][:,to_keep]
   filtered_clusters = [C for idx, C in enumerate(clusters) if idx not in to_remove]
-  assert len(filtered_clusters) == len(to_keep)
+  filtered_cidxs = [C for idx, C in enumerate(cidxs) if idx not in to_remove]
+  assert len(filtered_clusters) == len(to_keep) == len(filtered_cidxs)
 
-  return (filtered_mat, filtered_clusters)
+  return (filtered_mat, filtered_clusters, filtered_cidxs)
 
 def plot_mle_toposort(model_probs, outf, remove_small=False):
   mle = calc_mle(model_probs)
@@ -192,13 +195,14 @@ def plot_mle_toposort(model_probs, outf, remove_small=False):
   collapsed, idxmap = collapse_identical(mle_toposort)
   row_to_sidx_map = dict(enumerate(sidxs_toposort))
   clusters = [[row_to_sidx_map[rowidx] for rowidx in cluster] for cluster in idxmap]
+  cidxs = range(len(clusters))
 
   if remove_small:
-    collapsed, clusters = remove_small_clusters(collapsed, clusters)
+    collapsed, clusters, cidxs = remove_small_clusters(collapsed, clusters, cidxs)
 
   colours = make_colour_matrix(collapsed, make_colour_from_category)
   labels = ['C%s' % I for I in range(len(collapsed))]
-  write_cluster_map(clusters, outf)
+  write_cluster_map(clusters, cidxs, outf)
   suffix = remove_small and 'small_excluded' or 'small_included'
   write_table('mle_toposort_%s' % suffix, collapsed, labels, colours, outf)
 
