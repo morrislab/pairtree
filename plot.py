@@ -201,7 +201,7 @@ def plot_mle_toposort(model_probs, outf, remove_small=False):
     collapsed, clusters, cidxs = remove_small_clusters(collapsed, clusters, cidxs)
 
   colours = make_colour_matrix(collapsed, make_colour_from_category)
-  labels = ['C%s' % I for I in range(len(collapsed))]
+  labels = ['C%s' % I for I in cidxs]
   write_cluster_map(clusters, cidxs, outf)
   suffix = remove_small and 'small_excluded' or 'small_included'
   write_table('mle_toposort_%s' % suffix, collapsed, labels, colours, outf)
