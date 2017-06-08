@@ -5,10 +5,10 @@ function main {
   PROTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   BASEDIR=~/work/steph
   SSMDIR=$BASEDIR/data/inputs/steph.xenos
-  OUTDIR=$BASEDIR/data/pairwise.test
+  OUTDIR=$BASEDIR/data/pairwise
 
   mkdir -p $OUTDIR
-  rm -f $OUTDIR/*.{pairwise.json,stdout,stderr}
+  rm -f $OUTDIR/*.{pairwise.json,stdout,stderr,js}
   rm -f $OUTDIR/*.pairwise.html
 
   for ssmfn in $SSMDIR/*.sampled.ssm; do
@@ -18,9 +18,9 @@ function main {
       "$OUTDIR/$sampid.pairwise.json" \
       "> $OUTDIR/$sampid.stdout" \
       "2> $OUTDIR/$sampid.stderr"
-  done #| parallel -j40
-  return
+  done | parallel -j40 --halt 1
 
+  cp -a $PROTDIR/highlight_table_labels.js $OUTDIR/
   for jsonfn in $OUTDIR/*.pairwise.json; do
     sampid=$(basename $jsonfn | cut -d . -f1)
     cmd="python3 $PROTDIR/plot.py"

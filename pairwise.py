@@ -33,23 +33,18 @@ def generate_logprob_phi(N, models):
   for M in models:
     prob[M] = np.zeros((N, N))
 
-  # cocluster
   for i in range(N):
+    # cocluster
     prob['cocluster'][i,i] = 1./N
 
-  # A_B, B_A
-  for i in range(N):
     for j in range(N):
-      if i == j:
-        continue
-      elif i < j:
-        prob['B_A'][i,j] = 1. / (N*(N - 1)/2)
-      elif i > j:
-        prob['A_B'][i,j] = 1. / (N*(N - 1)/2)
-
-  # diff_branches
-  for i in range(N):
-    for j in range(N):
+      # B_A
+      if i <= j:
+        prob['B_A'][i,j] = 1. / (N*(N - 1)/2 + N)
+      # A_B
+      if i >= j:
+        prob['A_B'][i,j] = 1. / (N*(N - 1)/2 + N)
+      # diff_branches
       if i + j < N:
         prob['diff_branches'][i,j] = 1. / (N*(N - 1)/2 + N)
 
