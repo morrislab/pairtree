@@ -133,7 +133,6 @@ def plot_mle(model_probs, should_cluster, outf):
     ssmidxs = list(range(len(mle)))
 
   colours = make_colour_matrix(mle, make_colour_from_category)
-  write_legend(model_probs['models'], outf)
   write_table('mle', mle, ['s%s' % I for I in ssmidxs], colours, outf)
 
 def collapse_identical(mat):
@@ -192,9 +191,9 @@ def plot_mle_toposort(model_probs, outf, remove_small=False):
 
   colours = make_colour_matrix(mle, make_colour_from_category)
   labels = ['C%s' % I for I in cidxs]
-  write_cluster_map(clusters, cidxs, outf)
   suffix = remove_small and 'small_excluded' or 'small_included'
   write_table('mle_toposort_%s' % suffix, mle, labels, colours, outf)
+  write_cluster_map(clusters, cidxs, outf)
 
 def extract_B_A_rels(mle, models):
   ssmidxs = list(range(len(mle)))
@@ -240,11 +239,15 @@ def toposort(mle, models):
     raise Exception('Graph has cycle')
   return topo_sorted
 
-def plot(sampid, model_probs, should_cluster, ssmfn, paramsfn, spreadsheetfn, outfn):
+def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn):
+  should_cluster = not (output_type == 'unclustered')
+
   with open(outfn, 'w') as outf:
-    write_header(sampid, should_cluster and 'clustered' or 'unclustered', outf)
-    plot_individual(model_probs, should_cluster, outf)
-    plot_mle(model_probs, should_cluster, outf)
+    write_header(sampid, output_type, outf)
+    write_legend(model_probs['models'], outf)
+    if output_type != 'condensed':
+      plot_individual(model_probs, should_cluster, outf)
+      plot_mle(model_probs, should_cluster, outf)
     plot_mle_toposort(model_probs, outf)
     plot_mle_toposort(model_probs, outf, remove_small=True)
 
@@ -260,7 +263,7 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('--cluster', dest='should_cluster', action='store_true')
+  parser.add_argument('--output-type', dest='output_type', choices=('clustered', 'unclustered', 'condensed'), default='clustered')
   parser.add_argument('sampid')
   parser.add_argument('model_probs_fn')
   parser.add_argument('ssm_fn')
@@ -270,6 +273,6 @@ def main():
   args = parser.parse_args()
 
   model_probs = load_model_probs(args.model_probs_fn)
-  plot(args.sampid, model_probs, args.should_cluster, args.ssm_fn, args.params_fn, args.spreadsheet_fn, args.out_fn)
+  plot(args.sampid, model_probs, args.output_type, args.ssm_fn, args.params_fn, args.spreadsheet_fn, args.out_fn)
 
 main()
