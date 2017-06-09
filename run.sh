@@ -1,15 +1,26 @@
 #!/bin/sh
 set -euo pipefail
 
-function main {
-  PROTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-  BASEDIR=~/work/steph
-  SSMDIR=$BASEDIR/data/inputs/steph.xenos
-  OUTDIR=$BASEDIR/data/pairwise
+PROTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+BASEDIR=~/work/steph
+SSMDIR=$BASEDIR/data/inputs/steph.xenos
+OUTDIR=$BASEDIR/data/pairwise
+RENAMEDSAMPS=$BASEDIR/misc/renamed.txt
+HIDDENSAMPS=$BASEDIR/misc/hidden.txt
 
-  mkdir -p $OUTDIR
-  rm -f $OUTDIR/*.{pairwise.json,stdout,stderr,js}
-  rm -f $OUTDIR/*.pairwise.html
+function rename_samples {
+  for paramsfn in $SSMDIR/*.params.json; do
+    sampid=$(basename $paramsfn | cut -d . -f1)
+    echo "python3 $PROTDIR/rename_samples.py" \
+      "$sampid" \
+      "$HIDDENSAMPS" \
+      "$RENAMEDSAMPS" \
+      "$paramsfn"
+  done | parallel -j40 --halt 1
+}
+
+function calc_pairwise {
+  rm -f $OUTDIR/*.{pairwise.json,stdout,stderr}
 
   for ssmfn in $SSMDIR/*.sampled.ssm; do
     sampid=$(basename $ssmfn | cut -d . -f1)
@@ -19,6 +30,10 @@ function main {
       "> $OUTDIR/$sampid.stdout" \
       "2> $OUTDIR/$sampid.stderr"
   done | parallel -j40 --halt 1
+}
+
+function plot {
+  rm -f $OUTDIR/*.{pairwise.html,js}
 
   cp -a $PROTDIR/highlight_table_labels.js $OUTDIR/
   for jsonfn in $OUTDIR/*.pairwise.json; do
@@ -31,7 +46,9 @@ function main {
     echo "$cmd --cluster $sampid $jsonfn $ssmfn $paramsfn $spreadsheetfn $OUTDIR/$sampid.clustered.pairwise.html"
     echo "$cmd           $sampid $jsonfn $ssmfn $paramsfn $spreadsheetfn $OUTDIR/$sampid.unclustered.pairwise.html"
   done | parallel -j40 --halt 1
+}
 
+function write_index {
   cd $OUTDIR
   for status in clustered unclustered; do
     for htmlfn in S*.$status.pairwise.html; do
@@ -40,6 +57,15 @@ function main {
     done
     echo "<br>"
   done > index.html
+}
+
+function main {
+  mkdir -p $OUTDIR
+
+  #rename_samples
+  calc_pairwise
+  plot
+  write_index
 }
 
 main

@@ -30,8 +30,8 @@ def munge_samp_names(sampnames):
 def print_vafs(variants, cidxs, sampnames, outf):
   colours = assign_colours(cidxs)
 
-  print('<style>td, table { padding: 5px; margin: 0; border-collapse: collapse; } th { transform: rotate(45deg); font-weight: normal !important; } span { visibility: hidden; } td:hover > span { visibility: visible; }</style>', file=outf)
-  print('<br><br><br><table><thead>', file=outf)
+  print('<style>#vafmatrix td, #vafmatrix { padding: 5px; margin: 0; border-collapse: collapse; } #vafmatrix th { transform: rotate(45deg); font-weight: normal !important; } #vafmatrix span { visibility: hidden; } #vafmatrix td:hover > span { visibility: visible; }</style>', file=outf)
+  print('<br><br><br><table id="vafmatrix"><thead>', file=outf)
 
   header = ['Gene', 'ID', 'Chrom', 'Locus', 'Cluster']
   header += munge_samp_names(sampnames)
