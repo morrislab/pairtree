@@ -1,32 +1,10 @@
 import argparse
-import csv
 import numpy as np
 import scipy.stats, scipy.misc
 import json
+from common import parse_ssms
 np.seterr(divide='raise')
 #from numba import jit
-
-def parse(ssmfn):
-  vaf = []
-  ssm_ids = []
-  var_names = []
-  variants = {}
-
-  with open(ssmfn) as F:
-    reader = csv.DictReader(F, delimiter='\t')
-    for row in reader:
-      if False and len(variants) >= 3:
-        break
-      variant = {
-        'id': row['id'],
-        'name': row['gene'],
-        'ref_reads': np.array([float(V) for V in row['a'].split(',')]),
-        'total_reads': np.array([float(V) for V in row['d'].split(',')]),
-      }
-      variant['var_reads'] = variant['total_reads'] - variant['ref_reads']
-      variants[row['id']] = variant
-
-  return variants
 
 def generate_logprob_phi(N, models):
   prob = {}
@@ -134,7 +112,7 @@ def main():
   parser.add_argument('out_fn')
   args = parser.parse_args()
 
-  variants = parse(args.ssm_fn)
+  variants = parse_ssms(args.ssm_fn)
   models = ('cocluster', 'A_B', 'B_A', 'diff_branches')
   posterior = calc_posterior(variants, models)
   write_posterior(posterior, variants, models, args.out_fn)

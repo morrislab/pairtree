@@ -4,23 +4,9 @@ import json
 import numpy as np
 import sklearn.cluster
 import colorlover as cl
+from common import parse_ssms
+from vaf_plotter import plot_vaf_matrix
 np.set_printoptions(threshold=np.nan)
-
-def load_spreadsheet(spreadsheetfn):
-  with open(spreadsheetfn) as S:
-    reader = csv.DictReader(S)
-    return list(reader)
-
-def find_gene_name(chrom, pos, spreadsheet_rows):
-  for row in spreadsheet_rows:
-    assert row['CHR'].startswith('chr')
-    C = row['CHR'][3:].upper()
-    P = int(row['WU_HG19_POS'])
-
-    if chrom == C and pos == P:
-      return row['GENENAME']
-  return 'unknown'
-  raise Exception('Could not find gene name for %s_%s' % (chrom, pos))
 
 def create_matrix(model, model_probs, var_names):
   N = len(var_names)
@@ -186,7 +172,7 @@ def remove_small_clusters(mat, clusters, cidxs, threshold=1):
 
   return (filtered_mat, filtered_clusters, filtered_cidxs)
 
-def plot_mle_toposort(model_probs, outf, remove_small=False):
+def cluster_mle(model_probs):
   mle = calc_mle(model_probs)
   sidxs_toposort = toposort(mle, model_probs['models'])
   # Sort rows by toposorted indexes.
@@ -197,14 +183,18 @@ def plot_mle_toposort(model_probs, outf, remove_small=False):
   clusters = [[row_to_sidx_map[rowidx] for rowidx in cluster] for cluster in idxmap]
   cidxs = range(len(clusters))
 
-  if remove_small:
-    collapsed, clusters, cidxs = remove_small_clusters(collapsed, clusters, cidxs)
+  return (collapsed, clusters, cidxs)
 
-  colours = make_colour_matrix(collapsed, make_colour_from_category)
+def plot_mle_toposort(model_probs, outf, remove_small=False):
+  mle, clusters, cidxs = cluster_mle(model_probs)
+  if remove_small:
+    mle, clusters, cidxs = remove_small_clusters(mle, clusters, cidxs)
+
+  colours = make_colour_matrix(mle, make_colour_from_category)
   labels = ['C%s' % I for I in cidxs]
   write_cluster_map(clusters, cidxs, outf)
   suffix = remove_small and 'small_excluded' or 'small_included'
-  write_table('mle_toposort_%s' % suffix, collapsed, labels, colours, outf)
+  write_table('mle_toposort_%s' % suffix, mle, labels, colours, outf)
 
 def extract_B_A_rels(mle, models):
   ssmidxs = list(range(len(mle)))
@@ -250,13 +240,16 @@ def toposort(mle, models):
     raise Exception('Graph has cycle')
   return topo_sorted
 
-def plot(sampid, model_probs, should_cluster, outfn):
+def plot(sampid, model_probs, should_cluster, ssmfn, paramsfn, spreadsheetfn, outfn):
   with open(outfn, 'w') as outf:
     write_header(sampid, should_cluster and 'clustered' or 'unclustered', outf)
     plot_individual(model_probs, should_cluster, outf)
     plot_mle(model_probs, should_cluster, outf)
     plot_mle_toposort(model_probs, outf)
     plot_mle_toposort(model_probs, outf, remove_small=True)
+
+    _, clusters, cidxs = cluster_mle(model_probs)
+    plot_vaf_matrix(clusters, cidxs, ssmfn, paramsfn, spreadsheetfn, outf)
 
 def load_model_probs(model_probs_fn):
   with open(model_probs_fn) as F:
@@ -270,10 +263,13 @@ def main():
   parser.add_argument('--cluster', dest='should_cluster', action='store_true')
   parser.add_argument('sampid')
   parser.add_argument('model_probs_fn')
+  parser.add_argument('ssm_fn')
+  parser.add_argument('params_fn')
+  parser.add_argument('spreadsheet_fn')
   parser.add_argument('out_fn')
   args = parser.parse_args()
 
   model_probs = load_model_probs(args.model_probs_fn)
-  plot(args.sampid, model_probs, args.should_cluster, args.out_fn)
+  plot(args.sampid, model_probs, args.should_cluster, args.ssm_fn, args.params_fn, args.spreadsheet_fn, args.out_fn)
 
 main()
