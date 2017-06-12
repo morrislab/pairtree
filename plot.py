@@ -206,12 +206,9 @@ def cluster_relations(relations, remove_small):
 
   return (relations, clusters, cidxs)
 
-def plot_relations_toposort(relations, outf, remove_small=False):
-  relations, clusters, cidxs = cluster_relations(relations, remove_small)
-
+def plot_relations_toposort(relations, clusters, cidxs, suffix, outf):
   colours = make_colour_matrix(relations, make_colour_from_category)
   labels = ['C%s' % I for I in cidxs]
-  suffix = remove_small and 'small_excluded' or 'small_included'
   write_table('relations_toposort_%s' % suffix, relations, labels, colours, outf)
   write_cluster_map(clusters, cidxs, outf)
 
@@ -272,7 +269,9 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn
       plot_individual(model_probs, should_cluster, outf)
       plot_relations(relations, should_cluster, outf)
     for remove_small in (False, True):
-      clusters, cidxs = plot_relations_toposort(relations, outf, remove_small=remove_small)
+      relations, clusters, cidxs = cluster_relations(relations, remove_small)
+      suffix = remove_small and 'small_excluded' or 'small_included'
+      plot_relations_toposort(relations, clusters, cidxs, suffix, outf)
       plot_vaf_matrix(clusters, cidxs, ssmfn, paramsfn, spreadsheetfn, outf)
 
 def load_model_probs(model_probs_fn):
