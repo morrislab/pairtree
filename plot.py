@@ -6,6 +6,7 @@ import sklearn.cluster
 import colorlover as cl
 from common import parse_ssms, Models
 from vaf_plotter import plot_vaf_matrix
+from collections import defaultdict
 np.set_printoptions(threshold=np.nan)
 
 def create_matrix(model, model_probs, var_names):
@@ -124,9 +125,7 @@ def calc_relations(model_probs):
   relations = np.argmax(mats, axis=0)
   return relations
 
-def plot_relations(model_probs, should_cluster, outf):
-  relations = calc_relations(model_probs)
-
+def plot_relations(relations, should_cluster, outf):
   if should_cluster:
     relations, ssmidxs = cluster_rows(relations)
   else:
@@ -135,8 +134,8 @@ def plot_relations(model_probs, should_cluster, outf):
   colours = make_colour_matrix(relations, make_colour_from_category)
   write_table('relations', relations, ['s%s' % I for I in ssmidxs], colours, outf)
 
-def collapse_identical(mat):
-  '''Collapse identical rows & columns.'''
+def combine_identical(mat):
+  '''Combine identical rows & columns.'''
   rowmap = {}
   retained_idxs = []
 
@@ -156,8 +155,30 @@ def collapse_identical(mat):
   collapsed = mat[retained_idxs,:][:,retained_idxs]
   return (collapsed, idxmap)
 
-def remove_small_clusters(mat, clusters, cidxs, threshold=1):
-  assert len(clusters) == len(mat) == len(cidxs)
+def combine_identical_clusters(relations, clusters):
+  combined, idxmap = combine_identical(relations)
+  assert len(combined) <= len(relations)
+
+  # idxmap maps newidx -> oldidxs. Reverse this.
+  revidxmap = {}
+  for newidx, oldidxs in enumerate(idxmap):
+    for oldidx in oldidxs:
+      assert oldidx not in revidxmap
+      revidxmap[oldidx] = newidx
+
+  new_clusters = defaultdict(list)
+  for old_cidx, old_cluster in enumerate(clusters):
+    new_cidx = revidxmap[old_cidx]
+    new_clusters[new_cidx] += old_cluster
+
+  assert set(new_clusters.keys()) == set(range(len(combined)))
+  # Convert dictionary -> list.
+  new_clusters = [sorted(new_clusters[idx]) for idx in sorted(new_clusters.keys())]
+
+  return (combined, new_clusters)
+
+def remove_small_clusters(mat, clusters, threshold=1):
+  assert len(clusters) == len(mat)
 
   N = len(mat)
   to_remove = set([idx for idx, C in enumerate(clusters) if len(C) <= threshold])
@@ -166,34 +187,35 @@ def remove_small_clusters(mat, clusters, cidxs, threshold=1):
 
   filtered_mat = mat[to_keep,:][:,to_keep]
   filtered_clusters = [C for idx, C in enumerate(clusters) if idx not in to_remove]
-  filtered_cidxs = [C for idx, C in enumerate(cidxs) if idx not in to_remove]
-  assert len(filtered_clusters) == len(to_keep) == len(filtered_cidxs)
+  assert len(filtered_clusters) == len(to_keep)
 
-  return (filtered_mat, filtered_clusters, filtered_cidxs)
+  return (filtered_mat, filtered_clusters)
 
-def cluster_relations(model_probs):
-  relations = calc_relations(model_probs)
-  sidxs_toposort = toposort(relations)
+def cluster_relations(relations, remove_small):
+  sorted_idxs = toposort(relations)
   # Sort rows by toposorted indexes.
-  relations_toposort = np.array([_reorder_row(relations[idx], sidxs_toposort) for idx in sidxs_toposort])
+  relations = np.array([_reorder_row(relations[idx], sorted_idxs) for idx in sorted_idxs])
+  clusters = [[I] for I in sorted_idxs]
 
-  collapsed, idxmap = collapse_identical(relations_toposort)
-  row_to_sidx_map = dict(enumerate(sidxs_toposort))
-  clusters = [[row_to_sidx_map[rowidx] for rowidx in cluster] for cluster in idxmap]
-  cidxs = range(len(clusters))
-
-  return (collapsed, clusters, cidxs)
-
-def plot_relations_toposort(model_probs, outf, remove_small=False):
-  relations, clusters, cidxs = cluster_relations(model_probs)
+  relations, clusters = combine_identical_clusters(relations, clusters)
+  cidxs = list(range(len(clusters)))
   if remove_small:
-    relations, clusters, cidxs = remove_small_clusters(relations, clusters, cidxs)
+    relations, clusters = remove_small_clusters(relations, clusters)
+    relations, clusters = combine_identical_clusters(relations, clusters)
+    cidxs = list(range(len(clusters)))
+
+  return (relations, clusters, cidxs)
+
+def plot_relations_toposort(relations, outf, remove_small=False):
+  relations, clusters, cidxs = cluster_relations(relations, remove_small)
 
   colours = make_colour_matrix(relations, make_colour_from_category)
   labels = ['C%s' % I for I in cidxs]
   suffix = remove_small and 'small_excluded' or 'small_included'
   write_table('relations_toposort_%s' % suffix, relations, labels, colours, outf)
   write_cluster_map(clusters, cidxs, outf)
+
+  return (clusters, cidxs)
 
 def extract_B_A_rels(relations):
   ssmidxs = list(range(len(relations)))
@@ -241,18 +263,17 @@ def toposort(relations):
 
 def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn):
   should_cluster = not (output_type == 'unclustered')
+  relations = calc_relations(model_probs)
 
   with open(outfn, 'w') as outf:
     write_header(sampid, output_type, outf)
     write_legend(outf)
     if output_type != 'condensed':
       plot_individual(model_probs, should_cluster, outf)
-      plot_relations(model_probs, should_cluster, outf)
-    plot_relations_toposort(model_probs, outf)
-    plot_relations_toposort(model_probs, outf, remove_small=True)
-
-    _, clusters, cidxs = cluster_relations(model_probs)
-    plot_vaf_matrix(clusters, cidxs, ssmfn, paramsfn, spreadsheetfn, outf)
+      plot_relations(relations, should_cluster, outf)
+    for remove_small in (False, True):
+      clusters, cidxs = plot_relations_toposort(relations, outf, remove_small=remove_small)
+      plot_vaf_matrix(clusters, cidxs, ssmfn, paramsfn, spreadsheetfn, outf)
 
 def load_model_probs(model_probs_fn):
   with open(model_probs_fn) as F:

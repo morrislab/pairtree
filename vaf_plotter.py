@@ -31,7 +31,7 @@ def print_vafs(variants, cidxs, sampnames, outf):
   colours = assign_colours(cidxs)
 
   print('<style>#vafmatrix td, #vafmatrix { padding: 5px; margin: 0; border-collapse: collapse; } #vafmatrix th { transform: rotate(45deg); font-weight: normal !important; } #vafmatrix span { visibility: hidden; } #vafmatrix td:hover > span { visibility: visible; }</style>', file=outf)
-  print('<br><br><br><h2>VAFs</h2><table id="vafmatrix"><thead>', file=outf)
+  print('<br><br><br><table id="vafmatrix"><thead>', file=outf)
 
   header = ['Gene', 'ID', 'Chrom', 'Locus', 'Cluster']
   header += munge_samp_names(sampnames)
@@ -83,8 +83,6 @@ def plot_vaf_matrix(clusters, cidxs, ssmfn, paramsfn, spreadsheetfn, outf):
   sampnames = params['samples']
 
   variants = parse_ssms(ssmfn)
-  num_clustered_vars = sum([len(C) for C in clusters])
-  assert num_clustered_vars == len(variants)
 
   for V in variants.values():
     V['chrom'], V['pos'] = V['name'].split('_')
