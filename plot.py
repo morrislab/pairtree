@@ -119,21 +119,21 @@ def write_cluster_map(cmap, cidxs, outf):
     print('<tr><td style="font-weight: bold">C%s</td><td>%s</td></tr>' % (cidx, ssmidxs), file=outf)
   print('</tbody></table>', file=outf)
 
-def calc_mle(model_probs):
+def calc_relations(model_probs):
   mats = np.array([create_matrix(M, model_probs['model_probs'][M], model_probs['var_names']) for M in Models._all])
-  mle = np.argmax(mats, axis=0)
-  return mle
+  relations = np.argmax(mats, axis=0)
+  return relations
 
-def plot_mle(model_probs, should_cluster, outf):
-  mle = calc_mle(model_probs)
+def plot_relations(model_probs, should_cluster, outf):
+  relations = calc_relations(model_probs)
 
   if should_cluster:
-    mle, ssmidxs = cluster_rows(mle)
+    relations, ssmidxs = cluster_rows(relations)
   else:
-    ssmidxs = list(range(len(mle)))
+    ssmidxs = list(range(len(relations)))
 
-  colours = make_colour_matrix(mle, make_colour_from_category)
-  write_table('mle', mle, ['s%s' % I for I in ssmidxs], colours, outf)
+  colours = make_colour_matrix(relations, make_colour_from_category)
+  write_table('relations', relations, ['s%s' % I for I in ssmidxs], colours, outf)
 
 def collapse_identical(mat):
   '''Collapse identical rows & columns.'''
@@ -171,32 +171,32 @@ def remove_small_clusters(mat, clusters, cidxs, threshold=1):
 
   return (filtered_mat, filtered_clusters, filtered_cidxs)
 
-def cluster_mle(model_probs):
-  mle = calc_mle(model_probs)
-  sidxs_toposort = toposort(mle)
+def cluster_relations(model_probs):
+  relations = calc_relations(model_probs)
+  sidxs_toposort = toposort(relations)
   # Sort rows by toposorted indexes.
-  mle_toposort = np.array([_reorder_row(mle[idx], sidxs_toposort) for idx in sidxs_toposort])
+  relations_toposort = np.array([_reorder_row(relations[idx], sidxs_toposort) for idx in sidxs_toposort])
 
-  collapsed, idxmap = collapse_identical(mle_toposort)
+  collapsed, idxmap = collapse_identical(relations_toposort)
   row_to_sidx_map = dict(enumerate(sidxs_toposort))
   clusters = [[row_to_sidx_map[rowidx] for rowidx in cluster] for cluster in idxmap]
   cidxs = range(len(clusters))
 
   return (collapsed, clusters, cidxs)
 
-def plot_mle_toposort(model_probs, outf, remove_small=False):
-  mle, clusters, cidxs = cluster_mle(model_probs)
+def plot_relations_toposort(model_probs, outf, remove_small=False):
+  relations, clusters, cidxs = cluster_relations(model_probs)
   if remove_small:
-    mle, clusters, cidxs = remove_small_clusters(mle, clusters, cidxs)
+    relations, clusters, cidxs = remove_small_clusters(relations, clusters, cidxs)
 
-  colours = make_colour_matrix(mle, make_colour_from_category)
+  colours = make_colour_matrix(relations, make_colour_from_category)
   labels = ['C%s' % I for I in cidxs]
   suffix = remove_small and 'small_excluded' or 'small_included'
-  write_table('mle_toposort_%s' % suffix, mle, labels, colours, outf)
+  write_table('relations_toposort_%s' % suffix, relations, labels, colours, outf)
   write_cluster_map(clusters, cidxs, outf)
 
-def extract_B_A_rels(mle):
-  ssmidxs = list(range(len(mle)))
+def extract_B_A_rels(relations):
+  ssmidxs = list(range(len(relations)))
   A_B_rels, B_A_rels = set(), set()
   B_A_adjlist = {}
 
@@ -204,7 +204,7 @@ def extract_B_A_rels(mle):
     B_A_adjlist[sidx1] = set()
 
     for sidx2 in ssmidxs:
-      rel = mle[sidx1,sidx2]
+      rel = relations[sidx1,sidx2]
       if rel == Models.A_B:
         A_B_rels.add((sidx1, sidx2))
       elif rel == Models.B_A:
@@ -217,9 +217,9 @@ def extract_B_A_rels(mle):
 
   return B_A_adjlist
 
-def toposort(mle):
+def toposort(relations):
   # Algorithm taken from https://en.wikipedia.org/w/index.php?title=Topological_sorting&oldid=779516160#Kahn.27s_algorithm.
-  B_A_rels = extract_B_A_rels(mle)
+  B_A_rels = extract_B_A_rels(relations)
   topo_sorted = []
   indeg_zero = [vert for vert, ancs in B_A_rels.items() if len(ancs) == 0]
 
@@ -247,11 +247,11 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn
     write_legend(outf)
     if output_type != 'condensed':
       plot_individual(model_probs, should_cluster, outf)
-      plot_mle(model_probs, should_cluster, outf)
-    plot_mle_toposort(model_probs, outf)
-    plot_mle_toposort(model_probs, outf, remove_small=True)
+      plot_relations(model_probs, should_cluster, outf)
+    plot_relations_toposort(model_probs, outf)
+    plot_relations_toposort(model_probs, outf, remove_small=True)
 
-    _, clusters, cidxs = cluster_mle(model_probs)
+    _, clusters, cidxs = cluster_relations(model_probs)
     plot_vaf_matrix(clusters, cidxs, ssmfn, paramsfn, spreadsheetfn, outf)
 
 def load_model_probs(model_probs_fn):
