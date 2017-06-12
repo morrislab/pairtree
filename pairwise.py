@@ -2,13 +2,13 @@ import argparse
 import numpy as np
 import scipy.stats, scipy.misc
 import json
-from common import parse_ssms
+from common import parse_ssms, Models
 np.seterr(divide='raise')
 #from numba import jit
 
-def generate_logprob_phi(N, models):
+def generate_logprob_phi(N):
   prob = {}
-  for M in models:
+  for M in Models._all:
     prob[M] = np.zeros((N, N))
 
   for i in range(N):
@@ -37,17 +37,17 @@ def generate_logprob_phi(N, models):
   return logprob
 
 #@jit
-def _calc_model_prob(var1, var2, models):
+def _calc_model_prob(var1, var2):
   grid_step = 0.01
   N = int(1/grid_step + 1) # N: number of grid points
   G = 0.5 * np.linspace(start=0, stop=1, num=N)[:,np.newaxis] # Nx1
 
   S = len(var1['total_reads']) # S
-  logprob_phi = generate_logprob_phi(N, models) # MxNxN
-  logprob_models = np.zeros((S, len(models))) # SxM
+  logprob_phi = generate_logprob_phi(N) # MxNxN
+  logprob_models = np.zeros((S, len(Models._all))) # SxM
 
   for s in range(S):
-    for modelidx, model in enumerate(models):
+    for modelidx, model in enumerate(Models._all):
       pv1, pv2 = [scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], G) for V in (var1, var2)] # Nx1
       p1 = np.tile(pv1, N)   # pv1 vector tiled as columns
       p2 = np.tile(pv2, N).T # pv1 vector tiled as rows
@@ -60,43 +60,27 @@ def _calc_model_prob(var1, var2, models):
   return normpm
 
 #@jit
-def calc_posterior(variants, models):
+def calc_posterior(variants):
   N = len(variants)
   done = 0
   model_probs = {}
 
   for vidx1 in variants.keys():
     for vidx2 in variants.keys():
-      model_probs[(vidx1,vidx2)] = _calc_model_prob(variants[vidx1], variants[vidx2], models)
+      model_probs[(vidx1,vidx2)] = _calc_model_prob(variants[vidx1], variants[vidx2])
       done += 1
       print(vidx1, vidx2, '%.1f%%' % (100*(done / N**2)), model_probs[(vidx1,vidx2)], sep='\t')
 
   return model_probs
 
-def write_posterior(posterior, N, models, outfn):
-  out = np.zeros((N, N, len(models)))
-  used_pairs = set()
-
-  for vid1, vid2 in posterior.keys():
-    pair = (vid1, vid2)
-    vidx1 = int(vid1[1:])
-    vidx2 = int(vid2[1:])
-    post = { models[idx]: posterior[(vid1,vid2)][idx] for idx in range(len(models)) }
-    assert pair not in used_pairs
-    used_pairs.add(pair)
-    out[vidx1,vidx2] = post
-
-  assert len(used_pairs) == N**2
-  np.save(outfn, out)
-
-def write_posterior(posterior, variants, models, outfn):
+def write_posterior(posterior, variants, outfn):
   model_probs = {}
-  for midx, model in enumerate(models):
+  for midx, model in enumerate(Models._all):
     model_probs[model] = {'%s,%s' % (vid1, vid2): P[midx] for (vid1, vid2), P in posterior.items() }
 
   var_names = { V: variants[V]['name'] for V in variants.keys() }
   out = {
-    'models': models,
+    'models': Models._all,
     'model_probs': model_probs,
     'var_names': var_names,
   }
@@ -113,8 +97,7 @@ def main():
   args = parser.parse_args()
 
   variants = parse_ssms(args.ssm_fn)
-  models = ('cocluster', 'A_B', 'B_A', 'diff_branches')
-  posterior = calc_posterior(variants, models)
-  write_posterior(posterior, variants, models, args.out_fn)
+  posterior = calc_posterior(variants)
+  write_posterior(posterior, variants, args.out_fn)
 
 main()

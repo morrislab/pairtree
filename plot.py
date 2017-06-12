@@ -4,7 +4,7 @@ import json
 import numpy as np
 import sklearn.cluster
 import colorlover as cl
-from common import parse_ssms
+from common import parse_ssms, Models
 from vaf_plotter import plot_vaf_matrix
 np.set_printoptions(threshold=np.nan)
 
@@ -92,7 +92,7 @@ def write_table(model, mat, labels, colours, outf):
   print('</tbody></table>', file=outf)
 
 def plot_individual(model_probs, should_cluster, outf):
-  for model in model_probs['models']:
+  for model in Models._all:
     mat = create_matrix(model, model_probs['model_probs'][model], model_probs['var_names'])
     if should_cluster:
       mat, ssmidxs = cluster_rows(mat)
@@ -104,9 +104,9 @@ def plot_individual(model_probs, should_cluster, outf):
     colours = make_colour_matrix(mat, make_colour_from_intensity)
     write_table(model, mat, ['s%s' % I for I in ssmidxs], colours, outf)
 
-def write_legend(models, outf):
+def write_legend(outf):
   print('<br><table class="table"><tbody>', file=outf)
-  for midx, model in enumerate(models):
+  for midx, model in enumerate(Models._all):
     colour = make_colour_from_category(midx)
     print('<tr><td style="background-color: %s">%s</td></tr>' % (colour, model), file=outf)
   print('</tbody></table>', file=outf)
@@ -120,7 +120,7 @@ def write_cluster_map(cmap, cidxs, outf):
   print('</tbody></table>', file=outf)
 
 def calc_mle(model_probs):
-  mats = np.array([create_matrix(M, model_probs['model_probs'][M], model_probs['var_names']) for M in model_probs['models']])
+  mats = np.array([create_matrix(M, model_probs['model_probs'][M], model_probs['var_names']) for M in Models._all])
   mle = np.argmax(mats, axis=0)
   return mle
 
@@ -173,7 +173,7 @@ def remove_small_clusters(mat, clusters, cidxs, threshold=1):
 
 def cluster_mle(model_probs):
   mle = calc_mle(model_probs)
-  sidxs_toposort = toposort(mle, model_probs['models'])
+  sidxs_toposort = toposort(mle)
   # Sort rows by toposorted indexes.
   mle_toposort = np.array([_reorder_row(mle[idx], sidxs_toposort) for idx in sidxs_toposort])
 
@@ -195,7 +195,7 @@ def plot_mle_toposort(model_probs, outf, remove_small=False):
   write_table('mle_toposort_%s' % suffix, mle, labels, colours, outf)
   write_cluster_map(clusters, cidxs, outf)
 
-def extract_B_A_rels(mle, models):
+def extract_B_A_rels(mle):
   ssmidxs = list(range(len(mle)))
   A_B_rels, B_A_rels = set(), set()
   B_A_adjlist = {}
@@ -205,9 +205,9 @@ def extract_B_A_rels(mle, models):
 
     for sidx2 in ssmidxs:
       rel = mle[sidx1,sidx2]
-      if models[rel] == 'A_B':
+      if rel == Models.A_B:
         A_B_rels.add((sidx1, sidx2))
-      elif models[rel] == 'B_A':
+      elif rel == Models.B_A:
         B_A_rels.add((sidx1, sidx2))
         B_A_adjlist[sidx1].add(sidx2)
 
@@ -217,9 +217,9 @@ def extract_B_A_rels(mle, models):
 
   return B_A_adjlist
 
-def toposort(mle, models):
+def toposort(mle):
   # Algorithm taken from https://en.wikipedia.org/w/index.php?title=Topological_sorting&oldid=779516160#Kahn.27s_algorithm.
-  B_A_rels = extract_B_A_rels(mle, models)
+  B_A_rels = extract_B_A_rels(mle)
   topo_sorted = []
   indeg_zero = [vert for vert, ancs in B_A_rels.items() if len(ancs) == 0]
 
@@ -244,7 +244,7 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn
 
   with open(outfn, 'w') as outf:
     write_header(sampid, output_type, outf)
-    write_legend(model_probs['models'], outf)
+    write_legend(outf)
     if output_type != 'condensed':
       plot_individual(model_probs, should_cluster, outf)
       plot_mle(model_probs, should_cluster, outf)
