@@ -269,14 +269,41 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn
       plot_individual(model_probs, should_cluster, outf)
       plot_relations(relations, should_cluster, outf)
     for remove_small in (False, True):
-      relations, clusters, cidxs = cluster_relations(relations, remove_small)
+      clustered_relations, clusters, cidxs = cluster_relations(relations, remove_small)
       suffix = remove_small and 'small_excluded' or 'small_included'
-      plot_relations_toposort(relations, clusters, cidxs, suffix, outf)
+      plot_relations_toposort(clustered_relations, clusters, cidxs, suffix, outf)
       plot_vaf_matrix(clusters, cidxs, ssmfn, paramsfn, spreadsheetfn, outf)
+
+      if remove_small:
+        build_tree(clustered_relations, clusters, cidxs)
+        pass
 
 def load_model_probs(model_probs_fn):
   with open(model_probs_fn) as F:
     return json.load(F)
+
+def build_tree(relations, clusters, cidxs):
+  N = len(relations)
+  assert relations.shape == (N, N)
+  assert len(clusters) == len(cidxs) == N
+  assert relations[1,0] == Models.B_A
+
+  adj = {0: [1], 1: []}
+  for I in range(2, N):
+    adj[I] = []
+    I_placed = False
+
+    for J in reversed(range(I)):
+      if relations[I,J] == Models.B_A:
+        if I_placed is False:
+          adj[J].append(I)
+          I_placed = True
+      elif relations[I,J] == Models.diff_branches:
+        pass
+      else:
+        raise Exception('Unexpected relation for (%s,%s): %s' % (I, J, Models._all[relations[I,J]]))
+  print(adj)
+  return adj
 
 def main():
   parser = argparse.ArgumentParser(

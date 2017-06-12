@@ -8,6 +8,9 @@ OUTDIR=$BASEDIR/data/pairwise
 RENAMEDSAMPS=$BASEDIR/misc/renamed.txt
 HIDDENSAMPS=$BASEDIR/misc/hidden.txt
 
+OUTPUT_TYPES="clustered unclustered condensed"
+OUTPUT_TYPES="condensed"
+
 function rename_samples {
   for paramsfn in $SSMDIR/*.params.json; do
     sampid=$(basename $paramsfn | cut -d . -f1)
@@ -42,7 +45,7 @@ function plot {
     paramsfn=$SSMDIR/$sampid.params.json
     spreadsheetfn=$BASEDIR/data/ssms/$sampid.csv
 
-    for output_type in clustered unclustered condensed; do
+    for output_type in $OUTPUT_TYPES; do
       echo "python3 $PROTDIR/plot.py " \
 	"--output-type $output_type " \
 	"$sampid" \
@@ -57,7 +60,7 @@ function plot {
 
 function write_index {
   cd $OUTDIR
-  for status in clustered unclustered condensed; do
+  for status in $OUTPUT_TYPES; do
     echo "<h3>$status</h3>"
     for htmlfn in S*.$status.pairwise.html; do
       sampid=$(basename $htmlfn | cut -d. -f1)
@@ -70,7 +73,7 @@ function main {
   mkdir -p $OUTDIR
 
   #rename_samples
-  calc_pairwise
+  #calc_pairwise
   plot
   write_index
 }
