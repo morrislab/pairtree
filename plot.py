@@ -7,7 +7,10 @@ import colorlover as cl
 from common import parse_ssms, Models
 from vaf_plotter import plot_vaf_matrix
 from collections import defaultdict
+from tree_builder import build_tree
+
 np.set_printoptions(threshold=np.nan)
+np.random.seed(1)
 
 def create_matrix(model, model_probs, var_names):
   N = len(var_names)
@@ -261,6 +264,7 @@ def toposort(relations):
 def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn):
   should_cluster = not (output_type == 'unclustered')
   relations = calc_relations(model_probs)
+  variants = parse_ssms(ssmfn)
 
   with open(outfn, 'w') as outf:
     write_header(sampid, output_type, outf)
@@ -272,11 +276,10 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn
       clustered_relations, clusters, cidxs = cluster_relations(relations, remove_small)
       suffix = remove_small and 'small_excluded' or 'small_included'
       plot_relations_toposort(clustered_relations, clusters, cidxs, suffix, outf)
-      plot_vaf_matrix(clusters, cidxs, ssmfn, paramsfn, spreadsheetfn, outf)
+      plot_vaf_matrix(clusters, cidxs, variants, paramsfn, spreadsheetfn, outf)
 
       if remove_small:
-        adj = build_tree(clustered_relations, clusters, cidxs)
-        print(adj)
+        build_tree(clustered_relations, clusters, cidxs, variants)
 
 def load_model_probs(model_probs_fn):
   with open(model_probs_fn) as F:

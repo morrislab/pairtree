@@ -1,7 +1,6 @@
 import colorlover as cl
 import csv
 import json
-from common import parse_ssms
 
 def load_spreadsheet(spreadsheetfn):
   with open(spreadsheetfn) as S:
@@ -76,13 +75,11 @@ def get_next_colour():
   return scale[idx]
 get_next_colour._last_idx = -1
 
-def plot_vaf_matrix(clusters, cidxs, ssmfn, paramsfn, spreadsheetfn, outf):
+def plot_vaf_matrix(clusters, cidxs, variants, paramsfn, spreadsheetfn, outf):
   spreadsheet = load_spreadsheet(spreadsheetfn)
   with open(paramsfn) as P:
     params = json.load(P)
   sampnames = params['samples']
-
-  variants = parse_ssms(ssmfn)
 
   for V in variants.values():
     V['chrom'], V['pos'] = V['name'].split('_')
@@ -93,7 +90,8 @@ def plot_vaf_matrix(clusters, cidxs, ssmfn, paramsfn, spreadsheetfn, outf):
   ordered_variants = []
   for cidx, C in zip(cidxs, clusters):
     for V in C:
-      variant = variants['s%s' % V]
+      # Copy variant so we don't modify original dict.
+      variant = dict(variants['s%s' % V])
       variant['cluster'] = cidx
       ordered_variants.append(variant)
   print_vafs(ordered_variants, cidxs, sampnames, outf)
