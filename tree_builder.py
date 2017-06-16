@@ -51,8 +51,13 @@ def calc_llh(var_reads, ref_reads, A, Z, psi):
   return np.sum(mut_probs)
 
 def extract_mut_info(clusters, cidxs, variants):
+  # Renumber variants so their indices are contiguous. They may not be
+  # contiguous, e.g., when singleton clusters are removed.
+  used_vars = set([V for C in clusters for V in C])
+  var_map = {old: new for (new, old) in enumerate(sorted(used_vars))}
+
   S = len(list(variants.values())[0]['total_reads']) # Number of samples
-  M = len(variants)
+  M = len(used_vars)
   K = len(cidxs)
   assert set(cidxs) == set(range(K))
 
@@ -64,32 +69,43 @@ def extract_mut_info(clusters, cidxs, variants):
     for V in C:
       # Copy variant so we don't modify original dict.
       variant = variants['s%s' % V]
-      A[V,cidx] = 1
-      ref_reads[V] = variant['ref_reads']
-      var_reads[V] = variant['var_reads']
+      varidx = var_map[V]
+      A[varidx,cidx] = 1
+      ref_reads[varidx] = variant['ref_reads']
+      var_reads[varidx] = variant['var_reads']
 
   return (A, ref_reads, var_reads)
 
-def fit_all_phis(adj, clusters, cidxs, variants):
+def fit_all_phis(adj, A, ref_reads, var_reads):
   Z = calc_Z(adj)
-  A, ref_reads, var_reads = extract_mut_info(clusters, cidxs, variants)
   M, K = A.shape
   _, S = ref_reads.shape
   psi = np.zeros((S, K))
 
   for s in range(S):
-    psi[s] = np.random.normal(size=K)
-    llh = calc_llh(var_reads[:,s], ref_reads[:,s], A, Z, psi[s])
-    print('sample', s, llh)
+    psi[s] = grad_desc(var_reads[:,s], ref_reads[:,s], A, Z)
 
-def _calc_grad(var_reads, ref_reads, A, Z, psi):
+def calc_grad(var_reads, ref_reads, A, Z, psi):
+  M, K = A.shape
+  AZ = np.dot(A, Z) # MxK
+
   mut_p = calc_mut_p(A, Z, psi)
-  grad = (var_reads / mut_p) - (ref_reads / (1 - mut_p))
+  binom_grad = (var_reads / mut_p) - (ref_reads / (1 - mut_p)) # Mx1
+  assert len(binom_grad) == M
 
   eta = softmax(psi)
+  eta_rows = np.tile(eta, (K, 1))
+  softmax_grad = eta_rows * (np.eye(K) - eta_rows.T) # KxK
 
+  grad_elem = np.zeros((M, K))
+  for m in range(M):
+    active_b = softmax_grad * np.tile(AZ[m], (K, 1))
+    grad_elem[m] = binom_grad[m] * np.sum(active_b, axis=1)
 
-def grad_desc(var_reads, ref_reads, Z):
+  grad = 0.5 * np.sum(grad_elem, axis=0)
+  return grad
+
+def grad_desc(var_reads, ref_reads, A, Z):
   learn_rate = 0.5
   iterations = 1000
 
@@ -98,11 +114,23 @@ def grad_desc(var_reads, ref_reads, Z):
 
   last_llh = -float('inf')
   last_psi = None
+  psi = np.random.normal(size=K)
 
   for I in range(iterations):
-    grad = 
+    grad = calc_grad(var_reads, ref_reads, A, Z, psi)
+    psi += learn_rate * grad
+    llh = calc_llh(var_reads, ref_reads, A, Z, psi)
 
-
+    if llh > last_llh:
+      print('%s\tkeep\t%.2e\t%.2e' % (I, learn_rate, llh))
+      last_llh = llh
+      last_psi = psi
+      learn_rate *= 1.1
+    else:
+      print('%s\trevert\t%.2e\t%.2e' % (I, learn_rate, llh))
+      llh = last_llh
+      psi = last_psi
+      learn_rate *= 0.5
 
 def softmax(X):
   b = np.max(X)
@@ -134,4 +162,5 @@ def make_adj(relations):
 
 def build_tree(relations, clusters, cidxs, variants):
   adj = make_adj(relations)
-  fit_all_phis(adj, clusters, cidxs, variants)
+  A, ref_reads, var_reads = extract_mut_info(clusters, cidxs, variants)
+  fit_all_phis(adj, A, ref_reads, var_reads)
