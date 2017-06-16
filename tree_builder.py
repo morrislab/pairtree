@@ -13,18 +13,13 @@ def calc_Z(adj):
   K = len(adj)
   Z = np.zeros((K,K))
 
-  def _find_desc(vec):
-    # Given parent->child vector (i.e., row from `adj`), compute
-    # parent->child->grandchild vector. Applying this recursively transforms
-    # parent->child vector to parent->descendant vector.
-
+  def _find_desc(I, vec):
     # Base case: if I have no children, my ancestor vec is just myself.
-    leaf_vec = np.eye(K)[K - 1]
-    if np.array_equal(vec, leaf_vec):
+    if np.sum(vec) == 0:
       return vec
     else:
-      vec = vec[np.newaxis,:] # K -> 1xK
-      self_and_child = np.dot(vec, adj) # Adjacency vector for self and child
+      children = np.array([_find_desc(idx, adj[idx]) for (idx, val) in enumerate(vec) if idx != I and val == 1])
+      self_and_child = vec + np.sum(children, axis=0)
       self_and_child[self_and_child > 1] = 1
       return self_and_child
 
@@ -33,7 +28,7 @@ def calc_Z(adj):
     # this -- we would start at leaves and work our way upward, eliminating
     # need for recursive DFS. But since we don't expect `K` to be large, we can
     # write more general version that works for non-toposorted trees.
-    Z[k] = _find_desc(adj[k])
+    Z[k] = _find_desc(k, adj[k])
 
   return Z
 
@@ -81,9 +76,13 @@ def fit_all_phis(adj, A, ref_reads, var_reads):
   M, K = A.shape
   _, S = ref_reads.shape
   psi = np.zeros((S, K))
+  phi = np.zeros((S, K))
 
   for s in range(S):
     psi[s] = grad_desc(var_reads[:,s], ref_reads[:,s], A, Z)
+    phi[s] = np.dot(Z, softmax(psi[s]))
+
+  return phi
 
 def calc_grad(var_reads, ref_reads, A, Z, psi):
   M, K = A.shape
@@ -102,11 +101,21 @@ def calc_grad(var_reads, ref_reads, A, Z, psi):
     active_b = softmax_grad * np.tile(AZ[m], (K, 1))
     grad_elem[m] = binom_grad[m] * np.sum(active_b, axis=1)
 
-  grad = 0.5 * np.sum(grad_elem, axis=0)
+  grad = 0.5 * np.sum(grad_elem, axis=0) / M
+  return grad
+
+def calc_grad_numerical(var_reads, ref_reads, A, Z, psi):
+  _, K = A.shape
+  grad = np.zeros(K)
+  for k in range(K):
+    delta = 1e-20
+    P = np.copy(psi)
+    P[k] += delta
+    grad[k] = (calc_llh(var_reads, ref_reads, A, Z, P) - calc_llh(var_reads, ref_reads, A, Z, psi)) / delta
   return grad
 
 def grad_desc(var_reads, ref_reads, A, Z):
-  learn_rate = 0.5
+  learn_rate = 1e-4
   iterations = 1000
 
   K = len(Z)
@@ -118,6 +127,9 @@ def grad_desc(var_reads, ref_reads, A, Z):
 
   for I in range(iterations):
     grad = calc_grad(var_reads, ref_reads, A, Z, psi)
+    #grad_num = calc_grad_numerical(var_reads, ref_reads, A, Z, psi)
+    #print(grad - grad_num)
+
     psi += learn_rate * grad
     llh = calc_llh(var_reads, ref_reads, A, Z, psi)
 
@@ -127,10 +139,12 @@ def grad_desc(var_reads, ref_reads, A, Z):
       last_psi = psi
       learn_rate *= 1.1
     else:
-      print('%s\trevert\t%.2e\t%.2e' % (I, learn_rate, llh))
+      #print('%s\trevert\t%.2e\t%.2e' % (I, learn_rate, llh))
       llh = last_llh
       psi = last_psi
       learn_rate *= 0.5
+
+  return psi
 
 def softmax(X):
   b = np.max(X)
@@ -163,4 +177,6 @@ def make_adj(relations):
 def build_tree(relations, clusters, cidxs, variants):
   adj = make_adj(relations)
   A, ref_reads, var_reads = extract_mut_info(clusters, cidxs, variants)
-  fit_all_phis(adj, A, ref_reads, var_reads)
+  phi = fit_all_phis(adj, A, ref_reads, var_reads)
+
+  print(adj, phi)
