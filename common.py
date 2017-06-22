@@ -29,3 +29,26 @@ def parse_ssms(ssmfn):
 
   return variants
 
+def make_ancestral_from_adj(adj):
+  K = len(adj)
+  Z = np.zeros((K,K))
+
+  def _find_desc(I, vec):
+    # Base case: if I have no children, my ancestor vec is just myself.
+    if np.sum(vec) == 0:
+      return vec
+    else:
+      children = np.array([_find_desc(idx, adj[idx]) for (idx, val) in enumerate(vec) if idx != I and val == 1])
+      self_and_child = vec + np.sum(children, axis=0)
+      self_and_child[self_and_child > 1] = 1
+      return self_and_child
+
+  for k in range(K):
+    # If we know `adj` is topologically sorted, we can reduce the complexity of
+    # this -- we would start at leaves and work our way upward, eliminating
+    # need for recursive DFS. But since we don't expect `K` to be large, we can
+    # write more general version that works for non-toposorted trees.
+    Z[k] = _find_desc(k, adj[k])
+
+  return Z
+

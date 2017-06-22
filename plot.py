@@ -123,9 +123,19 @@ def write_cluster_map(cmap, cidxs, outf):
     print('<tr><td style="font-weight: bold">C%s</td><td>%s</td></tr>' % (cidx, ssmidxs), file=outf)
   print('</tbody></table>', file=outf)
 
+def create_model_prob_tensor(model_probs):
+  M = len(model_probs['var_names'])
+  num_models = len(Models._all)
+  tensor = np.zeros((M, M, num_models))
+  for midx, mdl in enumerate(Models._all):
+    tensor[:,:,midx] = create_matrix(mdl, model_probs['model_probs'][mdl], model_probs['var_names'])
+  return tensor
+
 def calc_relations(model_probs):
-  mats = np.array([create_matrix(M, model_probs['model_probs'][M], model_probs['var_names']) for M in Models._all])
-  relations = np.argmax(mats, axis=0)
+  tensor = create_model_prob_tensor(model_probs)
+  M = len(tensor)
+  relations = np.argmax(tensor, axis=2)
+  assert relations.shape == (M, M)
   return relations
 
 def plot_relations(relations, should_cluster, outf):
@@ -261,6 +271,48 @@ def toposort(relations):
     raise Exception('Graph has cycle')
   return topo_sorted
 
+def euclid_dist(A, B):
+  return np.sqrt(np.sum((B - A)**2))
+
+def find_closest(tensor, target):
+  # Find matrix in tensor that's closest to `target` in Euclidean distance.
+  min_dist = float('inf')
+  best_idx = None
+
+  for idx, mat in enumerate(tensor):
+    dist = euclid_dist(mat, target)
+    if dist < min_dist:
+      min_dist = dist
+      best_idx = idx
+
+  assert best_idx is not None
+  return best_idx
+
+def assign_missing(clusters, model_probs):
+  K = len(clusters)
+  # Repalce dictionary with tensor.
+  model_probs = create_model_prob_tensor(model_probs)
+  M = len(model_probs)
+
+  already_assigned = set([midx for cluster in clusters for midx in cluster])
+  missing = set(range(M)) - already_assigned
+
+  # Mean relations of members.
+  cluster_rels = np.array([np.mean(np.array([model_probs[midx] for midx in cluster]), axis=0) for cluster in clusters])
+  assert cluster_rels.shape == (K, M, len(Models._all))
+
+  for midx in missing:
+    closest_cluster_idx = find_closest(cluster_rels, model_probs[midx])
+    clusters[closest_cluster_idx].append(midx)
+
+  for cluster in clusters:
+    cluster.sort()
+
+  assigned = set([midx for cluster in clusters for midx in cluster])
+  assert len(assigned) == M
+  assert  assigned == already_assigned | missing
+  return clusters
+
 def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn):
   should_cluster = not (output_type == 'unclustered')
   relations = calc_relations(model_probs)
@@ -274,9 +326,13 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn
       plot_relations(relations, should_cluster, outf)
     for remove_small in (False, True):
       clustered_relations, clusters, cidxs = cluster_relations(relations, remove_small)
+      if remove_small:
+        assign_missing(clusters, model_probs)
+
       suffix = remove_small and 'small_excluded' or 'small_included'
       plot_relations_toposort(clustered_relations, clusters, cidxs, suffix, outf)
       plot_vaf_matrix(clusters, cidxs, variants, paramsfn, spreadsheetfn, outf)
+      continue
 
       if remove_small:
         build_tree(clustered_relations, clusters, cidxs, variants)
