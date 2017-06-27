@@ -3,8 +3,8 @@ import scipy.stats
 import common
 
 # Matrices: M mutations, K clusters
-#   adj: KxK, adjacency matrix
-#   Z: KxK, Z[a,b]=1 iff cluster a is ancestral to cluster b
+#   adj: KxK, adjacency matrix -- adj[a,b]=1 iff a is parent of b (with 1 on diagonal)
+#   Z: KxK, Z[a,b]=1 iff cluster a is ancestral to cluster b (with 1 on diagonal)
 #   A: MxK, A[m,k]=1 iff mut m is in cluster k
 #   phi: Kx1, per-cluster phis
 #   mut_phi: Mx1, per-mutation phis

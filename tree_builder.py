@@ -58,6 +58,4 @@ def build_tree(relations, clusters, cidxs, variants):
   adj = make_adj(relations)
   A, ref_reads, var_reads = extract_mut_info(clusters, cidxs, variants)
   phi = fit_all_phis(adj, A, ref_reads, var_reads)
-
-
   print(adj, phi)

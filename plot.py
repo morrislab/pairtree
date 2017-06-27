@@ -7,7 +7,8 @@ import colorlover as cl
 from common import parse_ssms, Models
 from vaf_plotter import plot_vaf_matrix
 from collections import defaultdict
-from tree_builder import build_tree
+import tree_sampler
+import tree_builder
 
 np.set_printoptions(threshold=np.nan)
 np.random.seed(1)
@@ -132,9 +133,8 @@ def create_model_prob_tensor(model_probs):
   return tensor
 
 def calc_relations(model_probs):
-  tensor = create_model_prob_tensor(model_probs)
-  M = len(tensor)
-  relations = np.argmax(tensor, axis=2)
+  M = len(model_probs)
+  relations = np.argmax(model_probs, axis=2)
   assert relations.shape == (M, M)
   return relations
 
@@ -290,8 +290,6 @@ def find_closest(tensor, target):
 
 def assign_missing(clusters, model_probs):
   K = len(clusters)
-  # Repalce dictionary with tensor.
-  model_probs = create_model_prob_tensor(model_probs)
   M = len(model_probs)
 
   already_assigned = set([midx for cluster in clusters for midx in cluster])
@@ -315,7 +313,8 @@ def assign_missing(clusters, model_probs):
 
 def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn):
   should_cluster = not (output_type == 'unclustered')
-  relations = calc_relations(model_probs)
+  model_probs_tensor = create_model_prob_tensor(model_probs)
+  relations = calc_relations(model_probs_tensor)
   variants = parse_ssms(ssmfn)
 
   with open(outfn, 'w') as outf:
@@ -326,16 +325,19 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn
       plot_relations(relations, should_cluster, outf)
     for remove_small in (False, True):
       clustered_relations, clusters, cidxs = cluster_relations(relations, remove_small)
+
       if remove_small:
-        assign_missing(clusters, model_probs)
+        assign_missing(clusters, model_probs_tensor)
+        tree_sampler.sample_trees(model_probs_tensor, clusters, cidxs)
+        handbuilt = tree_builder.make_adj(clustered_relations)
+        print('handbuilt', adjlol)
 
       suffix = remove_small and 'small_excluded' or 'small_included'
       plot_relations_toposort(clustered_relations, clusters, cidxs, suffix, outf)
       plot_vaf_matrix(clusters, cidxs, variants, paramsfn, spreadsheetfn, outf)
-      continue
 
-      if remove_small:
-        build_tree(clustered_relations, clusters, cidxs, variants)
+      #if remove_small:
+        #build_tree(clustered_relations, clusters, cidxs, variants)
 
 def load_model_probs(model_probs_fn):
   with open(model_probs_fn) as F:
