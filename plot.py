@@ -310,6 +310,26 @@ def assign_missing(clusters, model_probs):
   assert  assigned == already_assigned | missing
   return clusters
 
+def find_root_node(adj):
+  K = len(adj)
+  assert adj.shape == (K, K)
+  assert np.array_equal(np.diag(adj), np.ones(K))
+  assert np.sum(adj) == K + (K - 1)
+  assert np.array_equal(np.sort(np.sum(adj, axis=0)), np.array([1] + (K - 1)*[2]))
+  num_parents = np.sum(adj, axis=0) - 1
+  root = np.where(num_parents == 0)[0][0]
+  return int(root) # Must convert from NumPy int.
+
+def add_normal_root(adj, clusters):
+  old_root = find_root_node(adj)
+  for axis in (0, 1):
+    # Insert additional first row & column of zeroes.
+    adj = np.insert(adj, 0, 0, axis=axis)
+  # Add root non-cancerous node.
+  adj[0,0] = adj[0,old_root+1] = 1
+  clusters.insert(0, [])
+  return (adj, clusters)
+
 def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn, treesummfn, mutlistfn):
   should_cluster = not (output_type == 'unclustered')
   model_probs_tensor = create_model_prob_tensor(model_probs)
@@ -330,7 +350,7 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn
         sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, clusters)
         handbuilt_adjm = tree_builder.make_adj(clustered_relations)
 
-        adj = sampled_adjm[-1]
+        adj, clusters = add_normal_root(sampled_adjm[-1], clusters)
         phi = phi_fitter.fit_phis(adj, clusters, variants)
         print('phi', phi)
 

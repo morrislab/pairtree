@@ -88,7 +88,7 @@ def sample_trees(model_probs, clusters):
     new_adj = permute_adj(old_adj)
     cluster_anc = make_mut_ancestry_from_cluster_adj(new_adj, clusters)
     new_llh = calc_llh(ancestry_probs, cluster_anc)
-    if new_llh - old_llh > np.log(np.random.uniform()):
+    if False or new_llh - old_llh > np.log(np.random.uniform()):
       # Accept.
       cluster_adj.append(new_adj)
       llh.append(new_llh)

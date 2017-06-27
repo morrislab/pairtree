@@ -17,16 +17,6 @@ def convert_adj_matrix_to_adj_list(adjm):
 
   return adjl
 
-def find_root_node(adj):
-  K = len(adj)
-  assert adj.shape == (K, K)
-  assert np.array_equal(np.diag(adj), np.ones(K))
-  assert np.sum(adj) == K + (K - 1)
-  assert np.array_equal(np.sort(np.sum(adj, axis=0)), np.array([1] + (K - 1)*[2]))
-  num_parents = np.sum(adj, axis=0) - 1
-  root = np.where(num_parents == 0)[0][0]
-  return int(root) # Must convert from NumPy int.
-
 def generate_treesumm(clusters, nsamples, adjmats, llh, handbuilt_adjm):
   result = {
     'trees': {},
@@ -44,7 +34,7 @@ def generate_treesumm(clusters, nsamples, adjmats, llh, handbuilt_adjm):
       'llh': llh,
       'populations': pops,
       'structure': convert_adj_matrix_to_adj_list(adjmat),
-      'root': find_root_node(adjmat),
+      'root': 0,
     }
 
   if handbuilt_adjm is not None:

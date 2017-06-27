@@ -51,4 +51,3 @@ def make_ancestral_from_adj(adj):
     Z[k] = _find_desc(k, adj[k])
 
   return Z
-
