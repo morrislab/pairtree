@@ -17,7 +17,7 @@ def convert_adj_matrix_to_adj_list(adjm):
 
   return adjl
 
-def generate_treesumm(clusters, nsamples, adjmats, llh, handbuilt_adjm):
+def generate_treesumm(clusters, nsamples, adjmats, llh):
   result = {
     'trees': {},
   }
@@ -35,13 +35,6 @@ def generate_treesumm(clusters, nsamples, adjmats, llh, handbuilt_adjm):
       'populations': pops,
       'structure': convert_adj_matrix_to_adj_list(adjmat),
       'root': 0,
-    }
-
-  if handbuilt_adjm is not None:
-    result['trees']['-1'] = {
-      'llh': 0,
-      'populations': pops,
-      'structure': convert_adj_matrix_to_adj_list(handbuilt_adjm),
     }
 
   return result
@@ -62,9 +55,9 @@ def generate_mutlist(variants):
 
   return mutlist
 
-def write_json(sampid, clusters, adjmats, llh, handbuilt_adjm, variants, treesummfn, mutlistfn):
+def write_json(sampid, variants, clusters, adjmats, llh, treesummfn, mutlistfn):
   nsamples = len(list(variants.values())[0]['total_reads'])
-  treesumm = generate_treesumm(clusters, nsamples, adjmats, llh, handbuilt_adjm)
+  treesumm = generate_treesumm(clusters, nsamples, adjmats, llh)
   mutlist = generate_mutlist(variants)
 
   for results in (treesumm, mutlist):

@@ -320,15 +320,14 @@ def find_root_node(adj):
   root = np.where(num_parents == 0)[0][0]
   return int(root) # Must convert from NumPy int.
 
-def add_normal_root(adj, clusters):
+def add_normal_root(adj):
   old_root = find_root_node(adj)
   for axis in (0, 1):
     # Insert additional first row & column of zeroes.
     adj = np.insert(adj, 0, 0, axis=axis)
   # Add root non-cancerous node.
   adj[0,0] = adj[0,old_root+1] = 1
-  clusters.insert(0, [])
-  return (adj, clusters)
+  return adj
 
 def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn, treesummfn, mutlistfn):
   should_cluster = not (output_type == 'unclustered')
@@ -348,13 +347,18 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn
       if remove_small:
         assign_missing(clusters, model_probs_tensor)
         sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, clusters)
-        handbuilt_adjm = tree_builder.make_adj(clustered_relations)
 
-        adj, clusters = add_normal_root(sampled_adjm[-1], clusters)
-        phi = phi_fitter.fit_phis(adj, clusters, variants)
+        handbuilt_adjm = tree_builder.make_adj(clustered_relations)
+        sampled_adjm.insert(0, handbuilt_adjm)
+        sampled_llh.insert(0, 0)
+
+        sampled_adjm = [add_normal_root(adj) for adj in sampled_adjm]
+        clusters.insert(0, [])
+
+        phi = phi_fitter.fit_phis(sampled_adjm[0], clusters, variants)
         print('phi', phi)
 
-        json_writer.write_json(sampid, clusters, sampled_adjm, sampled_llh, handbuilt_adjm, variants, treesummfn, mutlistfn)
+        json_writer.write_json(sampid, variants, clusters, sampled_adjm, sampled_llh, treesummfn, mutlistfn)
 
       suffix = remove_small and 'small_excluded' or 'small_included'
       plot_relations_toposort(clustered_relations, clusters, suffix, outf)
