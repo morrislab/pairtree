@@ -22,8 +22,8 @@ def calc_llh(var_reads, ref_reads, A, Z, psi):
   mut_probs = scipy.stats.binom.logpmf(var_reads, total_reads, mut_p)
   return np.sum(mut_probs)
 
-def fit_phis(adj, clusters, cidxs, variants):
-  A, ref_reads, var_reads = extract_mut_info(clusters, cidxs, variants)
+def fit_phis(adj, clusters, variants):
+  A, ref_reads, var_reads = extract_mut_info(clusters, variants)
   return fit_all_phis(adj, A, ref_reads, var_reads)
 
 def fit_all_phis(adj, A, ref_reads, var_reads):
@@ -106,7 +106,7 @@ def softmax(X):
   logS = X - (b + np.log(np.sum(np.exp(X - b))))
   return np.exp(logS)
 
-def extract_mut_info(clusters, cidxs, variants):
+def extract_mut_info(clusters, variants):
   # Renumber variants so their indices are contiguous. They may not be
   # contiguous, e.g., when singleton clusters are removed.
   used_vars = set([V for C in clusters for V in C])
@@ -114,14 +114,13 @@ def extract_mut_info(clusters, cidxs, variants):
 
   S = len(list(variants.values())[0]['total_reads']) # Number of samples
   M = len(used_vars)
-  K = len(cidxs)
-  assert set(cidxs) == set(range(K))
+  K = len(clusters)
 
   A = np.zeros((M, K))
   ref_reads = np.zeros((M, S))
   var_reads = np.zeros((M, S))
 
-  for cidx, C in zip(cidxs, clusters):
+  for cidx, C in enumerate(clusters):
     for V in C:
       # Copy variant so we don't modify original dict.
       variant = variants['s%s' % V]

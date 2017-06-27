@@ -118,10 +118,9 @@ def write_legend(outf):
     print('<tr><td style="background-color: %s">%s</td></tr>' % (colour, model), file=outf)
   print('</tbody></table>', file=outf)
 
-def write_cluster_map(cmap, cidxs, outf):
-  assert len(cmap) == len(cidxs)
+def write_cluster_map(cmap, outf):
   print('<br><table class="table"><thead><tr><th>Cluster</th><th>SSMs</th></tr></thead><tbody>', file=outf)
-  for cidx, ssmidxs in zip(cidxs, cmap):
+  for cidx, ssmidxs in enumerate(cmap):
     ssmidxs = ', '.join(['s%s' % I for I in sorted(ssmidxs)])
     print('<tr><td style="font-weight: bold">C%s</td><td>%s</td></tr>' % (cidx, ssmidxs), file=outf)
   print('</tbody></table>', file=outf)
@@ -213,21 +212,19 @@ def cluster_relations(relations, remove_small):
   clusters = [[I] for I in sorted_idxs]
 
   relations, clusters = combine_identical_clusters(relations, clusters)
-  cidxs = list(range(len(clusters)))
   if remove_small:
     relations, clusters = remove_small_clusters(relations, clusters)
     relations, clusters = combine_identical_clusters(relations, clusters)
-    cidxs = list(range(len(clusters)))
 
-  return (relations, clusters, cidxs)
+  return (relations, clusters)
 
-def plot_relations_toposort(relations, clusters, cidxs, suffix, outf):
+def plot_relations_toposort(relations, clusters, suffix, outf):
   colours = make_colour_matrix(relations, make_colour_from_category)
-  labels = ['C%s' % I for I in cidxs]
+  labels = ['C%s' % I for I in range(len(clusters))]
   write_table('relations_toposort_%s' % suffix, relations, labels, colours, outf)
-  write_cluster_map(clusters, cidxs, outf)
+  write_cluster_map(clusters, outf)
 
-  return (clusters, cidxs)
+  return clusters
 
 def extract_B_A_rels(relations):
   ssmidxs = list(range(len(relations)))
@@ -326,23 +323,22 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn
       plot_individual(model_probs, should_cluster, outf)
       plot_relations(relations, should_cluster, outf)
     for remove_small in (False, True):
-      # TODO: remove cidxs. They're an artifact of a dumb way of doing things.
-      clustered_relations, clusters, cidxs = cluster_relations(relations, remove_small)
+      clustered_relations, clusters = cluster_relations(relations, remove_small)
 
       if remove_small:
         assign_missing(clusters, model_probs_tensor)
-        sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, clusters, cidxs)
+        sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, clusters)
         handbuilt_adjm = tree_builder.make_adj(clustered_relations)
 
         adj = sampled_adjm[-1]
-        phi = phi_fitter.fit_phis(adj, clusters, cidxs, variants)
+        phi = phi_fitter.fit_phis(adj, clusters, variants)
         print('phi', phi)
 
         json_writer.write_json(sampid, clusters, sampled_adjm, sampled_llh, handbuilt_adjm, variants, treesummfn, mutlistfn)
 
       suffix = remove_small and 'small_excluded' or 'small_included'
-      plot_relations_toposort(clustered_relations, clusters, cidxs, suffix, outf)
-      plot_vaf_matrix(clusters, cidxs, variants, paramsfn, spreadsheetfn, outf)
+      plot_relations_toposort(clustered_relations, clusters, suffix, outf)
+      plot_vaf_matrix(clusters, variants, paramsfn, spreadsheetfn, outf)
 
 def load_model_probs(model_probs_fn):
   with open(model_probs_fn) as F:

@@ -26,8 +26,8 @@ def load_spreadsheet(spreadsheetfn):
 def munge_samp_names(sampnames):
   return [S.replace('Diagnosis Xeno ', 'DX').replace('Relapse Xeno ', 'RX') for S in sampnames]
 
-def print_vafs(variants, cidxs, sampnames, outf):
-  colours = assign_colours(cidxs)
+def print_vafs(variants, clusters, sampnames, outf):
+  colours = assign_colours(clusters)
 
   print('<style>#vafmatrix td, #vafmatrix { padding: 5px; margin: 0; border-collapse: collapse; } #vafmatrix th { transform: rotate(45deg); font-weight: normal !important; } #vafmatrix span { visibility: hidden; } #vafmatrix td:hover > span { visibility: visible; }</style>', file=outf)
   print('<br><br><br><table id="vafmatrix"><thead>', file=outf)
@@ -60,8 +60,8 @@ def make_vaf_label(vaf):
 
 def assign_colours(clusters):
   colours = {}
-  for C in sorted(clusters):
-    colours[C] = get_next_colour()
+  for cidx in range(len(clusters)):
+    colours[cidx] = get_next_colour()
   colours['NA'] = '#fff'
   return colours
 
@@ -75,7 +75,7 @@ def get_next_colour():
   return scale[idx]
 get_next_colour._last_idx = -1
 
-def plot_vaf_matrix(clusters, cidxs, variants, paramsfn, spreadsheetfn, outf):
+def plot_vaf_matrix(clusters, variants, paramsfn, spreadsheetfn, outf):
   spreadsheet = load_spreadsheet(spreadsheetfn)
   with open(paramsfn) as P:
     params = json.load(P)
@@ -88,10 +88,10 @@ def plot_vaf_matrix(clusters, cidxs, variants, paramsfn, spreadsheetfn, outf):
     V['vaf'] = V['var_reads'] / V['total_reads']
 
   ordered_variants = []
-  for cidx, C in zip(cidxs, clusters):
+  for cidx, C in enumerate(clusters):
     for V in C:
       # Copy variant so we don't modify original dict.
       variant = dict(variants['s%s' % V])
       variant['cluster'] = cidx
       ordered_variants.append(variant)
-  print_vafs(ordered_variants, cidxs, sampnames, outf)
+  print_vafs(ordered_variants, clusters, sampnames, outf)

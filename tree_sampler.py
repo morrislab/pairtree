@@ -75,7 +75,7 @@ def permute_adj(adj):
   return adj
 permute_adj.blah = set()
 
-def sample_trees(model_probs, clusters, cidxs):
+def sample_trees(model_probs, clusters):
   ancestry_probs = make_ancestry_probs(model_probs)
   K = len(clusters)
 
