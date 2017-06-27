@@ -9,6 +9,7 @@ from vaf_plotter import plot_vaf_matrix
 from collections import defaultdict
 import tree_sampler
 import tree_builder
+import json_writer
 
 np.set_printoptions(threshold=np.nan)
 np.random.seed(1)
@@ -311,7 +312,7 @@ def assign_missing(clusters, model_probs):
   assert  assigned == already_assigned | missing
   return clusters
 
-def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn):
+def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn, treesummfn, mutlistfn):
   should_cluster = not (output_type == 'unclustered')
   model_probs_tensor = create_model_prob_tensor(model_probs)
   relations = calc_relations(model_probs_tensor)
@@ -324,20 +325,19 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn
       plot_individual(model_probs, should_cluster, outf)
       plot_relations(relations, should_cluster, outf)
     for remove_small in (False, True):
+      # TODO: remove cidxs. They're an artifact of a dumb way of doing things.
       clustered_relations, clusters, cidxs = cluster_relations(relations, remove_small)
 
       if remove_small:
         assign_missing(clusters, model_probs_tensor)
-        tree_sampler.sample_trees(model_probs_tensor, clusters, cidxs)
-        handbuilt = tree_builder.make_adj(clustered_relations)
-        print('handbuilt', adjlol)
+        sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, clusters, cidxs)
+        handbuilt_adjm = tree_builder.make_adj(clustered_relations)
+        json_writer.write_json(sampid, clusters, sampled_adjm, sampled_llh, handbuilt_adjm, variants, treesummfn, mutlistfn)
+        #build_tree(clustered_relations, clusters, cidxs, variants)
 
       suffix = remove_small and 'small_excluded' or 'small_included'
       plot_relations_toposort(clustered_relations, clusters, cidxs, suffix, outf)
       plot_vaf_matrix(clusters, cidxs, variants, paramsfn, spreadsheetfn, outf)
-
-      #if remove_small:
-        #build_tree(clustered_relations, clusters, cidxs, variants)
 
 def load_model_probs(model_probs_fn):
   with open(model_probs_fn) as F:
@@ -355,9 +355,11 @@ def main():
   parser.add_argument('params_fn')
   parser.add_argument('spreadsheet_fn')
   parser.add_argument('out_fn')
+  parser.add_argument('treesumm_fn')
+  parser.add_argument('mutlist_fn')
   args = parser.parse_args()
 
   model_probs = load_model_probs(args.model_probs_fn)
-  plot(args.sampid, model_probs, args.output_type, args.ssm_fn, args.params_fn, args.spreadsheet_fn, args.out_fn)
+  plot(args.sampid, model_probs, args.output_type, args.ssm_fn, args.params_fn, args.spreadsheet_fn, args.out_fn, args.treesumm_fn, args.mutlist_fn)
 
 main()

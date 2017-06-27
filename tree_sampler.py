@@ -78,15 +78,12 @@ permute_adj.blah = set()
 def sample_trees(model_probs, clusters, cidxs):
   ancestry_probs = make_ancestry_probs(model_probs)
   K = len(clusters)
-  adjs = set()
 
   cluster_adj = [init_cluster_adj(K)]
   cluster_anc = make_mut_ancestry_from_cluster_adj(cluster_adj[0], clusters)
   llh = [calc_llh(ancestry_probs, cluster_anc)]
-  print(np.array2string(cluster_adj[-1]))
 
   for I in range(1000):
-    #adjs.add(np.array2string(cluster_adj[-1]))
     old_llh, old_adj = llh[-1], cluster_adj[-1]
     new_adj = permute_adj(old_adj)
     cluster_anc = make_mut_ancestry_from_cluster_adj(new_adj, clusters)
@@ -101,4 +98,5 @@ def sample_trees(model_probs, clusters, cidxs):
       cluster_adj.append(old_adj)
       llh.append(old_llh)
       print(I, llh[-1], 'reject', sep='\t')
-  print('sampled', cluster_adj[-1])
+
+  return (cluster_adj, llh)
