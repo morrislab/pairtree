@@ -10,6 +10,7 @@ from collections import defaultdict
 import tree_sampler
 import tree_builder
 import json_writer
+import phi_fitter
 
 np.set_printoptions(threshold=np.nan)
 np.random.seed(1)
@@ -332,8 +333,12 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn
         assign_missing(clusters, model_probs_tensor)
         sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, clusters, cidxs)
         handbuilt_adjm = tree_builder.make_adj(clustered_relations)
+
+        adj = sampled_adjm[-1]
+        phi = phi_fitter.fit_phis(adj, clusters, cidxs, variants)
+        print('phi', phi)
+
         json_writer.write_json(sampid, clusters, sampled_adjm, sampled_llh, handbuilt_adjm, variants, treesummfn, mutlistfn)
-        #build_tree(clustered_relations, clusters, cidxs, variants)
 
       suffix = remove_small and 'small_excluded' or 'small_included'
       plot_relations_toposort(clustered_relations, clusters, cidxs, suffix, outf)
