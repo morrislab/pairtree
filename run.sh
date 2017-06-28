@@ -7,6 +7,7 @@ SSMDIR=$BASEDIR/data/inputs/steph.xenos
 OUTDIR=$BASEDIR/data/pairwise
 RENAMEDSAMPS=$BASEDIR/misc/renamed.txt
 HIDDENSAMPS=$BASEDIR/misc/hidden.txt
+PWGSPATH=~/.apps/phylowgs
 
 OUTPUT_TYPES="clustered unclustered condensed"
 OUTPUT_TYPES="clustered"
@@ -71,13 +72,26 @@ function write_index {
   done > index.html
 }
 
+function add_tree_indices {
+  for jsonfn in $OUTDIR/*.summ.json; do
+    sampid=$(basename $jsonfn | cut -d . -f1)
+    gzip "$OUTDIR/$sampid.summ.json" "$OUTDIR/$sampid.muts.json"
+    echo "PYTHONPATH=$PWGSPATH python2 $PROTDIR/add_tree_indices.py" \
+      "$OUTDIR/$sampid.summ.json.gz" \
+      "$OUTDIR/$sampid.muts.json.gz"
+  done | parallel -j40 --halt 1
+  gunzip $OUTDIR/*.{summ,muts}.json.gz
+
+}
+
 function main {
   mkdir -p $OUTDIR
 
   #rename_samples
 
-  #calc_pairwise
+  calc_pairwise
   plot
+  add_tree_indices
   write_index
 }
 

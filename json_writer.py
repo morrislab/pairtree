@@ -19,6 +19,7 @@ def convert_adj_matrix_to_adj_list(adjm):
 
 def generate_treesumm(clusters, adjmats, llh, phi):
   result = {
+    'params': {},
     'trees': {},
   }
 
