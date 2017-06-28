@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.stats
 import common
+np.seterr(invalid='raise')
 
 # Matrices: M mutations, K clusters
 #   adj: KxK, adjacency matrix -- adj[a,b]=1 iff a is parent of b (with 1 on diagonal)
@@ -14,6 +15,11 @@ def calc_mut_p(A, Z, psi):
   phi = np.dot(Z, eta) # Kx1
   mut_phi = np.dot(A, phi) # Mx1
   mut_p = 0.5 * mut_phi
+
+  delta = 1e-30
+  mut_p[mut_p == 0]   += delta
+  mut_p[mut_p == 0.5] -= delta
+
   return mut_p
 
 def calc_llh(var_reads, ref_reads, A, Z, psi):
