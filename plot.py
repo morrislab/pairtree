@@ -51,9 +51,9 @@ def make_colour_from_intensity(intensity):
   return 'rgb(255, %s, %s)' % (2*(val,))
 
 def make_colour_from_category(cat):
-  scalenum = 4
+  scalenum = len(Models._all)
   assert 0 <= cat < scalenum
-  scale = cl.scales[str(scalenum)]['qual']['Dark2']
+  scale = cl.scales[str(scalenum)]['qual']['Set1']
   return scale[cat]
 
 def make_colour_matrix(vals, colour_maker):

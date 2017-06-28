@@ -3,13 +3,18 @@ import numpy as np
 import scipy.stats, scipy.misc
 import json
 from common import parse_ssms, Models
+
 np.seterr(divide='raise')
+np.set_printoptions(threshold=np.nan, linewidth=120)
+
 #from numba import jit
 
 def generate_logprob_phi(N):
   prob = {}
-  for M in Models._all:
-    prob[M] = np.zeros((N, N))
+  for modelidx, model in enumerate(Models._all):
+    if modelidx == Models.garbage:
+      continue
+    prob[model] = np.zeros((N, N))
 
   for i in range(N):
     # cocluster
@@ -48,11 +53,17 @@ def _calc_model_prob(var1, var2):
 
   for s in range(S):
     for modelidx, model in enumerate(Models._all):
+      if modelidx == Models.garbage:
+        continue
       pv1, pv2 = [scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], G) for V in (var1, var2)] # Nx1
       p1 = np.tile(pv1, N)   # pv1 vector tiled as columns
       p2 = np.tile(pv2, N).T # pv1 vector tiled as rows
       P = p1 + p2 + logprob_phi[model]
       logprob_models[s,modelidx] = scipy.misc.logsumexp(P)
+
+  # Garbage model
+  pv1, pv2 = [scipy.stats.randint.logpmf(V['var_reads'], 0, V['var_reads'] + V['total_reads'] + 1) for V in (var1, var2)]
+  logprob_models[:,Models.garbage] = pv1 + pv2
 
   logpm = np.sum(logprob_models, axis=0)
   logpm -= np.max(logpm)

@@ -3,7 +3,7 @@ import numpy as np
 from collections import namedtuple
 
 class Models:
-  _all = ('cocluster', 'A_B', 'B_A', 'diff_branches')
+  _all = ('garbage', 'cocluster', 'A_B', 'B_A', 'diff_branches')
 for idx, M in enumerate(Models._all):
   setattr(Models, M, idx)
 
