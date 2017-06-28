@@ -66,33 +66,38 @@ def _calc_model_prob(var1, var2):
   logprob_models[:,Models.garbage] = pv1 + pv2
 
   logpm = np.sum(logprob_models, axis=0)
-  logpm -= np.max(logpm)
+  B = np.max(logpm)
+  logpm -= B
   normpm = np.exp(logpm) / np.sum(np.exp(logpm))
-  return normpm
+  return (normpm, logpm + B)
 
 #@jit
 def calc_posterior(variants):
   N = len(variants)
   done = 0
-  model_probs = {}
+  posterior = {}
+  evidence = {}
 
   for vidx1 in variants.keys():
     for vidx2 in variants.keys():
-      model_probs[(vidx1,vidx2)] = _calc_model_prob(variants[vidx1], variants[vidx2])
+      posterior[(vidx1,vidx2)], evidence[(vidx1,vidx2)] = _calc_model_prob(variants[vidx1], variants[vidx2])
       done += 1
-      print(vidx1, vidx2, '%.1f%%' % (100*(done / N**2)), model_probs[(vidx1,vidx2)], sep='\t')
+      print(vidx1, vidx2, '%.1f%%' % (100*(done / N**2)), posterior[(vidx1,vidx2)], sep='\t')
 
-  return model_probs
+  return (posterior, evidence)
 
-def write_posterior(posterior, variants, outfn):
+def write_posterior(posterior, evidence, variants, outfn):
   model_probs = {}
+  model_evidence = {}
   for midx, model in enumerate(Models._all):
-    model_probs[model] = {'%s,%s' % (vid1, vid2): P[midx] for (vid1, vid2), P in posterior.items() }
+    model_probs[model]    = {'%s,%s' % (vid1, vid2): P[midx] for (vid1, vid2), P in posterior.items() }
+    model_evidence[model] = {'%s,%s' % (vid1, vid2): P[midx] for (vid1, vid2), P in evidence.items()  }
 
   var_names = { V: variants[V]['name'] for V in variants.keys() }
   out = {
     'models': Models._all,
     'model_probs': model_probs,
+    'model_evidence': model_evidence,
     'var_names': var_names,
   }
   with open(outfn, 'w') as F:
@@ -108,7 +113,7 @@ def main():
   args = parser.parse_args()
 
   variants = parse_ssms(args.ssm_fn)
-  posterior = calc_posterior(variants)
-  write_posterior(posterior, variants, args.out_fn)
+  posterior, evidence = calc_posterior(variants)
+  write_posterior(posterior, evidence, variants, args.out_fn)
 
 main()
