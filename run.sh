@@ -7,7 +7,7 @@ SSMDIR=$BASEDIR/data/inputs/steph.xenos
 OUTDIR=$BASEDIR/data/pairwise
 RENAMEDSAMPS=$BASEDIR/misc/renamed.txt
 HIDDENSAMPS=$BASEDIR/misc/hidden.txt
-PWGSPATH=~/.apps/phylowgs
+PWGSDIR=~/.apps/phylowgs
 
 OUTPUT_TYPES="clustered unclustered condensed"
 OUTPUT_TYPES="clustered"
@@ -59,6 +59,8 @@ function plot {
 	"$OUTDIR/$sampid.muts.json"
     done
   done | parallel -j40 --halt 1
+
+
 }
 
 function write_index {
@@ -76,7 +78,7 @@ function add_tree_indices {
   for jsonfn in $OUTDIR/*.summ.json; do
     sampid=$(basename $jsonfn | cut -d . -f1)
     gzip "$OUTDIR/$sampid.summ.json" "$OUTDIR/$sampid.muts.json"
-    echo "PYTHONPATH=$PWGSPATH python2 $PROTDIR/add_tree_indices.py" \
+    echo "PYTHONPATH=$PWGSDIR python2 $PROTDIR/add_tree_indices.py" \
       "$OUTDIR/$sampid.summ.json.gz" \
       "$OUTDIR/$sampid.muts.json.gz"
   done | parallel -j40 --halt 1
@@ -84,15 +86,22 @@ function add_tree_indices {
 
 }
 
+function add_to_witness {
+  cp -a $OUTDIR/*.{summ,muts}.json $PWGSDIR/witness/data/steph
+  cd $PWGSDIR/witness
+  python2 index_data.py
+}
+
 function main {
   mkdir -p $OUTDIR
 
   #rename_samples
 
-  calc_pairwise
+  #calc_pairwise
   plot
-  add_tree_indices
+  #add_tree_indices
   write_index
+  add_to_witness
 }
 
 main
