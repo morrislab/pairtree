@@ -9,7 +9,7 @@ RENAMEDSAMPS=$BASEDIR/misc/renamed.txt
 HIDDENSAMPS=$BASEDIR/misc/hidden.txt
 
 OUTPUT_TYPES="clustered unclustered condensed"
-OUTPUT_TYPES="condensed"
+OUTPUT_TYPES="clustered"
 
 function rename_samples {
   for paramsfn in $SSMDIR/*.params.json; do
@@ -53,7 +53,9 @@ function plot {
 	"$ssmfn" \
 	"$paramsfn" \
 	"$spreadsheetfn" \
-	"$OUTDIR/$sampid.$output_type.pairwise.html"
+	"$OUTDIR/$sampid.$output_type.pairwise.html" \
+	"$OUTDIR/$sampid.summ.json" \
+	"$OUTDIR/$sampid.muts.json"
     done
   done | parallel -j40 --halt 1
 }
@@ -73,6 +75,7 @@ function main {
   mkdir -p $OUTDIR
 
   #rename_samples
+
   #calc_pairwise
   plot
   write_index

@@ -348,17 +348,19 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn
         assign_missing(clusters, model_probs_tensor)
         sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, clusters)
 
-        handbuilt_adjm = tree_builder.make_adj(clustered_relations)
-        sampled_adjm.insert(0, handbuilt_adjm)
-        sampled_llh.insert(0, 0)
+        #handbuilt_adjm = tree_builder.make_adj(clustered_relations)
+        #sampled_adjm.insert(0, handbuilt_adjm)
+        #sampled_llh.insert(0, 0)
 
         sampled_adjm = [add_normal_root(adj) for adj in sampled_adjm]
         clusters.insert(0, [])
 
-        phi = phi_fitter.fit_phis(sampled_adjm[0], clusters, variants)
-        print('phi', phi)
+        nsamples = len(list(variants.values())[0]['total_reads'])
+        ntrees = len(sampled_adjm)
+        phi = np.ones((ntrees, nsamples, len(clusters)))
+        phi[-1,:,:] = phi_fitter.fit_phis(sampled_adjm[-1], clusters, variants)
 
-        json_writer.write_json(sampid, variants, clusters, sampled_adjm, sampled_llh, treesummfn, mutlistfn)
+        json_writer.write_json(sampid, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
 
       suffix = remove_small and 'small_excluded' or 'small_included'
       plot_relations_toposort(clustered_relations, clusters, suffix, outf)

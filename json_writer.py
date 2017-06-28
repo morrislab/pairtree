@@ -17,19 +17,19 @@ def convert_adj_matrix_to_adj_list(adjm):
 
   return adjl
 
-def generate_treesumm(clusters, nsamples, adjmats, llh):
+def generate_treesumm(clusters, adjmats, llh, phi):
   result = {
     'trees': {},
-  }
-  pops = { str(pidx): {
-    'num_ssms': len(ssms),
-    'num_cnvs': 0,
-    'cellular_prevalence': nsamples*[1] }
-    for pidx, ssms in enumerate(clusters)
   }
 
   assert len(adjmats) == len(llh)
   for tidx, adjmat, llh in zip(range(len(llh)), adjmats, llh):
+    pops = { str(pidx): {
+      'num_ssms': len(ssms),
+      'num_cnvs': 0,
+      'cellular_prevalence': list(phi[tidx,:,pidx])
+      } for pidx, ssms in enumerate(clusters)
+    }
     result['trees'][str(tidx)] = {
       'llh': llh,
       'populations': pops,
@@ -55,9 +55,8 @@ def generate_mutlist(variants):
 
   return mutlist
 
-def write_json(sampid, variants, clusters, adjmats, llh, treesummfn, mutlistfn):
-  nsamples = len(list(variants.values())[0]['total_reads'])
-  treesumm = generate_treesumm(clusters, nsamples, adjmats, llh)
+def write_json(sampid, variants, clusters, adjmats, llh, phi, treesummfn, mutlistfn):
+  treesumm = generate_treesumm(clusters, adjmats, llh, phi)
   mutlist = generate_mutlist(variants)
 
   for results in (treesumm, mutlist):
