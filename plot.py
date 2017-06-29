@@ -355,6 +355,12 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn
         sampled_adjm = [add_normal_root(adj) for adj in sampled_adjm]
         clusters.insert(0, [])
 
+        for axis in (0, 1):
+          clustered_relations = np.insert(clustered_relations, 0, 0, axis=axis)
+        clustered_relations[0,0] = Models.cocluster
+        clustered_relations[0,1:] = Models.A_B
+        clustered_relations[1:,0] = Models.B_A
+
         nsamples = len(list(variants.values())[0]['total_reads'])
         ntrees = len(sampled_adjm)
         phi = np.ones((ntrees, nsamples, len(clusters)))
