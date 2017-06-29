@@ -1,28 +1,38 @@
 import common
 import numpy as np
 np.set_printoptions(linewidth=200)
+Models = common.Models
 
-def make_mut_ancestry_from_cluster_adj(cluster_adj, clusters):
+def make_mutrel_tensor_from_cluster_adj(cluster_adj, clusters):
   cluster_anc = common.make_ancestral_from_adj(cluster_adj)
+  # In determining A_B relations, don't want to set mutaitons (i,j), where i
+  # and j are in same cluster, to 1.
+  np.fill_diagonal(cluster_anc, 0)
+
   M = sum([len(clus) for clus in clusters])
   K = len(clusters)
-  mut_anc = np.eye(M)
+  mutrel = np.zeros((M, M, len(Models._all)))
 
   for k in range(K):
-    self_muts = clusters[k]
+    self_muts = np.array(clusters[k])
     desc_clusters = np.flatnonzero(cluster_anc[k])
-    desc_muts = [midx for cidx in desc_clusters for midx in clusters[cidx]]
-    mut_anc[np.ix_(self_muts, desc_muts)] = 1
+    desc_muts = np.array([midx for cidx in desc_clusters for midx in clusters[cidx]])
 
-  return mut_anc
+    if len(self_muts) > 0:
+      mutrel[self_muts[:,None,None], self_muts[None,:,None], Models.cocluster] = 1
+    if len(self_muts) > 0 and len(desc_muts) > 0:
+      mutrel[self_muts[:,None,None], desc_muts[None,:,None], Models.A_B] = 1
 
-def make_ancestry_probs(model_probs):
-  ancestry_probs = np.copy(model_probs[:,:,common.Models.A_B])
-  np.fill_diagonal(ancestry_probs, 1)
-  return ancestry_probs
+  mutrel[:,:,Models.B_A] = mutrel[:,:,Models.A_B].T
+  existing = (Models.cocluster, Models.A_B, Models.B_A)
+  already_filled = np.sum(mutrel[:,:,existing], axis=2)
+  mutrel[already_filled == 0,Models.diff_branches] = 1
+  assert np.array_equal(np.ones((M,M)), np.sum(mutrel, axis=2))
 
-def calc_llh(ancestry_probs, cluster_anc):
-  probs = 1 - np.abs(ancestry_probs - cluster_anc)
+  return mutrel
+
+def calc_llh(data_mutrel, tree_mutrel):
+  probs = 1 - np.abs(data_mutrel - tree_mutrel)
   # Prevent log of zero.
   probs = np.maximum(1e-20, probs)
   llh = np.sum(np.log(probs))
@@ -75,19 +85,18 @@ def permute_adj(adj):
   return adj
 permute_adj.blah = set()
 
-def sample_trees(model_probs, clusters):
-  ancestry_probs = make_ancestry_probs(model_probs)
+def sample_trees(data_mutrel, clusters):
   K = len(clusters)
 
   cluster_adj = [init_cluster_adj(K)]
-  cluster_anc = make_mut_ancestry_from_cluster_adj(cluster_adj[0], clusters)
-  llh = [calc_llh(ancestry_probs, cluster_anc)]
+  tree_mutrel = make_mutrel_tensor_from_cluster_adj(cluster_adj[0], clusters)
+  llh = [calc_llh(data_mutrel, tree_mutrel)]
 
   for I in range(1000):
     old_llh, old_adj = llh[-1], cluster_adj[-1]
     new_adj = permute_adj(old_adj)
-    cluster_anc = make_mut_ancestry_from_cluster_adj(new_adj, clusters)
-    new_llh = calc_llh(ancestry_probs, cluster_anc)
+    tree_mutrel = make_mutrel_tensor_from_cluster_adj(new_adj, clusters)
+    new_llh = calc_llh(data_mutrel, tree_mutrel)
     if False or new_llh - old_llh > np.log(np.random.uniform()):
       # Accept.
       cluster_adj.append(new_adj)
