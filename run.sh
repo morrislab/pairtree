@@ -47,7 +47,7 @@ function calc_pairwise {
 }
 
 function plot {
-  #rm -f $OUTDIR/*.{pairwise.html,js}
+  rm -f $OUTDIR/*.{pairwise.html,js}
 
   cp -a $PROTDIR/highlight_table_labels.js $OUTDIR/
   for jsonfn in $OUTDIR/*.pairwise.json; do
@@ -104,12 +104,12 @@ function main {
   mkdir -p $OUTDIR
 
   #rename_samples
-  remove_samples
+  #remove_samples
 
   #calc_pairwise
-  #plot
+  plot
   #add_tree_indices
-  #write_index
+  write_index
   #add_to_witness
 }
 

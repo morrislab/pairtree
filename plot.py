@@ -329,6 +329,29 @@ def add_normal_root(adj):
   adj[0,0] = adj[0,old_root+1] = 1
   return adj
 
+def cluster_variants(model_probs_tensor):
+  M = len(model_probs_tensor)
+  features = np.zeros((M, M*len(Models._all)))
+  for idx, mat in enumerate(model_probs_tensor):
+    features[idx] = np.ravel(mat)
+  # Insert clustering algorithm here. Bleh.
+
+def make_trees(variants, model_probs, clusters):
+  model_probs_tensor = create_model_prob_tensor(model_probs)
+
+  assign_missing(clusters, model_probs_tensor)
+  sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, clusters)
+  sampled_adjm = [add_normal_root(adj) for adj in sampled_adjm]
+  clusters.insert(0, [])
+
+  nsamples = len(list(variants.values())[0]['total_reads'])
+  ntrees = len(sampled_adjm)
+  phi = np.ones((ntrees, nsamples, len(clusters)))
+  phi[-1,:,:] = phi_fitter.fit_phis(sampled_adjm[-1], clusters, variants)
+
+  return (sampled_adjm, sampled_llh, phi)
+
+
 def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn, treesummfn, mutlistfn):
   should_cluster = not (output_type == 'unclustered')
   model_probs_tensor = create_model_prob_tensor(model_probs)
@@ -345,27 +368,10 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn
       clustered_relations, clusters = cluster_relations(relations, remove_small)
 
       if remove_small:
-        assign_missing(clusters, model_probs_tensor)
-        sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, clusters)
-
         #handbuilt_adjm = tree_builder.make_adj(clustered_relations)
         #sampled_adjm.insert(0, handbuilt_adjm)
         #sampled_llh.insert(0, 0)
-
-        sampled_adjm = [add_normal_root(adj) for adj in sampled_adjm]
-        clusters.insert(0, [])
-
-        for axis in (0, 1):
-          clustered_relations = np.insert(clustered_relations, 0, 0, axis=axis)
-        clustered_relations[0,0] = Models.cocluster
-        clustered_relations[0,1:] = Models.A_B
-        clustered_relations[1:,0] = Models.B_A
-
-        nsamples = len(list(variants.values())[0]['total_reads'])
-        ntrees = len(sampled_adjm)
-        phi = np.ones((ntrees, nsamples, len(clusters)))
-        phi[-1,:,:] = phi_fitter.fit_phis(sampled_adjm[-1], clusters, variants)
-
+        sampled_adjm, sampled_llh, phi = make_trees(variants, model_probs, clusters)
         json_writer.write_json(sampid, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
 
       suffix = remove_small and 'small_excluded' or 'small_included'
