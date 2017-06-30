@@ -45,7 +45,7 @@ def generate_logprob_phi(N):
 def _calc_model_prob(var1, var2):
   grid_step = 0.01
   N = int(1/grid_step + 1) # N: number of grid points
-  G = 0.5 * np.linspace(start=0, stop=1, num=N)[:,np.newaxis] # Nx1
+  G = np.linspace(start=0, stop=1, num=N)[:,np.newaxis] # Nx1
 
   S = len(var1['total_reads']) # S
   logprob_phi = generate_logprob_phi(N) # MxNxN
@@ -55,7 +55,7 @@ def _calc_model_prob(var1, var2):
     for modelidx, model in enumerate(Models._all):
       if modelidx == Models.garbage:
         continue
-      pv1, pv2 = [scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], G) for V in (var1, var2)] # Nx1
+      pv1, pv2 = [scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], (1 - V['mu_v'])*G) for V in (var1, var2)] # Nx1
       p1 = np.tile(pv1, N)   # pv1 vector tiled as columns
       p2 = np.tile(pv2, N).T # pv1 vector tiled as rows
       P = p1 + p2 + logprob_phi[model]
