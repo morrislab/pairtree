@@ -3,7 +3,7 @@ set -euo pipefail
 
 PROTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 BASEDIR=~/work/steph
-SSMDIR=$BASEDIR/data/inputs/steph.xenos
+SSMDIR=$BASEDIR/data/inputs/steph.xenos.nocns
 OUTDIR=$BASEDIR/data/pairwise
 RENAMEDSAMPS=$BASEDIR/misc/renamed.txt
 HIDDENSAMPS=$BASEDIR/misc/hidden.txt
@@ -11,6 +11,16 @@ PWGSDIR=~/.apps/phylowgs
 
 OUTPUT_TYPES="clustered unclustered condensed"
 OUTPUT_TYPES="clustered"
+
+function remove_samples {
+  for paramsfn in $SSMDIR/*.params.json; do
+    sampid=$(basename $paramsfn | cut -d . -f1)
+    echo "python3 $PROTDIR/remove_samples.py" \
+      "$sampid" \
+      "$SSMDIR/$sampid.sampled.ssm" \
+      "$paramsfn"
+  done | parallel -j40 --halt 1
+}
 
 function rename_samples {
   for paramsfn in $SSMDIR/*.params.json; do
@@ -37,7 +47,7 @@ function calc_pairwise {
 }
 
 function plot {
-  rm -f $OUTDIR/*.{pairwise.html,js}
+  #rm -f $OUTDIR/*.{pairwise.html,js}
 
   cp -a $PROTDIR/highlight_table_labels.js $OUTDIR/
   for jsonfn in $OUTDIR/*.pairwise.json; do
@@ -59,8 +69,6 @@ function plot {
 	"$OUTDIR/$sampid.muts.json"
     done
   done | parallel -j40 --halt 1
-
-
 }
 
 function write_index {
@@ -96,12 +104,13 @@ function main {
   mkdir -p $OUTDIR
 
   #rename_samples
+  remove_samples
 
   #calc_pairwise
-  plot
+  #plot
   #add_tree_indices
-  write_index
-  add_to_witness
+  #write_index
+  #add_to_witness
 }
 
 main
