@@ -329,12 +329,30 @@ def add_normal_root(adj):
   adj[0,0] = adj[0,old_root+1] = 1
   return adj
 
-def cluster_variants(model_probs_tensor):
+def make_vaf_matrix(variants):
+  print(variants)
+  vaf = np.array([V['var_reads'] / V['total_reads'] for V in variants.values()])
+  return vaf
+
+def cluster_variants(model_probs_tensor, vaf_matrix):
   M = len(model_probs_tensor)
   features = np.zeros((M, M*len(Models._all)))
   for idx, mat in enumerate(model_probs_tensor):
     features[idx] = np.ravel(mat)
+
+  #features = vaf_matrix
   # Insert clustering algorithm here. Bleh.
+  clusterer = hdbscan.HDBSCAN(min_cluster_size=2)
+  labels = clusterer.fit_predict(vaf_matrix)
+
+  clusters = [list() for _ in range(np.max(labels) + 1)]
+  unclustered = []
+  for idx, label in enumerate(labels):
+    dest = clusters[label] if label >= 0 else unclustered
+    dest.append(idx)
+
+  print(clusters, unclustered)
+  return clusters
 
 def make_trees(variants, model_probs, clusters):
   model_probs_tensor = create_model_prob_tensor(model_probs)
@@ -358,6 +376,9 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn
   relations = calc_relations(model_probs_tensor)
   variants = parse_ssms(ssmfn)
 
+  #vaf = make_vaf_matrix(variants)
+  #clusters = cluster_variants(model_probs_tensor, vaf)
+
   with open(outfn, 'w') as outf:
     write_header(sampid, output_type, outf)
     write_legend(outf)
@@ -368,8 +389,8 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn
       clustered_relations, clusters = cluster_relations(relations, remove_small)
 
       if remove_small:
-        #handbuilt_adjm = tree_builder.make_adj(clustered_relations)
-        #sampled_adjm.insert(0, handbuilt_adjm)
+        #mle_adjm = tree_builder.make_adj(clustered_relations)
+        #sampled_adjm.insert(0, mle_adjm)
         #sampled_llh.insert(0, 0)
         sampled_adjm, sampled_llh, phi = make_trees(variants, model_probs, clusters)
         json_writer.write_json(sampid, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
