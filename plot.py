@@ -11,6 +11,7 @@ import tree_sampler
 import tree_builder
 import json_writer
 import phi_fitter
+import handbuilt
 
 np.set_printoptions(threshold=np.nan)
 np.random.seed(1)
@@ -370,7 +371,7 @@ def make_trees(variants, model_probs, clusters):
   return (sampled_adjm, sampled_llh, phi)
 
 
-def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn, treesummfn, mutlistfn):
+def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn):
   should_cluster = not (output_type == 'unclustered')
   model_probs_tensor = create_model_prob_tensor(model_probs)
   relations = calc_relations(model_probs_tensor)
@@ -385,15 +386,19 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, outfn
     if output_type != 'condensed':
       plot_individual(model_probs, should_cluster, outf)
       plot_relations(relations, should_cluster, outf)
-    for remove_small in (False, True):
-      clustered_relations, clusters = cluster_relations(relations, remove_small)
 
-      if remove_small:
+    for remove_small in (False,):
+      clustered_relations, clusters = cluster_relations(relations, remove_small)
+      clusters = handbuilt.cluster_variants(handbuiltfn, variants)
+
+      #if remove_small:
         #mle_adjm = tree_builder.make_adj(clustered_relations)
         #sampled_adjm.insert(0, mle_adjm)
         #sampled_llh.insert(0, 0)
-        sampled_adjm, sampled_llh, phi = make_trees(variants, model_probs, clusters)
-        json_writer.write_json(sampid, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
+        #sampled_adjm, sampled_llh, phi = make_trees(variants, model_probs, clusters)
+        #json_writer.write_json(sampid, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
+      sampled_adjm, sampled_llh, phi = make_trees(variants, model_probs, clusters)
+      json_writer.write_json(sampid, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
 
       suffix = remove_small and 'small_excluded' or 'small_included'
       plot_relations_toposort(clustered_relations, clusters, suffix, outf)
@@ -414,12 +419,13 @@ def main():
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
   parser.add_argument('spreadsheet_fn')
+  parser.add_argument('handbuilt_fn')
   parser.add_argument('out_fn')
   parser.add_argument('treesumm_fn')
   parser.add_argument('mutlist_fn')
   args = parser.parse_args()
 
   model_probs = load_model_probs(args.model_probs_fn)
-  plot(args.sampid, model_probs, args.output_type, args.ssm_fn, args.params_fn, args.spreadsheet_fn, args.out_fn, args.treesumm_fn, args.mutlist_fn)
+  plot(args.sampid, model_probs, args.output_type, args.ssm_fn, args.params_fn, args.spreadsheet_fn, args.handbuilt_fn, args.out_fn, args.treesumm_fn, args.mutlist_fn)
 
 main()

@@ -5,6 +5,7 @@ PROTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 BASEDIR=~/work/steph
 SSMDIR=$BASEDIR/data/inputs/steph.xenos.nocns
 OUTDIR=$BASEDIR/data/pairwise
+HANDBUILTDIR=$BASEDIR/data/handbuilt_trees
 RENAMEDSAMPS=$BASEDIR/misc/renamed.txt
 HIDDENSAMPS=$BASEDIR/misc/hidden.txt
 PWGSDIR=~/.apps/phylowgs
@@ -64,11 +65,12 @@ function plot {
 	"$ssmfn" \
 	"$paramsfn" \
 	"$spreadsheetfn" \
+	"$HANDBUILTDIR/$sampid.json" \
 	"$OUTDIR/$sampid.$output_type.pairwise.html" \
 	"$OUTDIR/$sampid.summ.json" \
 	"$OUTDIR/$sampid.muts.json"
     done
-  done | parallel -j40 --halt 1
+  done #| parallel -j40 --halt 1
 }
 
 function write_index {
