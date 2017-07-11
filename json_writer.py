@@ -24,7 +24,7 @@ def generate_treesumm(clusters, adjmats, llh, phi):
   }
 
   assert len(adjmats) == len(llh)
-  for tidx, adjmat, llh in zip(range(len(llh)), adjmats, llh):
+  for tidx, adjmat, L in zip(range(len(llh)), adjmats, llh):
     pops = { str(pidx): {
       'num_ssms': len(ssms),
       'num_cnvs': 0,
@@ -32,7 +32,7 @@ def generate_treesumm(clusters, adjmats, llh, phi):
       } for pidx, ssms in enumerate(clusters)
     }
     result['trees'][str(tidx)] = {
-      'llh': llh,
+      'llh': L,
       'populations': pops,
       'structure': convert_adj_matrix_to_adj_list(adjmat),
       'root': 0,

@@ -81,18 +81,18 @@ def permute_adj(adj):
 
   np.fill_diagonal(adj, 1)
   permute_adj.blah.add((A, B, np.array2string(adj)))
-  #print(A, B, np.array2string(adj), sep='\n')
   return adj
 permute_adj.blah = set()
 
-def sample_trees(data_mutrel, clusters):
+def sample_trees(data_mutrel, clusters, nsamples):
+  assert nsamples > 0
   K = len(clusters)
 
   cluster_adj = [init_cluster_adj(K)]
   tree_mutrel = make_mutrel_tensor_from_cluster_adj(cluster_adj[0], clusters)
   llh = [calc_llh(data_mutrel, tree_mutrel)]
 
-  for I in range(1000):
+  for I in range(1, nsamples):
     old_llh, old_adj = llh[-1], cluster_adj[-1]
     new_adj = permute_adj(old_adj)
     tree_mutrel = make_mutrel_tensor_from_cluster_adj(new_adj, clusters)
