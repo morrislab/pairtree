@@ -56,6 +56,9 @@ function plot {
     ssmfn=$SSMDIR/$sampid.sampled.ssm
     paramsfn=$SSMDIR/$sampid.params.json
     spreadsheetfn=$BASEDIR/data/ssms/$sampid.csv
+    handbuiltfn="$HANDBUILTDIR/$sampid.json"
+
+    [ -f $handbuiltfn ] || continue
 
     for output_type in $OUTPUT_TYPES; do
       echo "python3 $PROTDIR/plot.py " \
@@ -65,12 +68,14 @@ function plot {
 	"$ssmfn" \
 	"$paramsfn" \
 	"$spreadsheetfn" \
-	"$HANDBUILTDIR/$sampid.json" \
+	"$handbuiltfn" \
 	"$OUTDIR/$sampid.$output_type.pairwise.html" \
 	"$OUTDIR/$sampid.summ.json" \
-	"$OUTDIR/$sampid.muts.json"
+	"$OUTDIR/$sampid.muts.json" \
+	">  $OUTDIR/$sampid.plot.stdout" \
+	"2> $OUTDIR/$sampid.plot.stderr"
     done
-  done #| parallel -j40 --halt 1
+  done | parallel -j40 --halt 1
 }
 
 function write_index {
@@ -112,7 +117,7 @@ function main {
   plot
   #add_tree_indices
   write_index
-  #add_to_witness
+  add_to_witness
 }
 
 main
