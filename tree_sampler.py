@@ -57,6 +57,10 @@ def permute_adj(adj):
 
   anc = common.make_ancestral_from_adj(adj)
   A, B = np.random.choice(K, size=2, replace=False)
+  if B == 0 and anc[B,A]:
+    # Don't permit cluster 0 to become non-root node, since it corresponds to
+    # normal cell population.
+    return adj
   np.fill_diagonal(adj, 0)
 
   if anc[B,A]:
