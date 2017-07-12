@@ -6,8 +6,8 @@ function highlight_labels(cell, should_highlight) {
   if(col_idx === 0 || row_idx == 0) { return; }
 
   var tbl = cell.closest('table');
-  var row_label = tbl.find('tr').eq(row_idx).find('td:first-child');
-  var col_label = tbl.find('tr:first-child').children('td').eq(col_idx);
+  var row_label = tbl.find('tbody tr').eq(row_idx).find('td:first-child');
+  var col_label = tbl.find('thead tr:first-child').children('th').eq(col_idx);
 
   var combined = row_label.add(col_label);
   combined.toggleClass('highlighted', should_highlight);

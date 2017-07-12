@@ -68,28 +68,30 @@ def make_colour_matrix(vals, colour_maker):
 
   return colours
 
-def make_table_row(entries, visibilities, colours):
+def make_table_row(entries, visibilities, colours, is_header=False):
+  elem = 'th' if is_header else 'td'
   assert len(entries) == len(visibilities)
   entries = [E if V else ('<span>%s</span>' % E) for E, V in zip(entries, visibilities)]
-  return '<tr>' + ''.join(['<td style="background-color: %s">%s</td>' % (C, E) for E, C in zip(entries, colours)]) + '</tr>'
+  return '<tr>' + ''.join(['<%s style="background-color: %s">%s</%s>' % (elem, C, E, elem) for E, C in zip(entries, colours)]) + '</tr>'
 
 def write_header(sampid, extra, outf):
   print('<script type="text/javascript" src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>', file=outf)
   print('<script type="text/javascript" src="highlight_table_labels.js"></script>', file=outf)
   print('<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">', file=outf)
   print('<h1>%s (%s)</h1>' % (sampid, extra), file=outf)
-  print('<style>td, table { padding: 5px; margin: 0; border-collapse: collapse; } span { visibility: hidden; } td:hover > span { visibility: visible; } .highlighted { background-color: black !important; color: white; font-weight: bold; }</style>', file=outf)
+  print('<style>td, th, table { padding: 5px; margin: 0; border-collapse: collapse; font-weight: normal; } span { visibility: hidden; } td:hover > span { visibility: visible; } .highlighted { background-color: black !important; color: white; }</style>', file=outf)
 
 def write_table(model, mat, labels, colours, outf):
   print('<h2>%s</h2>' % model, file=outf)
-  print('<table class="matrix"><thead></thead><tbody>', file=outf)
+  print('<table class="matrix"><thead>', file=outf)
 
   N = len(mat)
 
   entries        = [''] + labels
   visibility     = len(entries)*[True]
   header_colours = len(entries)*['transparent']
-  print(make_table_row(entries, visibility, header_colours), file=outf)
+  print(make_table_row(entries, visibility, header_colours, is_header=True), file=outf)
+  print('</thead><tbody>', file=outf)
 
   for label, row, row_colours in zip(labels, mat, colours):
     entries     = [label]           + ['%.2f' % P for P in row]

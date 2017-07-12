@@ -32,7 +32,7 @@ def print_vafs(ordered_variants, sampnames, outf):
   cluster_colours = assign_colours(nclusters)
 
   print('<style>#vafmatrix td, #vafmatrix { padding: 5px; margin: 0; border-collapse: collapse; } #vafmatrix th { transform: rotate(45deg); font-weight: normal !important; } #vafmatrix span { visibility: hidden; } #vafmatrix td:hover > span { visibility: visible; }</style>', file=outf)
-  print('<br><br><br><table id="vafmatrix"><thead>', file=outf)
+  print('<br><br><br><table id="vafmatrix" class="matrix"><thead>', file=outf)
 
   header = ['Gene', 'ID', 'Chrom', 'Locus', 'Cluster']
   header += munge_samp_names(sampnames)
