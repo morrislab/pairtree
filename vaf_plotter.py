@@ -27,35 +27,73 @@ def load_spreadsheet(spreadsheetfn):
 def munge_samp_names(sampnames):
   return [S.replace('Diagnosis Xeno ', 'DX').replace('Relapse Xeno ', 'RX') for S in sampnames]
 
-def print_vafs(ordered_variants, sampnames, outf):
+def euclid_dist(A, B):
+  return np.sqrt(np.sum((B - A)**2))
+
+def find_closest(vec, mat):
+  # Find matrix in tensor that's closest to `target` in Euclidean distance.
+  min_dist = float('inf')
+  best_idx = None
+
+  for idx, candidate in enumerate(mat):
+    if candidate is None:
+      continue
+    dist = euclid_dist(candidate, vec)
+    if dist < min_dist:
+      min_dist = dist
+      best_idx = idx
+
+  assert best_idx is not None
+  return best_idx
+
+def make_cluster_supervars(ordered_variants):
+  cluster_supervars = []
+  for cidx, cluster in enumerate(ordered_variants):
+    if len(cluster) == 0:
+      cluster_supervars.append(None)
+      continue
+
+    cluster_var_reads = np.array([V['var_reads'] for V in cluster])
+    cluster_total_reads = np.array([V['total_reads'] for V in cluster])
+    cluster_supervars.append({
+      'gene': None,
+      'id': None,
+      'chrom': None,
+      'pos': None,
+      'cluster': cidx,
+      'vaf': np.sum(cluster_var_reads, axis=0) / np.sum(cluster_total_reads, axis=0)
+    })
+
+  return cluster_supervars
+
+def partition_garbage_variants(cluster_supervars, garbage_variants):
+  supervafs = [C['vaf'] if C is not None else None for C in cluster_supervars]
+  parted = [list() for _ in cluster_supervars]
+  for gvar in garbage_variants.values():
+    gvar['cluster'] = None
+    closest = find_closest(gvar['vaf'], supervafs)
+    parted[closest].append(gvar)
+  return parted
+
+def print_vafs(ordered_variants, garbage_variants, sampnames, outf):
   nclusters = len(ordered_variants)
   cluster_colours = assign_colours(nclusters)
 
   print('<style>#vafmatrix td, #vafmatrix { padding: 5px; margin: 0; border-collapse: collapse; } #vafmatrix th { transform: rotate(45deg); font-weight: normal !important; } #vafmatrix span { visibility: hidden; } #vafmatrix td:hover > span { visibility: visible; }</style>', file=outf)
   print('<br><br><br><table id="vafmatrix" class="matrix"><thead>', file=outf)
-
   header = ['Gene', 'ID', 'Chrom', 'Locus', 'Cluster']
   header += munge_samp_names(sampnames)
   print(''.join(['<th>%s</th>' % H for H in header]), file=outf)
-
   print('</thead><tbody>', file=outf)
-  for cidx, cluster in enumerate(ordered_variants):
+
+  supervars = make_cluster_supervars(ordered_variants)
+  parted_garbage_vars = partition_garbage_variants(supervars, garbage_variants)
+
+  for supervar, cluster, cluster_garbage_vars in zip(supervars, ordered_variants, parted_garbage_vars):
     if len(cluster) == 0:
       continue
-
-    cluster_var_reads = np.array([V['var_reads'] for V in cluster])
-    cluster_total_reads = np.array([V['total_reads'] for V in cluster])
-    cluster = [{
-      'gene': '&mdash;',
-      'id': '&mdash;',
-      'chrom': '&mdash;',
-      'pos': '&mdash;',
-      'cluster': cidx,
-      'vaf': np.sum(cluster_var_reads, axis=0) / np.sum(cluster_total_reads, axis=0)
-    }] + cluster
-
-    for V in cluster:
-      td = ['<td>%s</td>' % V[K] for K in ('gene', 'id', 'chrom', 'pos', 'cluster')]
+    for V in [supervar] + cluster + cluster_garbage_vars:
+      td = ['<td>%s</td>' % V[K] if V[K] is not None else '&mdash;' for K in ('gene', 'id', 'chrom', 'pos', 'cluster')]
       td += ['<td style="background-color: %s"><span>%s</span></td>' % (make_colour(v), make_vaf_label(v)) for v in V['vaf']]
       print('<tr style="background-color: %s">%s</tr>' % (
         cluster_colours[V['cluster']],
@@ -71,7 +109,7 @@ def make_vaf_label(vaf):
   return '%.2f' % float(vaf)
 
 def assign_colours(num_colours):
-  colours = {}
+  colours = {None: '#fff'}
   for cidx in range(num_colours):
     colours[cidx] = get_next_colour()
   return colours
@@ -86,13 +124,13 @@ def get_next_colour():
   return scale[idx]
 get_next_colour._last_idx = -1
 
-def plot_vaf_matrix(clusters, variants, paramsfn, spreadsheetfn, outf):
+def plot_vaf_matrix(clusters, variants, garbage_variants, paramsfn, spreadsheetfn, outf):
   spreadsheet = load_spreadsheet(spreadsheetfn)
   with open(paramsfn) as P:
     params = json.load(P)
   sampnames = params['samples']
 
-  for V in variants.values():
+  for V in list(variants.values()) + list(garbage_variants.values()):
     V['chrom'], V['pos'] = V['name'].split('_')
     V['pos'] = int(V['pos'])
     V['gene'] = find_gene_name(V['chrom'], V['pos'], spreadsheet)
@@ -106,4 +144,4 @@ def plot_vaf_matrix(clusters, variants, paramsfn, spreadsheetfn, outf):
       variant = dict(variants['s%s' % V])
       variant['cluster'] = cidx
       ordered_variants[cidx].append(variant)
-  print_vafs(ordered_variants, sampnames, outf)
+  print_vafs(ordered_variants, garbage_variants, sampnames, outf)

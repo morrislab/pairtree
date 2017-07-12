@@ -255,46 +255,6 @@ def toposort(relations):
     raise Exception('Graph has cycle')
   return topo_sorted
 
-def euclid_dist(A, B):
-  return np.sqrt(np.sum((B - A)**2))
-
-def find_closest(tensor, target):
-  # Find matrix in tensor that's closest to `target` in Euclidean distance.
-  min_dist = float('inf')
-  best_idx = None
-
-  for idx, mat in enumerate(tensor):
-    dist = euclid_dist(mat, target)
-    if dist < min_dist:
-      min_dist = dist
-      best_idx = idx
-
-  assert best_idx is not None
-  return best_idx
-
-def assign_missing(clusters, model_probs):
-  K = len(clusters)
-  M = len(model_probs)
-
-  already_assigned = set([midx for cluster in clusters for midx in cluster])
-  missing = set(range(M)) - already_assigned
-
-  # Mean relations of members.
-  cluster_rels = np.array([np.mean(np.array([model_probs[midx] for midx in cluster]), axis=0) for cluster in clusters])
-  assert cluster_rels.shape == (K, M, len(Models._all))
-
-  for midx in missing:
-    closest_cluster_idx = find_closest(cluster_rels, model_probs[midx])
-    clusters[closest_cluster_idx].append(midx)
-
-  for cluster in clusters:
-    cluster.sort()
-
-  assigned = set([midx for cluster in clusters for midx in cluster])
-  assert len(assigned) == M
-  assert  assigned == already_assigned | missing
-  return clusters
-
 def find_root_node(adj):
   K = len(adj)
   assert adj.shape == (K, K)
@@ -353,6 +313,10 @@ def make_trees(variants, model_probs, clusters):
   return (sampled_adjm, sampled_llh, phi)
 
 def remove_garbage(garbage_ids, model_probs, variants, clusters):
+  garbage_variants = {'g%s' % gidx: variants['s%s' % vidx] for gidx, vidx in enumerate(garbage_ids)}
+  for gvid, var in garbage_variants.items():
+    var['id'] = gvid
+
   varid_map = {}
   for varid in sorted(variants.keys(), key = lambda S: int(S[1:])):
     if int(varid[1:]) in garbage_ids:
@@ -387,13 +351,13 @@ def remove_garbage(garbage_ids, model_probs, variants, clusters):
   for cidx, cluster in enumerate(clusters):
     clusters[cidx] = [int(varid_map['s%s' % S][1:]) for S in cluster]
 
-  return (remapped_model_probs, renamed_variants, clusters)
+  return (remapped_model_probs, renamed_variants, garbage_variants, clusters)
 
 def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn):
   variants = parse_ssms(ssmfn)
   garbage_ids = handbuilt.load_garbage(handbuiltfn)
   clusters = handbuilt.load_clusters(handbuiltfn, variants)
-  model_probs, variants, clusters = remove_garbage(garbage_ids, model_probs, variants, clusters)
+  model_probs, variants, garbage_variants, clusters = remove_garbage(garbage_ids, model_probs, variants, clusters)
 
   should_cluster = not (output_type == 'unclustered')
   model_probs_tensor = create_model_prob_tensor(model_probs)
@@ -430,7 +394,7 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
 
     json_writer.write_json(sampid, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
     plot_relations_toposort(clustered_relations, clusters, outf)
-    vaf_plotter.plot_vaf_matrix(clusters, variants, paramsfn, spreadsheetfn, outf)
+    vaf_plotter.plot_vaf_matrix(clusters, variants, garbage_variants, paramsfn, spreadsheetfn, outf)
 
 def load_model_probs(model_probs_fn):
   with open(model_probs_fn) as F:
