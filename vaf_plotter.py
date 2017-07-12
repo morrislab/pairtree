@@ -1,6 +1,7 @@
 import colorlover as cl
 import csv
 import json
+import numpy as np
 
 def load_spreadsheet(spreadsheetfn):
   with open(spreadsheetfn) as S:
@@ -26,8 +27,9 @@ def load_spreadsheet(spreadsheetfn):
 def munge_samp_names(sampnames):
   return [S.replace('Diagnosis Xeno ', 'DX').replace('Relapse Xeno ', 'RX') for S in sampnames]
 
-def print_vafs(variants, clusters, sampnames, outf):
-  colours = assign_colours(clusters)
+def print_vafs(ordered_variants, sampnames, outf):
+  nclusters = len(ordered_variants)
+  cluster_colours = assign_colours(nclusters)
 
   print('<style>#vafmatrix td, #vafmatrix { padding: 5px; margin: 0; border-collapse: collapse; } #vafmatrix th { transform: rotate(45deg); font-weight: normal !important; } #vafmatrix span { visibility: hidden; } #vafmatrix td:hover > span { visibility: visible; }</style>', file=outf)
   print('<br><br><br><table id="vafmatrix"><thead>', file=outf)
@@ -37,32 +39,41 @@ def print_vafs(variants, clusters, sampnames, outf):
   print(''.join(['<th>%s</th>' % H for H in header]), file=outf)
 
   print('</thead><tbody>', file=outf)
-  for V in variants:
-    td = ['<td>%s</td>' % V[K] for K in ('gene', 'id', 'chrom', 'pos', 'cluster')]
-    td += ['<td style="background-color: %s"><span>%s</span></td>' % (make_colour(v), make_vaf_label(v)) for v in V['vaf']]
-    print('<tr style="background-color: %s">%s</tr>' % (
-      colours[V['cluster']],
-      ''.join(td)
-    ), file=outf)
+  for cidx, cluster in enumerate(ordered_variants):
+    if len(cluster) == 0:
+      continue
+
+    cluster_var_reads = np.array([V['var_reads'] for V in cluster])
+    cluster_total_reads = np.array([V['total_reads'] for V in cluster])
+    cluster = [{
+      'gene': '&mdash;',
+      'id': '&mdash;',
+      'chrom': '&mdash;',
+      'pos': '&mdash;',
+      'cluster': cidx,
+      'vaf': np.sum(cluster_var_reads, axis=0) / np.sum(cluster_total_reads, axis=0)
+    }] + cluster
+
+    for V in cluster:
+      td = ['<td>%s</td>' % V[K] for K in ('gene', 'id', 'chrom', 'pos', 'cluster')]
+      td += ['<td style="background-color: %s"><span>%s</span></td>' % (make_colour(v), make_vaf_label(v)) for v in V['vaf']]
+      print('<tr style="background-color: %s">%s</tr>' % (
+        cluster_colours[V['cluster']],
+        ''.join(td)
+      ), file=outf)
   print('</tbody></table>', file=outf)
 
 def make_colour(vaf):
-  if vaf == 'NA':
-    return '#000'
   val = int(255*(1 - float(vaf)))
   return 'rgb(255, %s, %s)' % (2*(val,))
 
 def make_vaf_label(vaf):
-  try:
-    return '%.2f' % float(vaf)
-  except ValueError:
-    return 'NA'
+  return '%.2f' % float(vaf)
 
-def assign_colours(clusters):
+def assign_colours(num_colours):
   colours = {}
-  for cidx in range(len(clusters)):
+  for cidx in range(num_colours):
     colours[cidx] = get_next_colour()
-  colours['NA'] = '#fff'
   return colours
 
 def get_next_colour():
@@ -89,9 +100,10 @@ def plot_vaf_matrix(clusters, variants, paramsfn, spreadsheetfn, outf):
 
   ordered_variants = []
   for cidx, C in enumerate(clusters):
+    ordered_variants.append([])
     for V in C:
       # Copy variant so we don't modify original dict.
       variant = dict(variants['s%s' % V])
       variant['cluster'] = cidx
-      ordered_variants.append(variant)
-  print_vafs(ordered_variants, clusters, sampnames, outf)
+      ordered_variants[cidx].append(variant)
+  print_vafs(ordered_variants, sampnames, outf)

@@ -5,7 +5,7 @@ import numpy as np
 import sklearn.cluster
 import colorlover as cl
 from common import parse_ssms, Models
-from vaf_plotter import plot_vaf_matrix
+import vaf_plotter
 from collections import defaultdict
 import tree_sampler
 import tree_builder
@@ -428,7 +428,7 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
 
     json_writer.write_json(sampid, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
     plot_relations_toposort(clustered_relations, clusters, outf)
-    plot_vaf_matrix(clusters, variants, paramsfn, spreadsheetfn, outf)
+    vaf_plotter.plot_vaf_matrix(clusters, variants, paramsfn, spreadsheetfn, outf)
 
 def load_model_probs(model_probs_fn):
   with open(model_probs_fn) as F:
