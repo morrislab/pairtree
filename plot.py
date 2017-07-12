@@ -12,9 +12,31 @@ import tree_builder
 import json_writer
 import phi_fitter
 import handbuilt
+import pairwise
 
 np.set_printoptions(threshold=np.nan)
 np.random.seed(1)
+
+def make_cluster_supervars(clusters, variants):
+  cluster_supervars = []
+  for cidx, cluster in enumerate(clusters):
+    if len(cluster) == 0:
+      cluster_supervars.append(None)
+      continue
+
+    cvars = [variants['s%s' % vidx] for vidx in cluster]
+    cluster_var_reads = np.array([V['var_reads'] for V in cvars])
+    cluster_total_reads = np.array([V['total_reads'] for V in cvars])
+    cluster_supervars.append({
+      'gene': None,
+      'id': None,
+      'chrom': None,
+      'pos': None,
+      'cluster': cidx,
+      'vaf': np.sum(cluster_var_reads, axis=0) / np.sum(cluster_total_reads, axis=0)
+    })
+
+  return cluster_supervars
 
 def create_matrix(model, model_probs, var_names):
   N = len(var_names)
@@ -387,7 +409,8 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
     #sampled_llh.insert(0, 0)
 
     json_writer.write_json(sampid, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
-    vaf_plotter.plot_vaf_matrix(clusters, variants, garbage_variants, paramsfn, spreadsheetfn, outf)
+    supervars = make_cluster_supervars(clusters, variants)
+    vaf_plotter.plot_vaf_matrix(clusters, variants, supervars, garbage_variants, paramsfn, spreadsheetfn, outf)
     #clustered_relations, _ = cluster_relations(relations)
     #plot_relations_toposort(clustered_relations, clusters, outf)
 
@@ -420,4 +443,5 @@ def main():
   model_probs = load_model_probs(args.model_probs_fn)
   plot(args.sampid, model_probs, args.output_type, args.ssm_fn, args.params_fn, args.spreadsheet_fn, args.handbuilt_fn, args.out_fn, args.treesumm_fn, args.mutlist_fn)
 
-main()
+if __name__ == '__main__':
+  main()

@@ -116,4 +116,5 @@ def main():
   posterior, evidence = calc_posterior(variants)
   write_posterior(posterior, evidence, variants, args.out_fn)
 
-main()
+if __name__ == '__main__':
+  main()

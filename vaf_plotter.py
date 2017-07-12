@@ -46,26 +46,6 @@ def find_closest(vec, mat):
   assert best_idx is not None
   return best_idx
 
-def make_cluster_supervars(ordered_variants):
-  cluster_supervars = []
-  for cidx, cluster in enumerate(ordered_variants):
-    if len(cluster) == 0:
-      cluster_supervars.append(None)
-      continue
-
-    cluster_var_reads = np.array([V['var_reads'] for V in cluster])
-    cluster_total_reads = np.array([V['total_reads'] for V in cluster])
-    cluster_supervars.append({
-      'gene': None,
-      'id': None,
-      'chrom': None,
-      'pos': None,
-      'cluster': cidx,
-      'vaf': np.sum(cluster_var_reads, axis=0) / np.sum(cluster_total_reads, axis=0)
-    })
-
-  return cluster_supervars
-
 def partition_garbage_variants(cluster_supervars, garbage_variants):
   supervafs = [C['vaf'] if C is not None else None for C in cluster_supervars]
   parted = [list() for _ in cluster_supervars]
@@ -75,8 +55,8 @@ def partition_garbage_variants(cluster_supervars, garbage_variants):
     parted[closest].append(gvar)
   return parted
 
-def print_vafs(ordered_variants, garbage_variants, sampnames, outf):
-  nclusters = len(ordered_variants)
+def print_vafs(clustered_vars, supervars, garbage_variants, sampnames, outf):
+  nclusters = len(clustered_vars)
   cluster_colours = assign_colours(nclusters)
 
   print('<style>#vafmatrix td, #vafmatrix { padding: 5px; margin: 0; border-collapse: collapse; } #vafmatrix th { transform: rotate(45deg); font-weight: normal !important; } #vafmatrix span { visibility: hidden; } #vafmatrix td:hover > span { visibility: visible; }</style>', file=outf)
@@ -86,10 +66,9 @@ def print_vafs(ordered_variants, garbage_variants, sampnames, outf):
   print(''.join(['<th>%s</th>' % H for H in header]), file=outf)
   print('</thead><tbody>', file=outf)
 
-  supervars = make_cluster_supervars(ordered_variants)
   parted_garbage_vars = partition_garbage_variants(supervars, garbage_variants)
 
-  for supervar, cluster, cluster_garbage_vars in zip(supervars, ordered_variants, parted_garbage_vars):
+  for supervar, cluster, cluster_garbage_vars in zip(supervars, clustered_vars, parted_garbage_vars):
     if len(cluster) == 0:
       continue
     for V in [supervar] + cluster + cluster_garbage_vars:
@@ -124,7 +103,7 @@ def get_next_colour():
   return scale[idx]
 get_next_colour._last_idx = -1
 
-def plot_vaf_matrix(clusters, variants, garbage_variants, paramsfn, spreadsheetfn, outf):
+def plot_vaf_matrix(clusters, variants, supervars, garbage_variants, paramsfn, spreadsheetfn, outf):
   spreadsheet = load_spreadsheet(spreadsheetfn)
   with open(paramsfn) as P:
     params = json.load(P)
@@ -136,12 +115,9 @@ def plot_vaf_matrix(clusters, variants, garbage_variants, paramsfn, spreadsheetf
     V['gene'] = find_gene_name(V['chrom'], V['pos'], spreadsheet)
     V['vaf'] = V['var_reads'] / V['total_reads']
 
-  ordered_variants = []
-  for cidx, C in enumerate(clusters):
-    ordered_variants.append([])
-    for V in C:
-      # Copy variant so we don't modify original dict.
-      variant = dict(variants['s%s' % V])
-      variant['cluster'] = cidx
-      ordered_variants[cidx].append(variant)
-  print_vafs(ordered_variants, garbage_variants, sampnames, outf)
+  # Copy variant so we don't modify original dict.
+  clustered_vars = [[dict(variants['s%s' % vid]) for vid in C] for C in clusters]
+  for cidx, cluster in enumerate(clustered_vars):
+    for var in cluster:
+      var['cluster'] = cidx
+  print_vafs(clustered_vars, supervars, garbage_variants, sampnames, outf)
