@@ -93,7 +93,7 @@ def print_vafs(ordered_variants, garbage_variants, sampnames, outf):
     if len(cluster) == 0:
       continue
     for V in [supervar] + cluster + cluster_garbage_vars:
-      td = ['<td>%s</td>' % V[K] if V[K] is not None else '&mdash;' for K in ('gene', 'id', 'chrom', 'pos', 'cluster')]
+      td = ['<td>%s</td>' % (V[K] if V[K] is not None else '&mdash;') for K in ('gene', 'id', 'chrom', 'pos', 'cluster')]
       td += ['<td style="background-color: %s"><span>%s</span></td>' % (make_colour(v), make_vaf_label(v)) for v in V['vaf']]
       print('<tr style="background-color: %s">%s</tr>' % (
         cluster_colours[V['cluster']],
