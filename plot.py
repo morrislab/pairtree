@@ -372,13 +372,7 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
 
   with open(outfn, 'w') as outf:
     write_header(sampid, output_type, outf)
-    write_legend(outf)
-    if output_type != 'condensed':
-      plot_individual(model_probs, should_cluster, outf)
-      plot_relations(relations, should_cluster, outf)
-
     #clustered_relations, clusters = cluster_relations(relations, remove_small)
-    clustered_relations, _ = cluster_relations(relations)
 
     sampled_adjm, sampled_llh, phi = make_trees(variants, model_probs, clusters)
     sampled_adjm.insert(0, handbuilt_adjm)
@@ -393,8 +387,14 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
     #sampled_llh.insert(0, 0)
 
     json_writer.write_json(sampid, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
-    plot_relations_toposort(clustered_relations, clusters, outf)
     vaf_plotter.plot_vaf_matrix(clusters, variants, garbage_variants, paramsfn, spreadsheetfn, outf)
+    #clustered_relations, _ = cluster_relations(relations)
+    #plot_relations_toposort(clustered_relations, clusters, outf)
+
+    write_legend(outf)
+    if output_type != 'condensed':
+      plot_individual(model_probs, should_cluster, outf)
+      plot_relations(relations, should_cluster, outf)
 
 def load_model_probs(model_probs_fn):
   with open(model_probs_fn) as F:
