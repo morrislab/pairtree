@@ -86,22 +86,24 @@ def calc_posterior(variants):
 
   return (posterior, evidence)
 
-def write_posterior(posterior, evidence, variants, outfn):
+def generate_results(posterior, evidence, variants):
   model_probs = {}
   model_evidence = {}
   for midx, model in enumerate(Models._all):
     model_probs[model]    = {'%s,%s' % (vid1, vid2): P[midx] for (vid1, vid2), P in posterior.items() }
     model_evidence[model] = {'%s,%s' % (vid1, vid2): P[midx] for (vid1, vid2), P in evidence.items()  }
 
-  var_names = { V: variants[V]['name'] for V in variants.keys() }
-  out = {
+  results = {
     'models': Models._all,
     'model_probs': model_probs,
     'model_evidence': model_evidence,
-    'var_names': var_names,
+    'variants': { V: {'name': variants[V]['name']} for V in variants.keys() },
   }
+  return results
+
+def write_results(results, outfn):
   with open(outfn, 'w') as F:
-    json.dump(out, F)
+    json.dump(results, F)
 
 def main():
   parser = argparse.ArgumentParser(
@@ -114,7 +116,8 @@ def main():
 
   variants = parse_ssms(args.ssm_fn)
   posterior, evidence = calc_posterior(variants)
-  write_posterior(posterior, evidence, variants, args.out_fn)
+  results = generate_results (posterior, evidence, variants)
+  write_results(results, args.out_fn)
 
 if __name__ == '__main__':
   main()
