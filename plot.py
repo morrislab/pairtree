@@ -18,33 +18,65 @@ np.set_printoptions(threshold=np.nan)
 np.random.seed(1)
 
 def make_cluster_supervars(clusters, variants):
-  cluster_supervars = []
+  cluster_supervars = {}
+  svid2svidx = {}
+
   for cidx, cluster in enumerate(clusters):
     if len(cluster) == 0:
-      cluster_supervars.append(None)
       continue
-
     cvars = [variants['s%s' % vidx] for vidx in cluster]
-    cluster_var_reads = np.array([V['var_reads'] for V in cvars])
+
     cluster_total_reads = np.array([V['total_reads'] for V in cvars])
-    cluster_supervars.append({
+    cluster_var_reads = np.array([V['var_reads'] for V in cvars])
+    # Correct for sex variants.
+    mu_v = np.array([V['mu_v'] for V in cvars])[:,np.newaxis]
+    cluster_var_reads = np.round(cluster_var_reads / (2*mu_v))
+
+    S = {
       'gene': None,
-      'id': None,
+      'id': 'C%s' % cidx,
+      'name': 'C%s' % cidx,
       'chrom': None,
       'pos': None,
       'cluster': cidx,
-      'vaf': np.sum(cluster_var_reads, axis=0) / np.sum(cluster_total_reads, axis=0)
-    })
+      'mu_v': 0.499,
+      'var_reads': np.sum(cluster_var_reads, axis=0),
+      'total_reads': np.sum(cluster_total_reads, axis=0),
+    }
+    S['vaf'] = S['var_reads'] / S['total_reads']
 
-  return cluster_supervars
+    svid2svidx[S['id']] = len(cluster_supervars)
+    cluster_supervars[S['id']] = S
 
-def create_matrix(model, model_probs, var_names):
-  N = len(var_names)
+  svidx2svid = {V: K for K, V in svid2svidx.items()}
+  return (cluster_supervars, svid2svidx, svidx2svid)
+
+def plot_cluster_mle_relations(supervars, svid2svidx, svidx2svid, outf):
+  posterior, evidence = pairwise.calc_posterior(supervars)
+  results = pairwise.generate_results(posterior, evidence, supervars)
+  model_probs_tensor = create_model_prob_tensor(results, svid2svidx)
+  cluster_relations = calc_relations(model_probs_tensor)
+
+  # Sort rows by toposorted indexes.
+  sorted_idxs = toposort(cluster_relations)
+  sortmap = dict(enumerate(sorted_idxs))
+  cluster_relations = np.array([_reorder_row(cluster_relations[idx], sorted_idxs) for idx in sorted_idxs])
+  svidx2svid = {sortmap[K]: V for K, V in svidx2svid.items()}
+
+  plot_relations(cluster_relations, False, svidx2svid, outf)
+  plot_individual(results, False, svid2svidx, svidx2svid, outf)
+
+def create_matrix(model, model_probs, variants, vid2vidx):
+  N = len(variants)
   mat = np.zeros((N, N))
   for vids, P in model_probs.items():
     assert 0 <= P <= 1
-    vidx1, vidx2 = [int(V[1:]) for V in vids.split(',')]
-    mat[(vidx1, vidx2)] = P
+    vidx1, vidx2 = [vid2vidx[V] for V in vids.split(',')]
+    try:
+      mat[(vidx1, vidx2)] = P
+    except:
+      from IPython import embed
+      embed()
 
   if model in ('cocluster', 'diff_branches'):
     # These should be symmetric.
@@ -123,18 +155,18 @@ def write_table(model, mat, labels, colours, outf):
 
   print('</tbody></table>', file=outf)
 
-def plot_individual(model_probs, should_cluster, outf):
+def plot_individual(model_probs, should_cluster, vid2vidx, vidx2vid, outf):
   for model in Models._all:
-    mat = create_matrix(model, model_probs['model_probs'][model], model_probs['var_names'])
+    mat = create_matrix(model, model_probs['model_probs'][model], model_probs['variants'], vid2vidx)
     if should_cluster:
       mat, ssmidxs = cluster_rows(mat)
-      if model in ('cocluster', 'diff_branches'):
-        # These should be symmetric.
-        assert np.allclose(mat, mat.T)
     else:
       ssmidxs = list(range(len(mat)))
+    if model in ('cocluster', 'diff_branches'):
+      # These should be symmetric.
+      assert np.allclose(mat, mat.T)
     colours = make_colour_matrix(mat, make_colour_from_intensity)
-    write_table(model, mat, ['s%s' % I for I in ssmidxs], colours, outf)
+    write_table(model, mat, [vidx2vid[I] for I in ssmidxs], colours, outf)
 
 def write_legend(outf):
   print('<br><table class="table"><tbody>', file=outf)
@@ -150,12 +182,12 @@ def write_cluster_map(cmap, outf):
     print('<tr><td style="font-weight: bold">C%s</td><td>%s</td></tr>' % (cidx, ssmidxs), file=outf)
   print('</tbody></table>', file=outf)
 
-def create_model_prob_tensor(model_probs):
-  M = len(model_probs['var_names'])
+def create_model_prob_tensor(model_probs, vid2vidx):
+  M = len(model_probs['variants'])
   num_models = len(Models._all)
   tensor = np.zeros((M, M, num_models))
   for midx, mdl in enumerate(Models._all):
-    tensor[:,:,midx] = create_matrix(mdl, model_probs['model_probs'][mdl], model_probs['var_names'])
+    tensor[:,:,midx] = create_matrix(mdl, model_probs['model_probs'][mdl], model_probs['variants'], vid2vidx)
   return tensor
 
 def calc_relations(model_probs):
@@ -164,14 +196,14 @@ def calc_relations(model_probs):
   assert relations.shape == (M, M)
   return relations
 
-def plot_relations(relations, should_cluster, outf):
+def plot_relations(relations, should_cluster, vidx2vid, outf):
   if should_cluster:
     relations, ssmidxs = cluster_rows(relations)
   else:
     ssmidxs = list(range(len(relations)))
 
   colours = make_colour_matrix(relations, make_colour_from_category)
-  write_table('relations', relations, ['s%s' % I for I in ssmidxs], colours, outf)
+  write_table('relations', relations, [vidx2vid[I] for I in ssmidxs], colours, outf)
 
 def combine_identical(mat):
   '''Combine identical rows & columns.'''
@@ -319,11 +351,11 @@ def cluster_variants(model_probs_tensor, vaf_matrix):
 
   return clusters
 
-def make_trees(variants, model_probs, clusters):
-  model_probs_tensor = create_model_prob_tensor(model_probs)
+def make_trees(variants, model_probs, clusters, vid2vidx):
+  model_probs_tensor = create_model_prob_tensor(model_probs, vid2vidx)
 
   #assign_missing(clusters, model_probs_tensor)
-  sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, clusters, 1000)
+  sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, clusters, vid2vidx, 1000)
   #sampled_adjm = [add_normal_root(adj) for adj in sampled_adjm]
   #clusters.insert(0, [])
 
@@ -335,58 +367,41 @@ def make_trees(variants, model_probs, clusters):
   return (sampled_adjm, sampled_llh, phi)
 
 def remove_garbage(garbage_ids, model_probs, variants, clusters):
-  garbage_variants = {'g%s' % gidx: variants['s%s' % vidx] for gidx, vidx in enumerate(garbage_ids)}
-  for gvid, var in garbage_variants.items():
-    var['id'] = gvid
+  garbage_variants = {}
 
-  varid_map = {}
   for varid in sorted(variants.keys(), key = lambda S: int(S[1:])):
     if int(varid[1:]) in garbage_ids:
+      garbage_variants[varid] = variants[varid]
       del variants[varid]
-    else:
-      varid_map[varid] = 's%s' % len(varid_map)
-
-  remapped_model_probs = {}
-  remapped_model_probs['models'] = model_probs['models']
-  remapped_model_probs['var_names'] = {}
-  for varid in model_probs['var_names'].keys():
-    if int(varid[1:]) in garbage_ids:
-      continue
-    remapped_model_probs['var_names'][varid_map[varid]] = model_probs['var_names'][varid]
+      del model_probs['variants'][varid]
 
   for K in ('model_probs', 'model_evidence'):
-    remapped_model_probs[K] = {}
     for model in model_probs[K].keys():
-      remapped_model_probs[K][model] = {}
       for pair in list(model_probs[K][model].keys()):
         vidx1, vidx2 = [int(V[1:]) for V in pair.split(',')]
         if vidx1 in garbage_ids or vidx2 in garbage_ids:
-          pass
-        else:
-          vid1new, vid2new = varid_map['s%s' % vidx1], varid_map['s%s' % vidx2]
-          remapped_model_probs[K][model]['%s,%s' % (vid1new, vid2new)] = model_probs[K][model][pair]
+          del model_probs[K][model][pair]
 
-  renamed_variants = {varid_map[S]: variants[S] for S in variants.keys()}
-  for var in renamed_variants.values():
-    var['id'] = varid_map[var['id']]
-
-  for cidx, cluster in enumerate(clusters):
-    clusters[cidx] = [int(varid_map['s%s' % S][1:]) for S in cluster]
-
-  return (remapped_model_probs, renamed_variants, garbage_variants, clusters)
+  return garbage_variants
 
 def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn):
   variants = parse_ssms(ssmfn)
   garbage_ids = handbuilt.load_garbage(handbuiltfn)
+
   clusters = handbuilt.load_clusters(handbuiltfn, variants)
-  model_probs, variants, garbage_variants, clusters = remove_garbage(garbage_ids, model_probs, variants, clusters)
+  garbage_variants = remove_garbage(garbage_ids, model_probs, variants, clusters)
+  vidxs = sorted(model_probs['variants'].keys(), key = lambda V: int(V[1:]))
+  vidx2vid = dict(enumerate(vidxs))
+  vid2vidx = {V: K for K, V in vidx2vid.items()}
+
+  supervars, svid2svidx, svidx2svid = make_cluster_supervars(clusters, variants)
 
   should_cluster = not (output_type == 'unclustered')
-  model_probs_tensor = create_model_prob_tensor(model_probs)
-  relations = calc_relations(model_probs_tensor)
+  model_probs_tensor = create_model_prob_tensor(model_probs, vid2vidx)
+  ssm_relations = calc_relations(model_probs_tensor)
 
   handbuilt_adjm = handbuilt.load_tree(handbuiltfn)
-  handbuilt_mutrel = tree_sampler.make_mutrel_tensor_from_cluster_adj(handbuilt_adjm, clusters)
+  handbuilt_mutrel = tree_sampler.make_mutrel_tensor_from_cluster_adj(handbuilt_adjm, clusters, vid2vidx)
   handbuilt_llh = tree_sampler.calc_llh(model_probs_tensor, handbuilt_mutrel)
 
   #vaf = make_vaf_matrix(variants)
@@ -396,7 +411,7 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
     write_header(sampid, output_type, outf)
     #clustered_relations, clusters = cluster_relations(relations, remove_small)
 
-    sampled_adjm, sampled_llh, phi = make_trees(variants, model_probs, clusters)
+    sampled_adjm, sampled_llh, phi = make_trees(variants, model_probs, clusters, vid2vidx)
     sampled_adjm.insert(0, handbuilt_adjm)
     sampled_llh.insert(0, handbuilt_llh)
     phi = np.insert(phi, 0, phi[0,:,:], axis=0)
@@ -409,15 +424,15 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
     #sampled_llh.insert(0, 0)
 
     json_writer.write_json(sampid, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
-    supervars = make_cluster_supervars(clusters, variants)
     vaf_plotter.plot_vaf_matrix(clusters, variants, supervars, garbage_variants, paramsfn, spreadsheetfn, outf)
     #clustered_relations, _ = cluster_relations(relations)
     #plot_relations_toposort(clustered_relations, clusters, outf)
+    plot_cluster_mle_relations(supervars, svid2svidx, svidx2svid, outf)
 
     write_legend(outf)
     if output_type != 'condensed':
-      plot_individual(model_probs, should_cluster, outf)
-      plot_relations(relations, should_cluster, outf)
+      plot_individual(model_probs, should_cluster, vid2vidx, vidx2vid, outf)
+      plot_relations(ssm_relations, should_cluster, vidx2vid, outf)
 
 def load_model_probs(model_probs_fn):
   with open(model_probs_fn) as F:

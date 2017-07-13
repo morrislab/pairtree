@@ -3,7 +3,8 @@ import numpy as np
 np.set_printoptions(linewidth=200)
 Models = common.Models
 
-def make_mutrel_tensor_from_cluster_adj(cluster_adj, clusters):
+def make_mutrel_tensor_from_cluster_adj(cluster_adj, clusters, vid2vidx):
+  clusters = [[vid2vidx['s%s' % S] for S in C] for C in clusters]
   cluster_anc = common.make_ancestral_from_adj(cluster_adj)
   # In determining A_B relations, don't want to set mutaitons (i,j), where i
   # and j are in same cluster, to 1.
@@ -88,18 +89,18 @@ def permute_adj(adj):
   return adj
 permute_adj.blah = set()
 
-def sample_trees(data_mutrel, clusters, nsamples):
+def sample_trees(data_mutrel, clusters, vid2vidx, nsamples):
   assert nsamples > 0
   K = len(clusters)
 
   cluster_adj = [init_cluster_adj(K)]
-  tree_mutrel = make_mutrel_tensor_from_cluster_adj(cluster_adj[0], clusters)
+  tree_mutrel = make_mutrel_tensor_from_cluster_adj(cluster_adj[0], clusters, vid2vidx)
   llh = [calc_llh(data_mutrel, tree_mutrel)]
 
   for I in range(1, nsamples):
     old_llh, old_adj = llh[-1], cluster_adj[-1]
     new_adj = permute_adj(old_adj)
-    tree_mutrel = make_mutrel_tensor_from_cluster_adj(new_adj, clusters)
+    tree_mutrel = make_mutrel_tensor_from_cluster_adj(new_adj, clusters, vid2vidx)
     new_llh = calc_llh(data_mutrel, tree_mutrel)
     if False or new_llh - old_llh > np.log(np.random.uniform()):
       # Accept.

@@ -2,6 +2,7 @@ import colorlover as cl
 import csv
 import json
 import numpy as np
+from collections import defaultdict
 
 def load_spreadsheet(spreadsheetfn):
   with open(spreadsheetfn) as S:
@@ -47,12 +48,15 @@ def find_closest(vec, mat):
   return best_idx
 
 def partition_garbage_variants(cluster_supervars, garbage_variants):
-  supervafs = [C['vaf'] if C is not None else None for C in cluster_supervars]
-  parted = [list() for _ in cluster_supervars]
-  for gvar in garbage_variants.values():
+  supervars = list(cluster_supervars.values())
+  supervafs = [C['vaf'] for C in supervars]
+  parted = defaultdict(list)
+
+  for gvar in sorted(garbage_variants.values(), key = lambda V: int(V['id'][1:])):
     gvar['cluster'] = None
-    closest = find_closest(gvar['vaf'], supervafs)
-    parted[closest].append(gvar)
+    closest_idx = find_closest(gvar['vaf'], supervafs)
+    cidx = supervars[closest_idx]['cluster']
+    parted[cidx].append(gvar)
   return parted
 
 def print_vafs(clustered_vars, supervars, garbage_variants, sampnames, outf):
@@ -68,10 +72,13 @@ def print_vafs(clustered_vars, supervars, garbage_variants, sampnames, outf):
 
   parted_garbage_vars = partition_garbage_variants(supervars, garbage_variants)
 
-  for supervar, cluster, cluster_garbage_vars in zip(supervars, clustered_vars, parted_garbage_vars):
+  for cidx, cluster in enumerate(clustered_vars):
     if len(cluster) == 0:
       continue
-    for V in [supervar] + cluster + cluster_garbage_vars:
+    supervar = supervars['C%s' % cidx]
+    garbage = parted_garbage_vars[cidx] if cidx in parted_garbage_vars else []
+
+    for V in [supervar] + cluster + garbage:
       td = ['<td>%s</td>' % (V[K] if V[K] is not None else '&mdash;') for K in ('gene', 'id', 'chrom', 'pos', 'cluster')]
       td += ['<td style="background-color: %s"><span>%s</span></td>' % (make_colour(v), make_vaf_label(v)) for v in V['vaf']]
       print('<tr style="background-color: %s">%s</tr>' % (
