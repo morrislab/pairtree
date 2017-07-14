@@ -16,9 +16,10 @@ def calc_mut_p(A, Z, psi):
   mut_phi = np.dot(A, phi) # Mx1
   mut_p = 0.5 * mut_phi
 
+  # Avoid numerical issues.
   delta = 1e-30
-  mut_p[mut_p == 0]   += delta
-  mut_p[mut_p == 0.5] -= delta
+  mut_p[np.isclose(mut_p, 0)]   += delta
+  mut_p[np.isclose(mut_p, 0.5)] -= delta
 
   return mut_p
 
