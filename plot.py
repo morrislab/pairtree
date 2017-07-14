@@ -75,12 +75,7 @@ def create_matrix(model, model_probs, variants, vid2vidx):
   for vids, P in model_probs.items():
     assert 0 <= P <= 1
     vidx1, vidx2 = [vid2vidx[V] for V in vids.split(',')]
-    try:
-      mat[(vidx1, vidx2)] = P
-    except:
-      from IPython import embed
-      embed()
-
+    mat[(vidx1, vidx2)] = P
   if model in ('cocluster', 'diff_branches'):
     # These should be symmetric.
     assert np.allclose(mat, mat.T)
@@ -354,22 +349,17 @@ def cluster_variants(model_probs_tensor, vaf_matrix):
 
   return clusters
 
-def make_trees(variants, model_probs, clusters, vid2vidx):
-  model_probs_tensor = create_model_prob_tensor(model_probs, vid2vidx)
-
-  #assign_missing(clusters, model_probs_tensor)
-  sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, clusters, vid2vidx, 1000)
-  #sampled_adjm = [add_normal_root(adj) for adj in sampled_adjm]
-  #clusters.insert(0, [])
-
+def fit_phis(adjm, variants, clusters, tidxs=None):
+  ntrees = len(adjm)
   nsamples = len(list(variants.values())[0]['total_reads'])
-  ntrees = len(sampled_adjm)
   phi = np.ones((ntrees, nsamples, len(clusters)))
-  for tidx in (0, -1):
-    # Fit phis for handbuilt tree and last sampled tree.
-    phi[tidx,:,:] = phi_fitter.fit_phis(sampled_adjm[tidx], clusters, variants)
 
-  return (sampled_adjm, sampled_llh, phi)
+  if tidxs is None:
+    tidxs = range(ntrees)
+  for tidx in tidxs:
+    phi[tidx,:,:] = phi_fitter.fit_phis(adjm[tidx], clusters, variants)
+
+  return phi
 
 def remove_garbage(garbage_ids, model_probs, variants, clusters):
   garbage_variants = {}
@@ -392,8 +382,8 @@ def remove_garbage(garbage_ids, model_probs, variants, clusters):
 def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn):
   variants = parse_ssms(ssmfn)
   garbage_ids = handbuilt.load_garbage(handbuiltfn)
-
   clusters = handbuilt.load_clusters(handbuiltfn, variants)
+
   garbage_variants = remove_garbage(garbage_ids, model_probs, variants, clusters)
   vidxs = sorted(model_probs['variants'].keys(), key = lambda V: int(V[1:]))
   vidx2vid = dict(enumerate(vidxs))
@@ -420,7 +410,7 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
     #sampled_adjm.insert(0, mle_adjm)
     #sampled_llh.insert(0, 0)
 
-    sampled_adjm, sampled_llh, phi = make_trees(variants, model_probs, clusters, vid2vidx)
+    sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, clusters, vid2vidx, 1000)
 
     supervar_relations = plot_cluster_mle_relations(supervars, svid2svidx, svidx2svid, outf)
     try:
@@ -431,15 +421,16 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
     handbuilt_adjm = handbuilt.load_tree(handbuiltfn)
 
 
-    for adjm in (handbuilt_adjm, mle_adjm):
+    for adjm in (mle_adjm, handbuilt_adjm):
       if adjm is None:
         continue
       mutrel = tree_sampler.make_mutrel_tensor_from_cluster_adj(adjm, clusters, vid2vidx)
       llh = tree_sampler.calc_llh(model_probs_tensor, mutrel)
       sampled_adjm.insert(0, adjm)
       sampled_llh.insert(0, llh)
-      phi = np.insert(phi, 0, phi[0,:,:], axis=0)
 
+    # Fit phis for handbuilt tere and last sampled tree.
+    phi = fit_phis(sampled_adjm, variants, clusters, tidxs=(0, -1))
     json_writer.write_json(sampid, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
 
     #clustered_relations, _ = cluster_relations(relations)
