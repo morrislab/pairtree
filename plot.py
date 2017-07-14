@@ -30,7 +30,7 @@ def make_cluster_supervars(clusters, variants):
     cluster_var_reads = np.array([V['var_reads'] for V in cvars])
     # Correct for sex variants.
     mu_v = np.array([V['mu_v'] for V in cvars])[:,np.newaxis]
-    cluster_var_reads = np.round(cluster_var_reads / (2*mu_v))
+    cluster_var_reads = np.round(cluster_var_reads / (2*(1 - mu_v)))
 
     S = {
       'gene': None,
