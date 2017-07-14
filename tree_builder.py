@@ -4,7 +4,8 @@ import numpy as np
 def make_adj(relations):
   N = len(relations)
   assert relations.shape == (N, N)
-  assert relations[1,0] == Models.B_A
+  if relations[1,0] != Models.B_A:
+    raise CannotBuildTreeException('First subclone is not child of clonal node')
 
   adj = np.eye(N)
   adj[0,1] = 1
@@ -20,6 +21,9 @@ def make_adj(relations):
       elif relations[I,J] == Models.diff_branches:
         pass
       else:
-        raise Exception('Unexpected relation for (%s,%s): %s' % (I, J, Models._all[relations[I,J]]))
+        raise CannotBuildTreeException('Unexpected relation for (%s,%s): %s' % (I, J, Models._all[relations[I,J]]))
 
   return adj
+
+class CannotBuildTreeException(Exception):
+  pass
