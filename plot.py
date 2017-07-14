@@ -365,7 +365,9 @@ def make_trees(variants, model_probs, clusters, vid2vidx):
   nsamples = len(list(variants.values())[0]['total_reads'])
   ntrees = len(sampled_adjm)
   phi = np.ones((ntrees, nsamples, len(clusters)))
-  phi[-1,:,:] = phi_fitter.fit_phis(sampled_adjm[-1], clusters, variants)
+  for tidx in (0, -1):
+    # Fit phis for handbuilt tree and last sampled tree.
+    phi[tidx,:,:] = phi_fitter.fit_phis(sampled_adjm[tidx], clusters, variants)
 
   return (sampled_adjm, sampled_llh, phi)
 
@@ -418,22 +420,16 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
     #sampled_adjm.insert(0, mle_adjm)
     #sampled_llh.insert(0, 0)
 
-    vaf_plotter.plot_vaf_matrix(clusters, variants, supervars, garbage_variants, paramsfn, spreadsheetfn, outf)
-    #clustered_relations, _ = cluster_relations(relations)
-    #plot_relations_toposort(clustered_relations, clusters, outf)
-    supervar_relations = plot_cluster_mle_relations(supervars, svid2svidx, svidx2svid, outf)
-    plot_individual(model_probs, should_cluster, vid2vidx, vidx2vid, outf)
-    plot_relations(ssm_relations, should_cluster, vidx2vid, outf)
-    write_legend(outf)
-
     sampled_adjm, sampled_llh, phi = make_trees(variants, model_probs, clusters, vid2vidx)
 
+    supervar_relations = plot_cluster_mle_relations(supervars, svid2svidx, svidx2svid, outf)
     try:
       mle_adjm = tree_builder.make_adj(supervar_relations)
       mle_adjm = add_normal_root(mle_adjm)
     except tree_builder.CannotBuildTreeException:
       mle_adjm = None
     handbuilt_adjm = handbuilt.load_tree(handbuiltfn)
+
 
     for adjm in (handbuilt_adjm, mle_adjm):
       if adjm is None:
@@ -445,6 +441,13 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
       phi = np.insert(phi, 0, phi[0,:,:], axis=0)
 
     json_writer.write_json(sampid, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
+
+    #clustered_relations, _ = cluster_relations(relations)
+    #plot_relations_toposort(clustered_relations, clusters, outf)
+    plot_individual(model_probs, should_cluster, vid2vidx, vidx2vid, outf)
+    plot_relations(ssm_relations, should_cluster, vidx2vid, outf)
+    vaf_plotter.plot_vaf_matrix(clusters, variants, supervars, garbage_variants, phi[0].T, paramsfn, spreadsheetfn, outf)
+    write_legend(outf)
 
 def load_model_probs(model_probs_fn):
   with open(model_probs_fn) as F:

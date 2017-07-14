@@ -59,7 +59,19 @@ def partition_garbage_variants(cluster_supervars, garbage_variants):
     parted[cidx].append(gvar)
   return parted
 
-def print_vafs(clustered_vars, supervars, garbage_variants, sampnames, outf):
+def make_phi_pseudovars(phi):
+  V = [{
+    'gene': None,
+    'id': 'P%s' % cidx,
+    'name': 'P%s' % cidx,
+    'chrom': None,
+    'pos': None,
+    'cluster': cidx,
+    'vaf': 0.5 * row,
+  } for cidx, row in enumerate(phi)]
+  return V
+
+def print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, outf):
   nclusters = len(clustered_vars)
   cluster_colours = assign_colours(nclusters)
 
@@ -71,14 +83,16 @@ def print_vafs(clustered_vars, supervars, garbage_variants, sampnames, outf):
   print('</thead><tbody>', file=outf)
 
   parted_garbage_vars = partition_garbage_variants(supervars, garbage_variants)
+  phi_pseudovars = make_phi_pseudovars(phi)
 
   for cidx, cluster in enumerate(clustered_vars):
     if len(cluster) == 0:
       continue
     supervar = supervars['C%s' % cidx]
     garbage = parted_garbage_vars[cidx] if cidx in parted_garbage_vars else []
+    phi_pseudovar = phi_pseudovars[cidx]
 
-    for V in [supervar] + cluster + garbage:
+    for V in [phi_pseudovar, supervar] + cluster + garbage:
       td = ['<td>%s</td>' % (V[K] if V[K] is not None else '&mdash;') for K in ('gene', 'id', 'chrom', 'pos', 'cluster')]
       td += ['<td style="background-color: %s"><span>%s</span></td>' % (make_colour(v), make_vaf_label(v)) for v in V['vaf']]
       print('<tr style="background-color: %s">%s</tr>' % (
@@ -110,7 +124,7 @@ def get_next_colour():
   return scale[idx]
 get_next_colour._last_idx = -1
 
-def plot_vaf_matrix(clusters, variants, supervars, garbage_variants, paramsfn, spreadsheetfn, outf):
+def plot_vaf_matrix(clusters, variants, supervars, garbage_variants, phi, paramsfn, spreadsheetfn, outf):
   spreadsheet = load_spreadsheet(spreadsheetfn)
   with open(paramsfn) as P:
     params = json.load(P)
@@ -127,4 +141,4 @@ def plot_vaf_matrix(clusters, variants, supervars, garbage_variants, paramsfn, s
   for cidx, cluster in enumerate(clustered_vars):
     for var in cluster:
       var['cluster'] = cidx
-  print_vafs(clustered_vars, supervars, garbage_variants, sampnames, outf)
+  print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, outf)
