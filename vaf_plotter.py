@@ -124,11 +124,8 @@ def get_next_colour():
   return scale[idx]
 get_next_colour._last_idx = -1
 
-def plot_vaf_matrix(clusters, variants, supervars, garbage_variants, phi, paramsfn, spreadsheetfn, outf):
+def plot_vaf_matrix(clusters, variants, supervars, garbage_variants, phi, sampnames, spreadsheetfn, outf):
   spreadsheet = load_spreadsheet(spreadsheetfn)
-  with open(paramsfn) as P:
-    params = json.load(P)
-  sampnames = params['samples']
 
   for V in list(variants.values()) + list(garbage_variants.values()):
     V['chrom'], V['pos'] = V['name'].split('_')

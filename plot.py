@@ -13,6 +13,7 @@ import json_writer
 import phi_fitter
 import handbuilt
 import pairwise
+import eta_plotter
 
 np.set_printoptions(threshold=np.nan)
 np.random.seed(1)
@@ -352,14 +353,16 @@ def cluster_variants(model_probs_tensor, vaf_matrix):
 def fit_phis(adjm, variants, clusters, tidxs=None):
   ntrees = len(adjm)
   nsamples = len(list(variants.values())[0]['total_reads'])
+
+  eta = np.ones((ntrees, nsamples, len(clusters)))
   phi = np.ones((ntrees, nsamples, len(clusters)))
 
   if tidxs is None:
     tidxs = range(ntrees)
   for tidx in tidxs:
-    phi[tidx,:,:] = phi_fitter.fit_phis(adjm[tidx], clusters, variants)
+    phi[tidx,:,:], eta[tidx,:,:] = phi_fitter.fit_phis(adjm[tidx], clusters, variants)
 
-  return phi
+  return (phi, eta)
 
 def remove_garbage(garbage_ids, model_probs, variants, clusters):
   garbage_variants = {}
@@ -379,7 +382,15 @@ def remove_garbage(garbage_ids, model_probs, variants, clusters):
 
   return garbage_variants
 
+def load_sampnames(paramsfn):
+  with open(paramsfn) as P:
+    params = json.load(P)
+  sampnames = params['samples']
+  return sampnames
+
 def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn):
+  sampnames = load_sampnames(paramsfn)
+
   variants = parse_ssms(ssmfn)
   garbage_ids = handbuilt.load_garbage(handbuiltfn)
   clusters = handbuilt.load_clusters(handbuiltfn, variants)
@@ -429,15 +440,15 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
       sampled_adjm.insert(0, adjm)
       sampled_llh.insert(0, llh)
 
-    # Fit phis for handbuilt tere and last sampled tree.
-    phi = fit_phis(sampled_adjm, variants, clusters, tidxs=(0, -1))
+    phi, eta = fit_phis(sampled_adjm, variants, clusters, tidxs=(0, -1))
+    eta_plotter.plot_eta(eta[0].T, sampnames)
     json_writer.write_json(sampid, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
 
     #clustered_relations, _ = cluster_relations(relations)
     #plot_relations_toposort(clustered_relations, clusters, outf)
     plot_individual(model_probs, should_cluster, vid2vidx, vidx2vid, outf)
     plot_relations(ssm_relations, should_cluster, vidx2vid, outf)
-    vaf_plotter.plot_vaf_matrix(clusters, variants, supervars, garbage_variants, phi[0].T, paramsfn, spreadsheetfn, outf)
+    vaf_plotter.plot_vaf_matrix(clusters, variants, supervars, garbage_variants, phi[0].T, sampnames, spreadsheetfn, outf)
     write_legend(outf)
 
 def load_model_probs(model_probs_fn):

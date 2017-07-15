@@ -3,7 +3,7 @@ import scipy.stats
 import common
 np.seterr(invalid='raise')
 
-# Matrices: M mutations, K clusters
+# Matrices: M mutations, K clusters, S samples
 #   adj: KxK, adjacency matrix -- adj[a,b]=1 iff a is parent of b (with 1 on diagonal)
 #   Z: KxK, Z[a,b]=1 iff cluster a is ancestral to cluster b (with 1 on diagonal)
 #   A: MxK, A[m,k]=1 iff mut m is in cluster k
@@ -38,13 +38,15 @@ def fit_all_phis(adj, A, ref_reads, var_reads):
   M, K = A.shape
   _, S = ref_reads.shape
   psi = np.zeros((S, K))
+  eta = np.zeros((S, K))
   phi = np.zeros((S, K))
 
   for s in range(S):
     psi[s] = grad_desc(var_reads[:,s], ref_reads[:,s], A, Z)
-    phi[s] = np.dot(Z, softmax(psi[s]))
+    eta[s] = softmax(psi[s])
+    phi[s] = np.dot(Z, eta[s])
 
-  return phi
+  return (phi, eta)
 
 def calc_grad(var_reads, ref_reads, A, Z, psi):
   M, K = A.shape
