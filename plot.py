@@ -86,7 +86,8 @@ def create_matrix(model, model_probs, variants, vid2vidx):
 def _reorder_row(R, idxs):
   return np.array([R[idx] for idx in idxs])
 
-def cluster_rows(mat):
+def cluster_square_mat(mat):
+  '''Reorder both rows & columns.'''
   affprop = sklearn.cluster.AffinityPropagation(damping=0.5)
   affprop.fit(mat)
   labels = affprop.predict(mat)
@@ -99,6 +100,36 @@ def cluster_rows(mat):
   rows = [_reorder_row(R, idxs) for R in rows]
 
   return (np.array(rows), idxs)
+
+def cluster_rows(mat, start=None, end=None):
+  N = len(mat)
+  if start is None:
+    start = 0
+  if end is None:
+    end = N
+
+  fullidxs = np.array(range(N))
+  submat = mat[start:end]
+
+  affprop = sklearn.cluster.AffinityPropagation(damping=0.5)
+  affprop.fit(submat)
+  labels = affprop.predict(submat)
+
+  annotated = list(zip(submat, labels, range(end - start)))
+  # Sort by cluster, then by row index.
+  annotated = sorted(annotated, key = lambda R: R[1:])
+  rows, idxs = zip(*[(R, I) for R, L, I in annotated])
+  submat = np.array(rows)
+  idxs = np.array(idxs)
+
+  fullidxs[start:end] = idxs + start
+  mat = np.vstack((mat[:start], submat, mat[end:]))
+  return (mat, fullidxs)
+
+def cluster_cols(mat, start=None, end=None):
+  mat = mat.T
+  mat, idxs = cluster_rows(mat, start, end)
+  return (mat.T, idxs)
 
 def make_colour_from_intensity(intensity):
   val = np.int(np.round(255*(1 - intensity)))
@@ -158,7 +189,7 @@ def plot_individual(model_probs, should_cluster, vid2vidx, vidx2vid, outf):
   for model in Models._all:
     mat = create_matrix(model, model_probs['model_probs'][model], model_probs['variants'], vid2vidx)
     if should_cluster:
-      mat, ssmidxs = cluster_rows(mat)
+      mat, ssmidxs = cluster_square_mat(mat)
     else:
       ssmidxs = list(range(len(mat)))
     if model in ('cocluster', 'diff_branches'):
@@ -197,7 +228,7 @@ def calc_relations(model_probs):
 
 def plot_relations(relations, should_cluster, vidx2vid, outf):
   if should_cluster:
-    relations, ssmidxs = cluster_rows(relations)
+    relations, ssmidxs = cluster_square_mat(relations)
   else:
     ssmidxs = list(range(len(relations)))
 
@@ -388,10 +419,22 @@ def load_sampnames(paramsfn):
   sampnames = params['samples']
   return sampnames
 
+def cluster_samples(variants, sampnames):
+  vaf = make_vaf_matrix(variants)
+  _, idxs = cluster_cols(vaf)
+
+  for var in variants.values():
+    for K in ('ref_reads', 'var_reads', 'total_reads'):
+      var[K] = var[K][idxs]
+  sampnames = [sampnames[idx] for idx in idxs]
+
+  return (variants, sampnames)
+
 def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn):
   sampnames = load_sampnames(paramsfn)
-
   variants = parse_ssms(ssmfn)
+  variants, sampnames = cluster_samples(variants, sampnames)
+
   garbage_ids = handbuilt.load_garbage(handbuiltfn)
   clusters = handbuilt.load_clusters(handbuiltfn, variants)
 
