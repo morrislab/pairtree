@@ -101,36 +101,6 @@ def cluster_square_mat(mat):
 
   return (np.array(rows), idxs)
 
-def cluster_rows(mat, start=None, end=None):
-  N = len(mat)
-  if start is None:
-    start = 0
-  if end is None:
-    end = N
-
-  fullidxs = np.array(range(N))
-  submat = mat[start:end]
-
-  affprop = sklearn.cluster.AffinityPropagation(damping=0.5)
-  affprop.fit(submat)
-  labels = affprop.predict(submat)
-
-  annotated = list(zip(submat, labels, range(end - start)))
-  # Sort by cluster, then by row index.
-  annotated = sorted(annotated, key = lambda R: R[1:])
-  rows, idxs = zip(*[(R, I) for R, L, I in annotated])
-  submat = np.array(rows)
-  idxs = np.array(idxs)
-
-  fullidxs[start:end] = idxs + start
-  mat = np.vstack((mat[:start], submat, mat[end:]))
-  return (mat, fullidxs)
-
-def cluster_cols(mat, start=None, end=None):
-  mat = mat.T
-  mat, idxs = cluster_rows(mat, start, end)
-  return (mat.T, idxs)
-
 def make_colour_from_intensity(intensity):
   val = np.int(np.round(255*(1 - intensity)))
   return 'rgb(255, %s, %s)' % (2*(val,))
@@ -347,10 +317,10 @@ def cluster_samples(variants, sampnames):
 def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn):
   sampnames = load_sampnames(paramsfn)
   variants = parse_ssms(ssmfn)
-  variants, sampnames = cluster_samples(variants, sampnames)
 
   garbage_ids = handbuilt.load_garbage(handbuiltfn)
   clusters = handbuilt.load_clusters(handbuiltfn, variants)
+  handbuilt_adjm = handbuilt.load_tree(handbuiltfn)
 
   garbage_variants = remove_garbage(garbage_ids, model_probs, variants, clusters)
   vidxs = sorted(model_probs['variants'].keys(), key = lambda V: int(V[1:]))
@@ -368,12 +338,12 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
   with open(outfn, 'w') as outf:
     write_header(sampid, output_type, outf)
     supervar_relations = plot_cluster_mle_relations(supervars, svid2svidx, svidx2svid, outf)
-    try:
-      mle_adjm = tree_builder.make_adj(supervar_relations)
-      mle_adjm = add_normal_root(mle_adjm)
-    except tree_builder.CannotBuildTreeException:
-      mle_adjm = None
-    handbuilt_adjm = handbuilt.load_tree(handbuiltfn)
+    #try:
+    #  mle_adjm = tree_builder.make_adj(supervar_relations)
+    #  mle_adjm = add_normal_root(mle_adjm)
+    #except tree_builder.CannotBuildTreeException:
+    #  mle_adjm = None
+    mle_adjm = None
 
     for adjm in (mle_adjm, handbuilt_adjm):
       if adjm is None:
@@ -383,15 +353,13 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
       sampled_adjm.insert(0, adjm)
       sampled_llh.insert(0, llh)
 
-    phi, eta = fit_phis(sampled_adjm, variants, clusters, tidxs=(0, -1))
-    with open('phi.pickle', 'wb') as F:
-      import pickle
-      pickle.dump((phi, eta), F)
+    phi, eta = fit_phis(sampled_adjm, variants, clusters, tidxs=(0,))#tidxs=(0, -1))
     json_writer.write_json(sampid, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
 
     plot_individual(model_probs, should_cluster, vid2vidx, vidx2vid, outf)
     plot_relations(ssm_relations, should_cluster, vidx2vid, outf)
     vaf_plotter.plot_vaf_matrix(clusters, variants, supervars, garbage_variants, phi[0].T, sampnames, spreadsheetfn, outf)
+    eta_plotter.plot_eta(eta[0].T, sampnames, outf)
     write_legend(outf)
 
 def load_model_probs(model_probs_fn):

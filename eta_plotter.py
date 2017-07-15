@@ -52,9 +52,34 @@ def reorder_cols(mat, start=None, end=None):
   mat, idxs = reorder_rows(mat, start, end)
   return (mat.T, idxs)
 
+def find_xeno_ranges(sampnames):
+  def _is_xeno(samp):
+    return 'xeno' in samp.lower()
+  assert not _is_xeno(sampnames[0])
+
+  last_was_xeno = False
+  xeno_range_start = None
+  xeno_ranges = []
+  for idx, S in enumerate(sampnames[1:]):
+    idx += 1
+    if _is_xeno(S) and not last_was_xeno:
+      assert xeno_range_start is None
+      xeno_range_start = idx
+    elif not _is_xeno(S) and last_was_xeno:
+      xeno_ranges.append((xeno_range_start, idx))
+      xeno_range_start = None
+    last_was_xeno = _is_xeno(S)
+
+  if xeno_range_start is not None:
+    xeno_ranges.append((xeno_range_start, len(sampnames)))
+    xeno_range_start = None
+  return xeno_ranges
+
 def reorder_samples(eta, sampnames):
-  eta, idxs = reorder_cols(eta)
-  sampnames = [sampnames[I] for I in idxs]
+  xeno_ranges = find_xeno_ranges(sampnames)
+  for start, end in xeno_ranges:
+    eta, idxs = reorder_cols(eta, start, end)
+    sampnames = [sampnames[I] for I in idxs]
   return (eta, sampnames)
 
 def plot_eta(eta, sampnames, outf):
