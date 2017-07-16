@@ -34,10 +34,13 @@ def reorder_rows(mat, start=None, end=None):
   submat = mat[start:end]
 
   # n_clusters doesn't matter, as we're only interested in the linkage tree
-  # between data points, and sklearn will calculate the full tree for us
-  # regardless. (Though, with more data points, we might need to force this by
-  # passing the `complete_full_tree` to the clusterer constructor.
-  agglo = sklearn.cluster.AgglomerativeClustering(n_clusters=3)
+  # between data points.
+  agglo = sklearn.cluster.AgglomerativeClustering(
+    n_clusters=len(submat),
+    #affinity = 'l2',
+    #linkage = 'complete',
+    compute_full_tree = True,
+  )
   labels = agglo.fit_predict(submat)
   adjlist, root = agglo_children_to_adjlist(agglo.children_, agglo.n_leaves_)
   idxs = dfs(adjlist, root)
@@ -73,6 +76,14 @@ def find_xeno_ranges(sampnames):
   if xeno_range_start is not None:
     xeno_ranges.append((xeno_range_start, len(sampnames)))
     xeno_range_start = None
+
+  proposed_xenos = len(sampnames) * [False]
+  for start, end in xeno_ranges:
+    for idx in range(start, end):
+      proposed_xenos[idx] = True
+  truth_xenos = [_is_xeno(S) for S in sampnames]
+  assert np.array_equal(np.array(proposed_xenos), np.array(truth_xenos))
+
   return xeno_ranges
 
 def reorder_samples(eta, sampnames):
@@ -84,12 +95,13 @@ def reorder_samples(eta, sampnames):
 
 def plot_eta(eta, sampnames, outf):
   eta, sampnames = reorder_samples(eta, sampnames)
+  short_sampnames = [S.replace('Diagnosis Xeno', 'DX').replace('Relapse Xeno', 'RX')  for S in sampnames]
 
   # eta: KxS, K = # of clusters, S = # of samples
   etacum = np.cumsum(eta, axis=0)
   traces = [go.Scatter(
     name = 'Population %s' % cidx,
-    x = sampnames,
+    x = short_sampnames,
     y = cumrow,
     text = ['Population %s: %.0f%%' % (cidx, 100*E) for E in origrow],
     hoverinfo = 'x+text',
