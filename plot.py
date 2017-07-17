@@ -355,10 +355,10 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
     phi, eta = fit_phis(sampled_adjm, variants, clusters, tidxs=(0, -1))
     json_writer.write_json(sampid, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
 
-    plot_individual(model_probs, should_cluster, vid2vidx, vidx2vid, outf)
-    plot_relations(ssm_relations, should_cluster, vidx2vid, outf)
     vaf_plotter.plot_vaf_matrix(clusters, variants, supervars, garbage_variants, phi[0].T, sampnames, spreadsheetfn, outf)
     eta_plotter.plot_eta(eta[0].T, sampnames, outf)
+    plot_individual(model_probs, should_cluster, vid2vidx, vidx2vid, outf)
+    plot_relations(ssm_relations, should_cluster, vidx2vid, outf)
     write_legend(outf)
 
 def load_model_probs(model_probs_fn):

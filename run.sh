@@ -2,9 +2,10 @@
 set -euo pipefail
 
 PROTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+RUNNAME=xenos
 BASEDIR=~/work/steph
 SSMDIR=$BASEDIR/data/inputs/steph.xenos.nocns
-OUTDIR=$BASEDIR/data/pairwise
+OUTDIR=$BASEDIR/data/pairwise.$RUNNAME
 HANDBUILTDIR=$BASEDIR/data/handbuilt_trees
 RENAMEDSAMPS=$BASEDIR/misc/renamed.txt
 HIDDENSAMPS=$BASEDIR/misc/hidden.txt
@@ -102,7 +103,9 @@ function add_tree_indices {
 }
 
 function add_to_witness {
-  cp -a $OUTDIR/*.{summ,muts}.json $PWGSDIR/witness/data/steph
+  witnessdir=$PWGSDIR/witness/data/steph.$RUNNAME.$(date '+%Y%m%d')
+  mkdir -p $witnessdir
+  cp -a $OUTDIR/*.{summ,muts}.json $witnessdir
   cd $PWGSDIR/witness
   python2 index_data.py
 }
@@ -115,7 +118,7 @@ function main {
 
   #calc_pairwise
   plot
-  #add_tree_indices
+  add_tree_indices
   write_index
   add_to_witness
 }
