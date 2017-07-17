@@ -332,12 +332,11 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
   should_cluster = not (output_type == 'unclustered')
   model_probs_tensor = create_model_prob_tensor(model_probs, vid2vidx)
   ssm_relations = calc_relations(model_probs_tensor)
-
+  #supervar_relations = plot_cluster_mle_relations(supervars, svid2svidx, svidx2svid, outf)
   sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, clusters, vid2vidx, 1000)
 
   with open(outfn, 'w') as outf:
     write_header(sampid, output_type, outf)
-    supervar_relations = plot_cluster_mle_relations(supervars, svid2svidx, svidx2svid, outf)
     #try:
     #  mle_adjm = tree_builder.make_adj(supervar_relations)
     #  mle_adjm = add_normal_root(mle_adjm)
@@ -353,7 +352,7 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
       sampled_adjm.insert(0, adjm)
       sampled_llh.insert(0, llh)
 
-    phi, eta = fit_phis(sampled_adjm, variants, clusters, tidxs=(0,))#tidxs=(0, -1))
+    phi, eta = fit_phis(sampled_adjm, variants, clusters, tidxs=(0, -1))
     json_writer.write_json(sampid, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
 
     plot_individual(model_probs, should_cluster, vid2vidx, vidx2vid, outf)

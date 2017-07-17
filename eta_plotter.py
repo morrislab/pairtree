@@ -36,9 +36,9 @@ def reorder_rows(mat, start=None, end=None):
   # n_clusters doesn't matter, as we're only interested in the linkage tree
   # between data points.
   agglo = sklearn.cluster.AgglomerativeClustering(
-    n_clusters=len(submat),
-    #affinity = 'l2',
-    #linkage = 'complete',
+    n_clusters = len(submat),
+    affinity = 'l2',
+    linkage = 'average',
     compute_full_tree = True,
   )
   labels = agglo.fit_predict(submat)
@@ -87,6 +87,12 @@ def find_xeno_ranges(sampnames):
   return xeno_ranges
 
 def reorder_samples(eta, sampnames):
+  # For now, don't respect patient sample boundaries -- feel free to move
+  # everything around.
+  eta, idxs = reorder_cols(eta)
+  sampnames = [sampnames[I] for I in idxs]
+  return (eta, sampnames)
+
   xeno_ranges = find_xeno_ranges(sampnames)
   for start, end in xeno_ranges:
     eta, idxs = reorder_cols(eta, start, end)
