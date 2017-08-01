@@ -30,20 +30,38 @@ def calc_llh(var_reads, ref_reads, A, Z, psi):
   return np.sum(mut_probs)
 
 def fit_phis(adj, clusters, variants):
-  A, ref_reads, var_reads = extract_mut_info(clusters, variants)
+  supervars, _, _ = common.make_cluster_supervars(clusters, variants)
+  ref_reads = np.array([2*supervars[cid]['ref_reads'] for cid in sorted(supervars.keys(), key = lambda C: int(C[1:]))])
+  var_reads = np.array([2*supervars[cid]['var_reads'] for cid in sorted(supervars.keys(), key = lambda C: int(C[1:]))])
+  assert len(supervars) == len(adj) - 1
+  # Supervar `i` is in cluster `i`. Cluster 0 is empty.
+  A = np.insert(np.eye(len(supervars)), 0, 0, axis=1)
   return fit_all_phis(adj, A, ref_reads, var_reads)
 
 def fit_all_phis(adj, A, ref_reads, var_reads):
   Z = common.make_ancestral_from_adj(adj)
   M, K = A.shape
   _, S = ref_reads.shape
+
+  phi_implied = 2*(var_reads / (ref_reads + var_reads))
+  # Make first row 1 to account for normal root.
+  phi_implied = np.insert(phi_implied, 0, 1, axis=0)
+  # Since phi = Z.eta, we have eta = (Z^-1)phi.
+  eta = np.dot(np.linalg.inv(Z), phi_implied).T
+
+  assert eta.shape == (S, K)
   psi = np.zeros((S, K))
-  eta = np.zeros((S, K))
   phi = np.zeros((S, K))
 
   for s in range(S):
-    psi[s] = grad_desc(var_reads[:,s], ref_reads[:,s], A, Z)
-    eta[s] = softmax(psi[s])
+    # If no negative elements are in eta, we have the analytic solution.
+    # Otherwise, set the negative elements to zero to provide an initial
+    # starting point, then run the optimizer.
+    if np.any(eta[s] < 0):
+      eta_s = np.maximum(1e-10, eta[s])
+      psi_s = np.log(eta_s)
+      psi[s] = grad_desc(var_reads[:,s], ref_reads[:,s], A, Z, psi_s)
+      eta[s] = softmax(psi[s])
     phi[s] = np.dot(Z, eta[s])
 
   return (phi, eta)
@@ -78,7 +96,7 @@ def calc_grad_numerical(var_reads, ref_reads, A, Z, psi):
     grad[k] = (calc_llh(var_reads, ref_reads, A, Z, P) - calc_llh(var_reads, ref_reads, A, Z, psi)) / delta
   return grad
 
-def grad_desc(var_reads, ref_reads, A, Z):
+def grad_desc(var_reads, ref_reads, A, Z, psi):
   learn_rate = 1e-4
   iterations = 1000
 
@@ -87,7 +105,6 @@ def grad_desc(var_reads, ref_reads, A, Z):
 
   last_llh = -float('inf')
   last_psi = None
-  psi = np.random.normal(size=K)
 
   for I in range(iterations):
     grad = calc_grad(var_reads, ref_reads, A, Z, psi)

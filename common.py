@@ -52,3 +52,38 @@ def make_ancestral_from_adj(adj):
     Z[k] = _find_desc(k, adj[k])
 
   return Z
+
+def make_cluster_supervars(clusters, variants):
+  cluster_supervars = {}
+  svid2svidx = {}
+
+  for cidx, cluster in enumerate(clusters):
+    if len(cluster) == 0:
+      continue
+    cvars = [variants['s%s' % vidx] for vidx in cluster]
+
+    cluster_total_reads = np.array([V['total_reads'] for V in cvars])
+    cluster_var_reads = np.array([V['var_reads'] for V in cvars])
+    # Correct for sex variants.
+    mu_v = np.array([V['mu_v'] for V in cvars])[:,np.newaxis]
+    cluster_var_reads = np.round(cluster_var_reads / (2*(1 - mu_v)))
+
+    S = {
+      'gene': None,
+      'id': 'C%s' % cidx,
+      'name': 'C%s' % cidx,
+      'chrom': None,
+      'pos': None,
+      'cluster': cidx,
+      'mu_v': 0.499,
+      'var_reads': np.sum(cluster_var_reads, axis=0),
+      'total_reads': np.sum(cluster_total_reads, axis=0),
+    }
+    S['ref_reads'] = S['total_reads'] - S['var_reads']
+    S['vaf'] = S['var_reads'] / S['total_reads']
+
+    svid2svidx[S['id']] = len(cluster_supervars)
+    cluster_supervars[S['id']] = S
+
+  svidx2svid = {V: K for K, V in svid2svidx.items()}
+  return (cluster_supervars, svid2svidx, svidx2svid)

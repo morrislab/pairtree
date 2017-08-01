@@ -4,7 +4,8 @@ import json
 import numpy as np
 import sklearn.cluster
 import colorlover as cl
-from common import parse_ssms, Models
+import common
+from common import Models
 import vaf_plotter
 from collections import defaultdict
 import tree_sampler
@@ -17,40 +18,6 @@ import eta_plotter
 
 np.set_printoptions(threshold=np.nan)
 np.random.seed(1)
-
-def make_cluster_supervars(clusters, variants):
-  cluster_supervars = {}
-  svid2svidx = {}
-
-  for cidx, cluster in enumerate(clusters):
-    if len(cluster) == 0:
-      continue
-    cvars = [variants['s%s' % vidx] for vidx in cluster]
-
-    cluster_total_reads = np.array([V['total_reads'] for V in cvars])
-    cluster_var_reads = np.array([V['var_reads'] for V in cvars])
-    # Correct for sex variants.
-    mu_v = np.array([V['mu_v'] for V in cvars])[:,np.newaxis]
-    cluster_var_reads = np.round(cluster_var_reads / (2*(1 - mu_v)))
-
-    S = {
-      'gene': None,
-      'id': 'C%s' % cidx,
-      'name': 'C%s' % cidx,
-      'chrom': None,
-      'pos': None,
-      'cluster': cidx,
-      'mu_v': 0.499,
-      'var_reads': np.sum(cluster_var_reads, axis=0),
-      'total_reads': np.sum(cluster_total_reads, axis=0),
-    }
-    S['vaf'] = S['var_reads'] / S['total_reads']
-
-    svid2svidx[S['id']] = len(cluster_supervars)
-    cluster_supervars[S['id']] = S
-
-  svidx2svid = {V: K for K, V in svid2svidx.items()}
-  return (cluster_supervars, svid2svidx, svidx2svid)
 
 def plot_cluster_mle_relations(supervars, svid2svidx, svidx2svid, outf):
   posterior, evidence = pairwise.calc_posterior(supervars)
@@ -316,7 +283,7 @@ def cluster_samples(variants, sampnames):
 
 def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn):
   sampnames = load_sampnames(paramsfn)
-  variants = parse_ssms(ssmfn)
+  variants = common.parse_ssms(ssmfn)
 
   garbage_ids = handbuilt.load_garbage(handbuiltfn)
   clusters = handbuilt.load_clusters(handbuiltfn, variants)
@@ -327,7 +294,7 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
   vidx2vid = dict(enumerate(vidxs))
   vid2vidx = {V: K for K, V in vidx2vid.items()}
 
-  supervars, svid2svidx, svidx2svid = make_cluster_supervars(clusters, variants)
+  supervars, svid2svidx, svidx2svid = common.make_cluster_supervars(clusters, variants)
 
   should_cluster = not (output_type == 'unclustered')
   model_probs_tensor = create_model_prob_tensor(model_probs, vid2vidx)
