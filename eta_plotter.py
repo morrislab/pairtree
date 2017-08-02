@@ -55,9 +55,10 @@ def reorder_cols(mat, start=None, end=None):
   mat, idxs = reorder_rows(mat, start, end)
   return (mat.T, idxs)
 
+def _is_xeno(samp):
+  return 'xeno' in samp.lower()
+
 def find_xeno_ranges(sampnames):
-  def _is_xeno(samp):
-    return 'xeno' in samp.lower()
   assert not _is_xeno(sampnames[0])
 
   last_was_xeno = False
@@ -87,35 +88,36 @@ def find_xeno_ranges(sampnames):
   return xeno_ranges
 
 def reorder_samples(eta, sampnames):
-  # For now, don't respect patient sample boundaries -- feel free to move
-  # everything around.
-  eta, idxs = reorder_cols(eta)
-  sampnames = [sampnames[I] for I in idxs]
-  return (eta, sampnames)
-
   xeno_ranges = find_xeno_ranges(sampnames)
   for start, end in xeno_ranges:
     eta, idxs = reorder_cols(eta, start, end)
     sampnames = [sampnames[I] for I in idxs]
   return (eta, sampnames)
 
+def hide_unwanted(eta, sampnames):
+  def _is_unwanted(samp):
+    return 'cns' in samp.lower() or 'spleen' in samp.lower()
+  sampnames, eta = zip(*[(S, col) for S, col in zip(sampnames, eta.T) if not _is_unwanted(S)])
+  return (np.array(eta).T, sampnames)
+
 def plot_eta(eta, sampnames, outf):
+  eta, sampnames = hide_unwanted(eta, sampnames)
   eta, sampnames = reorder_samples(eta, sampnames)
   short_sampnames = [S.replace('Diagnosis Xeno', 'DX').replace('Relapse Xeno', 'RX')  for S in sampnames]
+  widths = np.array([1.2 if not _is_xeno(S) else 0.6 for S in sampnames])
 
   # eta: KxS, K = # of clusters, S = # of samples
-  etacum = np.cumsum(eta, axis=0)
-  traces = [go.Scatter(
+  traces = [go.Bar(
     name = 'Population %s' % cidx,
     x = short_sampnames,
-    y = cumrow,
-    text = ['Population %s: %.0f%%' % (cidx, 100*E) for E in origrow],
+    y = row,
+    text = ['Population %s: %.0f%%' % (cidx, 100*E) for E in row],
     hoverinfo = 'x+text',
-    mode = 'lines',
-    fill = 'tonexty'
-  ) for cidx, cumrow, origrow in zip(range(len(etacum)), etacum, eta)]
+    width = widths,
+  ) for cidx, row in zip(range(len(eta)), eta)]
   layout = go.Layout(
-    xaxis = {'showgrid': False}
+    barmode = 'stack',
+    bargap = 0.1,
   )
   fig = go.Figure(data=traces, layout=layout)
 
