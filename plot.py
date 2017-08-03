@@ -97,9 +97,13 @@ def make_table_row(entries, visibilities, colours, is_header=False):
 
 def write_header(sampid, extra, outf):
   print('<script type="text/javascript" src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>', file=outf)
+  print('<script src="https://d3js.org/d3.v4.min.js"></script>', file=outf)
   print('<script type="text/javascript" src="highlight_table_labels.js"></script>', file=outf)
+  print('<script type="text/javascript" src="tree_plotter.js"></script>', file=outf)
+  print('''<script type="text/javascript">$(document).ready(function() { (new TreePlotter()).plot('%s.summ.json', '#tree'); });</script>''' % sampid, file=outf)
   print('<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">', file=outf)
   print('<h1>%s (%s)</h1>' % (sampid, extra), file=outf)
+  print('<link href="tree.css" rel="stylesheet">', file=outf)
   print('<style>td, th, table { padding: 5px; margin: 0; border-collapse: collapse; font-weight: normal; } span { visibility: hidden; } td:hover > span { visibility: visible; } .highlighted { background-color: black !important; color: white; }</style>', file=outf)
 
 def write_table(model, mat, labels, colours, outf):
@@ -281,6 +285,9 @@ def cluster_samples(variants, sampnames):
 
   return (variants, sampnames)
 
+def write_tree_container(outf):
+  print('<div id="tree"></div>', file=outf)
+
 def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn):
   sampnames = load_sampnames(paramsfn)
   variants = common.parse_ssms(ssmfn)
@@ -324,6 +331,7 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
 
     vaf_plotter.plot_vaf_matrix(clusters, variants, supervars, garbage_variants, phi[0].T, sampnames, spreadsheetfn, outf)
     eta_plotter.plot_eta(eta[0].T, sampnames, outf)
+    write_tree_container(outf)
     plot_individual(model_probs, should_cluster, vid2vidx, vidx2vid, outf)
     plot_relations(ssm_relations, should_cluster, vidx2vid, outf)
     write_legend(outf)

@@ -1,0 +1,17 @@
+.node circle, .population circle {
+  fill: #428bca;
+  stroke-width: 1.5px;
+}
+
+.node circle, .node text {
+  cursor: pointer;
+}
+
+.node text {
+  font-size: 1.5em;
+  fill: white;
+}
+
+.link {
+  fill: none;
+}
