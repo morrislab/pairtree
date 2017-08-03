@@ -49,9 +49,9 @@ function calc_pairwise {
 }
 
 function plot {
-  rm -f $OUTDIR/*.{pairwise.html,js}
+  rm -f $OUTDIR/*.{pairwise.html,css,js}
 
-  cp -a $PROTDIR/highlight_table_labels.js $OUTDIR/
+  cp -a $PROTDIR/*.{css,js} $OUTDIR/
   for jsonfn in $OUTDIR/*.pairwise.json; do
     sampid=$(basename $jsonfn | cut -d . -f1)
     ssmfn=$SSMDIR/$sampid.sampled.ssm

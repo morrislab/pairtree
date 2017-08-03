@@ -17,9 +17,9 @@ def convert_adj_matrix_to_adj_list(adjm):
 
   return adjl
 
-def generate_treesumm(clusters, adjmats, llh, phi):
+def generate_treesumm(sampnames, clusters, adjmats, llh, phi):
   result = {
-    'params': {},
+    'params': {'samples': sampnames},
     'trees': {},
   }
 
@@ -56,8 +56,8 @@ def generate_mutlist(variants):
 
   return mutlist
 
-def write_json(sampid, variants, clusters, adjmats, llh, phi, treesummfn, mutlistfn):
-  treesumm = generate_treesumm(clusters, adjmats, llh, phi)
+def write_json(sampid, sampnames, variants, clusters, adjmats, llh, phi, treesummfn, mutlistfn):
+  treesumm = generate_treesumm(sampnames, clusters, adjmats, llh, phi)
   mutlist = generate_mutlist(variants)
 
   for results in (treesumm, mutlist):

@@ -1,15 +1,32 @@
-.node circle, .population circle {
-  fill: #428bca;
+.population path {
   stroke-width: 1.5px;
 }
 
-.node circle, .node text {
+.population .outline {
+	fill: none;
+stroke: #000;
+stroke-width: 2px;
+}
+
+.population .diagnosis {
+  fill: #428bca;
+}
+
+.population .relapse {
+	fill: #ca4242;
+}
+
+.population {
   cursor: pointer;
 }
 
-.node text {
-  font-size: 1.5em;
+.population text {
+  font-size: 1.8em;
+	font-weight: bold;
   fill: white;
+	paint-order: stroke;
+	stroke: #000;
+	stroke-width: 2px;
 }
 
 .link {

@@ -100,7 +100,6 @@ def write_header(sampid, extra, outf):
   print('<script src="https://d3js.org/d3.v4.min.js"></script>', file=outf)
   print('<script type="text/javascript" src="highlight_table_labels.js"></script>', file=outf)
   print('<script type="text/javascript" src="tree_plotter.js"></script>', file=outf)
-  print('''<script type="text/javascript">$(document).ready(function() { (new TreePlotter()).plot('%s.summ.json', '#tree'); });</script>''' % sampid, file=outf)
   print('<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">', file=outf)
   print('<h1>%s (%s)</h1>' % (sampid, extra), file=outf)
   print('<link href="tree.css" rel="stylesheet">', file=outf)
@@ -285,8 +284,13 @@ def cluster_samples(variants, sampnames):
 
   return (variants, sampnames)
 
-def write_tree_container(outf):
-  print('<div id="tree"></div>', file=outf)
+def write_trees(sampid, outf):
+  print('''<script type="text/javascript">$(document).ready(function() {
+    (new TreePlotter()).plot('%s.summ.json', 0, '#tree-handbuilt');
+    (new TreePlotter()).plot('%s.summ.json', 1000, '#tree-sampled'); });
+    </script>''' % (sampid, sampid), file=outf)
+  for tree_type in ('handbuilt', 'sampled'):
+    print('<h2>%s</h2><div id="tree-%s"></div>' % (tree_type, tree_type), file=outf)
 
 def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn):
   sampnames = load_sampnames(paramsfn)
@@ -327,11 +331,11 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
       sampled_llh.insert(0, llh)
 
     phi, eta = fit_phis(sampled_adjm, variants, clusters, tidxs=(0, -1))
-    json_writer.write_json(sampid, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
+    json_writer.write_json(sampid, sampnames, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
 
     vaf_plotter.plot_vaf_matrix(clusters, variants, supervars, garbage_variants, phi[0].T, sampnames, spreadsheetfn, outf)
     eta_plotter.plot_eta(eta[0].T, sampnames, outf)
-    write_tree_container(outf)
+    write_trees(sampid, outf)
     plot_individual(model_probs, should_cluster, vid2vidx, vidx2vid, outf)
     plot_relations(ssm_relations, should_cluster, vidx2vid, outf)
     write_legend(outf)

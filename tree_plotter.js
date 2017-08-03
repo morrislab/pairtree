@@ -1,5 +1,29 @@
 function TreePlotter() { }
 
+// Following two functions from https://stackoverflow.com/a/18473154.
+function polarToCartesian(centerX, centerY, radius, angleInDegrees) {
+  var angleInRadians = (angleInDegrees-90) * Math.PI / 180.0;
+
+  return {
+    x: centerX + (radius * Math.cos(angleInRadians)),
+    y: centerY + (radius * Math.sin(angleInRadians))
+  };
+}
+
+function describeArc(x, y, radius, startAngle, endAngle){
+  var start = polarToCartesian(x, y, radius, endAngle);
+  var end = polarToCartesian(x, y, radius, startAngle);
+
+  var largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+
+  var d = [
+    "M", start.x, start.y,
+    "A", radius, radius, 0, largeArcFlag, 0, end.x, end.y
+  ].join(" ");
+
+  return d;
+}
+
 TreePlotter.prototype._draw_tree = function(root, container) {
   // horiz_padding should be set to the maximum radius of a node, so a node
   // drawn on a boundry won't go over the canvas edge. Since max_area = 8000,
@@ -28,10 +52,21 @@ TreePlotter.prototype._draw_tree = function(root, container) {
 
   // Enter any new nodes at the parent's previous position.
   var nodeEnter = node.enter().append('svg:g');
-  nodeEnter.attr('class', 'node')
+  nodeEnter.attr('class', 'population')
     .attr('transform', function(d) { return 'translate(' + d.y + ',' + d.x + ')'; });
+
   nodeEnter.append('svg:circle')
-      .attr('r', function(d) { return d.data.radius; });
+    .attr('class', 'outline')
+    .attr('r', function(d) { return d.data.radius; });
+  nodeEnter.append('svg:path')
+    .attr('class', 'diagnosis')
+    .attr('d', function(d) { return describeArc(0, 0, d.data.radius, 180, 360); })
+    .attr('opacity', function (d) { return d.data.patient_cell_prevs.diagnosis; });
+  nodeEnter.append('svg:path')
+    .attr('class', 'relapse')
+    .attr('d', function(d) { return describeArc(0, 0, d.data.radius, 0, 180); })
+    .attr('opacity', function (d) { return d.data.patient_cell_prevs.relapse; });
+
   nodeEnter.append('svg:text')
       .attr('font-size', '30')
       .attr('dominant-baseline', 'central')
@@ -64,14 +99,24 @@ TreePlotter.prototype._find_max_ssms = function(populations) {
   return max_ssms;
 }
 
-TreePlotter.prototype._generate_tree_struct = function(adjlist, pops, root_id) {
+TreePlotter.prototype._generate_tree_struct = function(sampnames, adjlist, pops, root_id) {
   var max_ssms = this._find_max_ssms(pops);
+
+  var diag_index = sampnames.indexOf('D');
+  var relapse_index = sampnames.indexOf('R1');
+  if(diag_index === -1 || relapse_index === -1) {
+    throw "Can't find diagnosis or relapse sample in " + sampnames;
+  }
 
   var _add_node = function(node_id, struct) {
     struct.name = node_id;
 
     var num_ssms = pops[node_id]['num_ssms'];
     struct.radius = TreeUtil.calc_radius(num_ssms /  max_ssms);
+    struct.patient_cell_prevs = {
+      'diagnosis': pops[node_id]['cellular_prevalence'][diag_index],
+      'relapse':   pops[node_id]['cellular_prevalence'][relapse_index],
+    };
 
     if(typeof adjlist[node_id] === 'undefined') {
       return;
@@ -96,11 +141,10 @@ TreePlotter.prototype._draw = function(populations, structure, root_id, params) 
   this._draw_tree(root);
 }
 
-TreePlotter.prototype.plot = function(summ_path, container) {
+TreePlotter.prototype.plot = function(summ_path, tidx, container) {
   var self = this;
   d3.json(summ_path, function(summary) {
-    var tidx = 0;
-    var root = self._generate_tree_struct(summary.trees[tidx].structure, summary.trees[tidx].populations, summary.trees[tidx].root);
+    var root = self._generate_tree_struct(summary.params.samples, summary.trees[tidx].structure, summary.trees[tidx].populations, summary.trees[tidx].root);
     self._draw_tree(root, container);
   });
 }
