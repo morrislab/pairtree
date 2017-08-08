@@ -55,7 +55,7 @@ def _calc_model_prob(var1, var2):
     for modelidx, model in enumerate(Models._all):
       if modelidx == Models.garbage:
         continue
-      pv1, pv2 = [scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], (1 - V['mu_v'])*G) for V in (var1, var2)] # Nx1
+      pv1, pv2 = [scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], np.minimum(1., (1./V['vaf_correction'])*(1 - V['mu_v'])*G)) for V in (var1, var2)] # Nx1
       p1 = np.tile(pv1, N)   # pv1 vector tiled as columns
       p2 = np.tile(pv2, N).T # pv1 vector tiled as rows
       P = p1 + p2 + logprob_phi[model]
@@ -110,11 +110,12 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('sampid')
   parser.add_argument('ssm_fn')
   parser.add_argument('out_fn')
   args = parser.parse_args()
 
-  variants = parse_ssms(args.ssm_fn)
+  variants = parse_ssms(args.sampid, args.ssm_fn)
   posterior, evidence = calc_posterior(variants)
   results = generate_results (posterior, evidence, variants)
   write_results(results, args.out_fn)

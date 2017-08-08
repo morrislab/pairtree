@@ -1,13 +1,14 @@
 import csv
 import numpy as np
 from collections import namedtuple
+import vaf_correcter
 
 class Models:
   _all = ('garbage', 'cocluster', 'A_B', 'B_A', 'diff_branches')
 for idx, M in enumerate(Models._all):
   setattr(Models, M, idx)
 
-def parse_ssms(ssmfn):
+def parse_ssms(sampid, ssmfn):
   vaf = []
   ssm_ids = []
   var_names = []
@@ -28,6 +29,7 @@ def parse_ssms(ssmfn):
       variant['var_reads'] = variant['total_reads'] - variant['ref_reads']
       variants[row['id']] = variant
 
+  vaf_correcter.correct_vafs(sampid, variants)
   return variants
 
 def make_ancestral_from_adj(adj):
@@ -66,7 +68,8 @@ def make_cluster_supervars(clusters, variants):
     cluster_var_reads = np.array([V['var_reads'] for V in cvars])
     # Correct for sex variants.
     mu_v = np.array([V['mu_v'] for V in cvars])[:,np.newaxis]
-    cluster_var_reads = np.round(cluster_var_reads / (2*(1 - mu_v)))
+    vaf_corrections = np.array([V['vaf_correction'] for V in cvars])[:,np.newaxis]
+    cluster_var_reads = np.round(vaf_corrections * (cluster_var_reads / (2*(1 - mu_v))))
 
     S = {
       'gene': None,

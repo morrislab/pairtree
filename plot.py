@@ -294,7 +294,7 @@ def write_trees(sampid, outf):
 
 def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn):
   sampnames = load_sampnames(paramsfn)
-  variants = common.parse_ssms(ssmfn)
+  variants = common.parse_ssms(sampid, ssmfn)
 
   garbage_ids = handbuilt.load_garbage(handbuiltfn)
   clusters = handbuilt.load_clusters(handbuiltfn, variants)
@@ -333,9 +333,10 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
     phi, eta = fit_phis(sampled_adjm, variants, clusters, tidxs=(0, -1))
     json_writer.write_json(sampid, sampnames, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
 
-    vaf_plotter.plot_vaf_matrix(clusters, variants, supervars, garbage_variants, phi[0].T, sampnames, spreadsheetfn, outf)
     eta_plotter.plot_eta(eta[0].T, sampnames, outf)
     write_trees(sampid, outf)
+    for correct_vafs in (True, False):
+      vaf_plotter.plot_vaf_matrix(sampid, clusters, variants, supervars, garbage_variants, phi[0].T, sampnames, spreadsheetfn, correct_vafs, outf)
     plot_individual(model_probs, should_cluster, vid2vidx, vidx2vid, outf)
     plot_relations(ssm_relations, should_cluster, vidx2vid, outf)
     write_legend(outf)

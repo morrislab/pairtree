@@ -41,6 +41,7 @@ function calc_pairwise {
   for ssmfn in $SSMDIR/*.sampled.ssm; do
     sampid=$(basename $ssmfn | cut -d . -f1)
     echo "python3 $PROTDIR/pairwise.py "\
+      "$sampid" \
       "$ssmfn" \
       "$OUTDIR/$sampid.pairwise.json" \
       "> $OUTDIR/$sampid.stdout" \

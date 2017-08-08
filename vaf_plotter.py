@@ -3,6 +3,7 @@ import csv
 import json
 import numpy as np
 from collections import defaultdict
+import vaf_correcter
 
 def load_spreadsheet(spreadsheetfn):
   with open(spreadsheetfn) as S:
@@ -124,7 +125,12 @@ def get_next_colour():
   return scale[idx]
 get_next_colour._last_idx = -1
 
-def plot_vaf_matrix(clusters, variants, supervars, garbage_variants, phi, sampnames, spreadsheetfn, outf):
+def plot_vaf_matrix(sampid, clusters, variants, supervars, garbage_variants, phi, sampnames, spreadsheetfn, correct_vafs, outf):
+  if correct_vafs is True and not vaf_correcter.has_corrections(sampid):
+    return
+  print('<h2>VAFs (%s)</h2>' % ('corrected' if correct_vafs else 'uncorrected',), file=outf)
+  if correct_vafs is True:
+    print('<h3>Corrected variants: %s</h3>' % ', '.join(vaf_correcter.corrected_vars(sampid)), file=outf)
   spreadsheet = load_spreadsheet(spreadsheetfn)
 
   for V in list(variants.values()) + list(garbage_variants.values()):
@@ -132,6 +138,8 @@ def plot_vaf_matrix(clusters, variants, supervars, garbage_variants, phi, sampna
     V['pos'] = int(V['pos'])
     V['gene'] = find_gene_name(V['chrom'], V['pos'], spreadsheet)
     V['vaf'] = V['var_reads'] / V['total_reads']
+    if correct_vafs:
+      V['vaf'] *= V['vaf_correction']
 
   # Copy variant so we don't modify original dict.
   clustered_vars = [[dict(variants['s%s' % vid]) for vid in C] for C in clusters]
