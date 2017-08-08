@@ -31,8 +31,8 @@ def calc_llh(var_reads, ref_reads, A, Z, psi):
 
 def fit_phis(adj, clusters, variants):
   supervars, _, _ = common.make_cluster_supervars(clusters, variants)
-  ref_reads = np.array([2*supervars[cid]['ref_reads'] for cid in sorted(supervars.keys(), key = lambda C: int(C[1:]))])
-  var_reads = np.array([2*supervars[cid]['var_reads'] for cid in sorted(supervars.keys(), key = lambda C: int(C[1:]))])
+  ref_reads = np.array([supervars[cid]['ref_reads'] for cid in sorted(supervars.keys(), key = lambda C: int(C[1:]))])
+  var_reads = np.array([supervars[cid]['var_reads'] for cid in sorted(supervars.keys(), key = lambda C: int(C[1:]))])
   assert len(supervars) == len(adj) - 1
   # Supervar `i` is in cluster `i`. Cluster 0 is empty.
   A = np.insert(np.eye(len(supervars)), 0, 0, axis=1)
