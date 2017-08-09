@@ -1,5 +1,6 @@
 import csv
 import numpy as np
+import sklearn
 from collections import namedtuple
 import vaf_correcter
 
@@ -90,3 +91,64 @@ def make_cluster_supervars(clusters, variants):
 
   svidx2svid = {V: K for K, V in svid2svidx.items()}
   return (cluster_supervars, svid2svidx, svidx2svid)
+
+def agglo_children_to_adjlist(children, nleaves):
+  assert len(children) == nleaves - 1
+  adjlist = {}
+  for idx, C in enumerate(children):
+    adjlist[idx + nleaves] = C
+  root = nleaves + len(children) - 1
+  assert max(adjlist.keys()) == root
+  return (adjlist, root)
+
+def dfs(adjlist, root):
+  ordered = []
+  def _dfs(A, parent):
+    if parent not in A:
+      ordered.append(parent)
+      return
+    for child in A[parent]:
+      _dfs(A, child)
+  _dfs(adjlist, root)
+  return np.array(ordered)
+
+def reorder_rows(mat, start=None, end=None):
+  N = len(mat)
+  if start is None:
+    start = 0
+  if end is None:
+    end = N
+
+  fullidxs = np.array(range(N))
+  submat = mat[start:end]
+
+  # n_clusters doesn't matter, as we're only interested in the linkage tree
+  # between data points.
+  agglo = sklearn.cluster.AgglomerativeClustering(
+    n_clusters = len(submat),
+    affinity = 'l2',
+    linkage = 'average',
+    compute_full_tree = True,
+  )
+  labels = agglo.fit_predict(submat)
+  adjlist, root = agglo_children_to_adjlist(agglo.children_, agglo.n_leaves_)
+  idxs = dfs(adjlist, root)
+  submat = [submat[I] for I in idxs]
+
+  fullidxs[start:end] = idxs + start
+  mat = np.vstack((mat[:start], submat, mat[end:]))
+  return (mat, fullidxs)
+
+def reorder_cols(mat, start=None, end=None):
+  mat = mat.T
+  mat, idxs = reorder_rows(mat, start, end)
+  return (mat.T, idxs)
+
+def reorder_square_matrix(mat):
+  # Reorders the rows, then reorders the columns using the same indices. This
+  # works for symmetric matrices. It can also be used for non-symmetric
+  # matrices, as it doesn't require symmetry.
+  assert mat.shape[0] == mat.shape[1]
+  mat, idxs = reorder_rows(mat)
+  mat = mat.T[idxs,:].T
+  return (mat, idxs)

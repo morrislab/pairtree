@@ -53,21 +53,6 @@ def create_matrix(model, model_probs, variants, vid2vidx):
 def _reorder_row(R, idxs):
   return np.array([R[idx] for idx in idxs])
 
-def cluster_square_mat(mat):
-  '''Reorder both rows & columns.'''
-  affprop = sklearn.cluster.AffinityPropagation(damping=0.5)
-  affprop.fit(mat)
-  labels = affprop.predict(mat)
-
-  N = len(mat)
-  annotated = list(zip(mat, labels, range(N)))
-  # Sort by cluster, then by row index.
-  annotated = sorted(annotated, key = lambda R: R[1:])
-  rows, idxs = zip(*[(R, I) for R, L, I in annotated])
-  rows = [_reorder_row(R, idxs) for R in rows]
-
-  return (np.array(rows), idxs)
-
 def make_colour_from_intensity(intensity):
   val = np.int(np.round(255*(1 - intensity)))
   return 'rgb(255, %s, %s)' % (2*(val,))
@@ -129,7 +114,7 @@ def plot_individual(model_probs, should_cluster, vid2vidx, vidx2vid, outf):
   for model in Models._all:
     mat = create_matrix(model, model_probs['model_probs'][model], model_probs['variants'], vid2vidx)
     if should_cluster:
-      mat, ssmidxs = cluster_square_mat(mat)
+      mat, ssmidxs = common.reorder_square_matrix(mat)
     else:
       ssmidxs = list(range(len(mat)))
     if model in ('cocluster', 'diff_branches'):
@@ -161,7 +146,7 @@ def calc_relations(model_probs):
 
 def plot_relations(relations, should_cluster, vidx2vid, outf):
   if should_cluster:
-    relations, ssmidxs = cluster_square_mat(relations)
+    relations, ssmidxs = common.reorder_square_matrix(relations)
   else:
     ssmidxs = list(range(len(relations)))
 
