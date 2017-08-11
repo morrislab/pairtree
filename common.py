@@ -152,3 +152,6 @@ def reorder_square_matrix(mat):
   mat, idxs = reorder_rows(mat)
   mat = mat.T[idxs,:].T
   return (mat, idxs)
+
+def is_xeno(samp):
+  return 'xeno' in samp.lower()

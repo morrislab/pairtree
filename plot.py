@@ -15,6 +15,7 @@ import phi_fitter
 import handbuilt
 import pairwise
 import eta_plotter
+import vaf_correcter
 
 np.set_printoptions(threshold=np.nan)
 np.random.seed(1)
@@ -321,7 +322,11 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
     eta_plotter.plot_eta(eta[0].T, sampnames, outf)
     write_trees(sampid, outf)
     for correct_vafs in (True, False):
+      if correct_vafs is True and not vaf_correcter.has_corrections(sampid):
+        continue
       vaf_plotter.plot_vaf_matrix(sampid, clusters, variants, supervars, garbage_variants, phi[0].T, sampnames, spreadsheetfn, correct_vafs, outf)
+    vaf_plotter.plot_unclustered_vafs(sampid, variants, sampnames, spreadsheetfn, outf, patient_samples_only=False)
+    vaf_plotter.plot_unclustered_vafs(sampid, variants, sampnames, spreadsheetfn, outf, patient_samples_only=True)
     plot_individual(model_probs, should_cluster, vid2vidx, vidx2vid, outf)
     plot_relations(ssm_relations, should_cluster, vidx2vid, outf)
     write_legend(outf)
