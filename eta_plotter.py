@@ -1,7 +1,6 @@
 import plotly
 import plotly.graph_objs as go
 import numpy as np
-import sklearn.cluster
 import common
 
 def find_xeno_ranges(sampnames):

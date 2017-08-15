@@ -2,7 +2,6 @@ import csv
 import argparse
 import json
 import numpy as np
-import sklearn.cluster
 import colorlover as cl
 import common
 from common import Models
