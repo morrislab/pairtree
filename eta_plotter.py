@@ -42,7 +42,13 @@ def reorder_samples(eta, sampnames):
 
 def hide_unwanted(eta, sampnames):
   def _is_unwanted(samp):
-    return 'cns' in samp.lower() or 'spleen' in samp.lower()
+    if 'cns' in samp.lower() or 'spleen' in samp.lower():
+      return True
+    if samp in ('D2', 'D3', 'R2'):
+      return True
+    if samp.startswith('Pre-Diagnosis Xeno'):
+      return True
+    return False
   sampnames, eta = zip(*[(S, col) for S, col in zip(sampnames, eta.T) if not _is_unwanted(S)])
   return (np.array(eta).T, sampnames)
 
