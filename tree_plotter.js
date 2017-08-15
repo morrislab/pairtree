@@ -24,13 +24,30 @@ function describeArc(x, y, radius, startAngle, endAngle){
   return d;
 }
 
+TreePlotter.prototype._calculate_max_depth = function(root) {
+  var _calc_max_depth = function(node) {
+    if(!node.hasOwnProperty('children')) {
+      return 0;
+    }
+    var max_depth = 0;
+    node.children.forEach(function(child) {
+      var nd = _calc_max_depth(child);
+      if(nd > max_depth)
+        max_depth = nd;
+    });
+    return 1 + max_depth;
+  };
+  return _calc_max_depth(root);
+}
+
 TreePlotter.prototype._draw_tree = function(root, container) {
   // horiz_padding should be set to the maximum radius of a node, so a node
   // drawn on a boundry won't go over the canvas edge. Since max_area = 8000,
   // we have horiz_padding = sqrt(8000 / pi) =~ 51.
   var horiz_padding = 51;
+  var max_depth = this._calculate_max_depth(root);
   var m = [10, horiz_padding, 10, horiz_padding],
-      w = 800 - m[1] - m[3],
+      w = 120*max_depth - m[1] - m[3],
       h = 600 - m[0] - m[2],
       i = 0;
 
