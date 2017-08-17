@@ -131,15 +131,7 @@ def reorder_variants(variants, sampnames):
 
 def print_unclustered_vafs(variants, sampnames, outf, patient_samples_only=False):
   if patient_samples_only:
-    munged = {}
-    patient_mask = np.array([not common.is_xeno(S) for S in sampnames])
-    for vid in variants.keys():
-      munged[vid] = dict(variants[vid])
-      for K in ('total_reads', 'ref_reads', 'var_reads', 'vaf'):
-        munged[vid][K] = variants[vid][K][patient_mask]
-    variants = munged
-    sampnames = [S for (S, is_patient) in zip(sampnames, patient_mask) if is_patient]
-
+    variants, sampnames = common.extract_patient_samples(variants, sampnames)
   ordered_variants, sampnames = reorder_variants(variants, sampnames)
   print_vaftable_header(sampnames, outf)
   for variant in ordered_variants:
@@ -170,10 +162,7 @@ def get_next_colour():
 get_next_colour._last_idx = -1
 
 def augment_variant(V, spreadsheet, correct_vaf):
-    V['chrom'], V['pos'] = V['name'].split('_')
-    V['pos'] = int(V['pos'])
     V['gene'] = find_gene_name(V['chrom'], V['pos'], spreadsheet)
-    V['vaf'] = V['var_reads'] / V['total_reads']
     if correct_vaf:
       V['vaf'] *= V['vaf_correction']
 

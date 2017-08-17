@@ -28,6 +28,9 @@ def parse_ssms(sampid, ssmfn):
         'mu_v': float(row['mu_v']),
       }
       variant['var_reads'] = variant['total_reads'] - variant['ref_reads']
+      variant['vaf'] = variant['var_reads'] / variant['total_reads']
+      variant['chrom'], variant['pos'] = variant['name'].split('_')
+      variant['pos'] = int(variant['pos'])
       variants[row['id']] = variant
 
   vaf_correcter.correct_vafs(sampid, variants)
@@ -155,3 +158,14 @@ def reorder_square_matrix(mat):
 
 def is_xeno(samp):
   return 'xeno' in samp.lower()
+
+def extract_patient_samples(variants, sampnames):
+  munged = {}
+  patient_mask = np.array([not is_xeno(S) for S in sampnames])
+  for vid in variants.keys():
+    munged[vid] = dict(variants[vid])
+    for K in ('total_reads', 'ref_reads', 'var_reads', 'vaf'):
+      munged[vid][K] = variants[vid][K][patient_mask]
+  variants = munged
+  sampnames = [S for (S, is_patient) in zip(sampnames, patient_mask) if is_patient]
+  return (variants, sampnames)
