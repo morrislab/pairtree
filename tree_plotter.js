@@ -40,6 +40,19 @@ TreePlotter.prototype._calculate_max_depth = function(root) {
   return _calc_max_depth(root);
 }
 
+TreePlotter.prototype._get_next_colour = function() {
+  if(typeof this._colour_idx === 'undefined') {
+    this._colour_idx = -1;
+  }
+  var scale = d3.schemeDark2;
+
+  this._colour_idx++;
+  if(this._colour_idx === scale.length) {
+    this._colour_idx = 0;
+  }
+  return scale[this._colour_idx];
+}
+
 TreePlotter.prototype._draw_tree = function(root, container) {
   // horiz_padding should be set to the maximum radius of a node, so a node
   // drawn on a boundry won't go over the canvas edge. Since max_area = 8000,
@@ -67,9 +80,11 @@ TreePlotter.prototype._draw_tree = function(root, container) {
   var node = vis.selectAll('g.node')
       .data(root.descendants(), function(d) { return d.data.name; });
 
+  var self = this;
   // Enter any new nodes at the parent's previous position.
   var nodeEnter = node.enter().append('svg:g');
   nodeEnter.attr('class', 'population')
+    .attr('fill', function(d) { return self._get_next_colour(); })
     .attr('transform', function(d) { return 'translate(' + d.y + ',' + d.x + ')'; });
 
   nodeEnter.append('svg:circle')
@@ -83,6 +98,10 @@ TreePlotter.prototype._draw_tree = function(root, container) {
     .attr('class', 'relapse')
     .attr('d', function(d) { return describeArc(0, 0, d.data.radius, 0, 180); })
     .attr('opacity', function (d) { return d.data.patient_cell_prevs.relapse; });
+  nodeEnter.append('svg:path')
+    .attr('class', 'divider')
+    .attr('stroke', '#aaa')
+    .attr('d', function(d) { return 'M 0 -' + d.data.radius + ' V ' + d.data.radius; });
 
   nodeEnter.append('svg:text')
       .attr('font-size', '30')

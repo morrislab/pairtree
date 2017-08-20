@@ -15,6 +15,7 @@ import handbuilt
 import pairwise
 import eta_plotter
 import vaf_correcter
+import cluster
 
 np.set_printoptions(threshold=np.nan)
 np.random.seed(1)
@@ -83,6 +84,7 @@ def make_table_row(entries, visibilities, colours, is_header=False):
 def write_header(sampid, extra, outf):
   print('<script type="text/javascript" src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>', file=outf)
   print('<script src="https://d3js.org/d3.v4.min.js"></script>', file=outf)
+  print('<script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>', file=outf)
   print('<script type="text/javascript" src="highlight_table_labels.js"></script>', file=outf)
   print('<script type="text/javascript" src="tree_plotter.js"></script>', file=outf)
   print('<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">', file=outf)
@@ -317,6 +319,7 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
 
     phi, eta = fit_phis(sampled_adjm, variants, clusters, tidxs=(0, -1))
     json_writer.write_json(sampid, sampnames, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
+    cluster.cluster_patient_vars(sampid, variants, sampnames)
 
     eta_plotter.plot_eta(eta[0].T, sampnames, outf)
     write_trees(sampid, outf)

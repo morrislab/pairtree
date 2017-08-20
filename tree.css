@@ -3,30 +3,28 @@
 }
 
 .population .outline {
-	fill: none;
-stroke: #000;
-stroke-width: 2px;
-}
-
-.population .diagnosis {
-  fill: #428bca;
-}
-
-.population .relapse {
-	fill: #ca4242;
+  fill: none;
+  stroke: #000;
+  stroke-width: 2px;
 }
 
 .population {
   cursor: pointer;
 }
 
+.divider {
+  stroke: #aaa;
+  stroke-width: 2px;
+  stroke-dasharray: 5, 5;
+}
+
 .population text {
   font-size: 1.8em;
-	font-weight: bold;
+  font-weight: bold;
   fill: white;
-	paint-order: stroke;
-	stroke: #000;
-	stroke-width: 2px;
+  paint-order: stroke;
+  stroke: #000;
+  stroke-width: 2px;
 }
 
 .link {
