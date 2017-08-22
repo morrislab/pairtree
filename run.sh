@@ -75,6 +75,7 @@ function plot {
 	"$OUTDIR/$sampid.$output_type.pairwise.html" \
 	"$OUTDIR/$sampid.summ.json" \
 	"$OUTDIR/$sampid.muts.json" \
+	"$OUTDIR/$sampid.phi.json" \
 	">  $OUTDIR/$sampid.plot.stdout" \
 	"2> $OUTDIR/$sampid.plot.stderr"
     done

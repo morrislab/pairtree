@@ -2,6 +2,7 @@ import plotly
 import plotly.graph_objs as go
 import numpy as np
 import common
+import json
 
 def find_xeno_ranges(sampnames):
   assert not common.is_xeno(sampnames[0])
@@ -32,14 +33,14 @@ def find_xeno_ranges(sampnames):
 
   return xeno_ranges
 
-def reorder_samples(eta, sampnames):
+def reorder_samples(mat, sampnames):
   xeno_ranges = find_xeno_ranges(sampnames)
   for start, end in xeno_ranges:
-    eta, idxs = common.reorder_cols(eta, start, end)
+    mat, idxs = common.reorder_cols(mat, start, end)
     sampnames = [sampnames[I] for I in idxs]
-  return (eta, sampnames)
+  return (mat, sampnames)
 
-def hide_unwanted(eta, sampnames):
+def hide_unwanted(mat, sampnames):
   def _is_unwanted(samp):
     if 'cns' in samp.lower() or 'spleen' in samp.lower():
       return True
@@ -48,13 +49,16 @@ def hide_unwanted(eta, sampnames):
     if samp.startswith('Pre-Diagnosis Xeno'):
       return True
     return False
-  sampnames, eta = zip(*[(S, col) for S, col in zip(sampnames, eta.T) if not _is_unwanted(S)])
-  return (np.array(eta).T, sampnames)
+  sampnames, mat = zip(*[(S, col) for S, col in zip(sampnames, mat.T) if not _is_unwanted(S)])
+  return (np.array(mat).T, sampnames)
+
+def rename_samples(sampnames):
+  return [S.replace('Diagnosis Xeno', 'DX').replace('Relapse Xeno', 'RX')  for S in sampnames]
 
 def plot_eta(eta, sampnames, outf):
   eta, sampnames = hide_unwanted(eta, sampnames)
   eta, sampnames = reorder_samples(eta, sampnames)
-  short_sampnames = [S.replace('Diagnosis Xeno', 'DX').replace('Relapse Xeno', 'RX')  for S in sampnames]
+  short_sampnames = rename_samples(sampnames)
   widths = np.array([1.0 if not common.is_xeno(S) else 0.4 for S in sampnames])
 
   # eta: KxS, K = # of clusters, S = # of samples
@@ -77,3 +81,13 @@ def plot_eta(eta, sampnames, outf):
     output_type = 'div',
   )
   print(plot, file=outf)
+
+def write_phi_json(phi, sampnames, jsonfn):
+  phi, sampnames = hide_unwanted(phi, sampnames)
+  phi, sampnames = reorder_samples(phi, sampnames)
+  short_sampnames = rename_samples(sampnames)
+  with open(jsonfn, 'w') as outf:
+    json.dump({
+      'samples': short_sampnames,
+      'phi': phi.tolist()
+    }, outf)

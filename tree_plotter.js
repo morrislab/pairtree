@@ -194,3 +194,81 @@ TreeUtil.calc_radius = function(scale) {
   var area = min_area + scale*(max_area - min_area);
   return Math.sqrt(area / Math.PI);
 }
+
+function Util() {
+}
+
+Util.sort_ints = function(arr) {
+  var converted = arr.map(function(a) {
+    return parseInt(a, 10);
+  });
+  return converted.sort();
+}
+
+function PhiMatrix() {
+}
+
+PhiMatrix.prototype._calc_ccf = function(phi) {
+  var ccf = [];
+  var clonalidx = 1;
+
+  for(var rowidx = clonalidx; rowidx < phi.length; rowidx++) {
+    ccf[rowidx - 1] = [];
+    for(var sampidx = 0; sampidx < phi[rowidx].length; sampidx++) {
+      ccf[rowidx - 1].push(phi[rowidx][sampidx] / phi[clonalidx][sampidx]);
+    }
+  }
+
+  return ccf;
+}
+
+PhiMatrix.prototype.plot = function(phi_path, container) {
+  var self = this;
+  d3.json(phi_path, function(phi_data) {
+    var ccf = self._calc_ccf(phi_data['phi']);
+    var sampnames = phi_data['samples'];
+
+    var num_rows = ccf.length;
+    var num_cols = ccf[0].length;
+    var cell_size = 50;
+    var row_label_width = 100;
+    var col_label_height = 100;
+    var label_padding = 10;
+
+    var svg = d3.select(container).html('').append('svg:svg')
+      .attr('width', row_label_width + num_cols * cell_size)
+      .attr('height', col_label_height + num_rows * cell_size);
+    svg.append('svg:g')
+      .attr('transform', function(d, i) { return 'translate(' + (row_label_width + 0.5 * cell_size) + ',' + (col_label_height - label_padding) + ')'; })
+      .selectAll('text')
+      .data(sampnames)
+      .enter()
+      .append('svg:text')
+      .attr('transform', function(d, i) { return 'translate(' + i * cell_size + ',0) rotate(270)'; })
+      .attr('x', 0)
+      .attr('y', 0)
+      .text(function(d, i) { return d; });
+    var rows = svg.selectAll('g.phis')
+      .data(ccf)
+      .enter()
+      .append('svg:g')
+      .attr('class', 'phis')
+      .attr('transform', function(d, i) { return 'translate(' + row_label_width + ',' + (col_label_height + (i * cell_size)) + ')'; });
+    rows.append('svg:text')
+      .attr('x', -label_padding)
+      .attr('y', 0.5 * cell_size)
+      .attr('dominant-baseline', 'middle')
+      .attr('text-anchor', 'end')
+      .text(function(d, i) { return 'Population ' + (i + 1); });
+    rows.selectAll('rect')
+      .data(function(d) { return d; })
+      .enter()
+      .append('svg:rect')
+      .attr('width', cell_size)
+      .attr('height', cell_size)
+      .attr('x', function(d, i) { return i * cell_size; })
+      .attr('y', 0)
+      .attr('fill', '#ff0000')
+      .attr('fill-opacity', function(d) { return d; });
+  });
+}

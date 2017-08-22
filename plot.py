@@ -279,7 +279,13 @@ def write_trees(sampid, outf):
   for tree_type in ('handbuilt', 'sampled'):
     print('<h2>%s</h2><div id="tree-%s"></div>' % (tree_type, tree_type), file=outf)
 
-def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn):
+def write_phi_matrix(sampid, outf):
+  print('''<script type="text/javascript">$(document).ready(function() {
+  (new PhiMatrix()).plot('%s.phi.json', '#phi_matrix');
+  });</script>''' % sampid, file=outf)
+  print('<div id="phi_matrix" style="margin: 30px"></div>', file=outf)
+
+def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn, phifn):
   sampnames = load_sampnames(paramsfn)
   variants = common.parse_ssms(sampid, ssmfn)
 
@@ -322,7 +328,9 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
     cluster.cluster_patient_vars(sampid, variants, sampnames)
 
     eta_plotter.plot_eta(eta[0].T, sampnames, outf)
+    eta_plotter.write_phi_json(phi[0].T, sampnames, phifn)
     write_trees(sampid, outf)
+    write_phi_matrix(sampid, outf)
     for correct_vafs in (True, False):
       if correct_vafs is True and not vaf_correcter.has_corrections(sampid):
         continue
@@ -352,10 +360,11 @@ def main():
   parser.add_argument('out_fn')
   parser.add_argument('treesumm_fn')
   parser.add_argument('mutlist_fn')
+  parser.add_argument('phi_fn')
   args = parser.parse_args()
 
   model_probs = load_model_probs(args.model_probs_fn)
-  plot(args.sampid, model_probs, args.output_type, args.ssm_fn, args.params_fn, args.spreadsheet_fn, args.handbuilt_fn, args.out_fn, args.treesumm_fn, args.mutlist_fn)
+  plot(args.sampid, model_probs, args.output_type, args.ssm_fn, args.params_fn, args.spreadsheet_fn, args.handbuilt_fn, args.out_fn, args.treesumm_fn, args.mutlist_fn, args.phi_fn)
 
 if __name__ == '__main__':
   main()
