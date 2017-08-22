@@ -52,7 +52,8 @@ def main():
 
   should_remove = [
     lambda dataset, sampname: 'CNS' in sampname,
-    lambda dataset, sampname: dataset == 'SJETV047' and sampname == 'R2'
+    lambda dataset, sampname: dataset == 'SJETV047' and sampname == 'R2',
+    lambda dataset, sampname: dataset == 'SJBALL022611' and sampname == 'Relapse Xeno 11',
   ]
   remove(args.dataset, args.ssm_fn, args.params_fn, should_remove)
 
