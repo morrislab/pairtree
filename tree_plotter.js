@@ -40,20 +40,7 @@ TreePlotter.prototype._calculate_max_depth = function(root) {
   return _calc_max_depth(root);
 }
 
-TreePlotter.prototype._get_next_colour = function() {
-  if(typeof this._colour_idx === 'undefined') {
-    this._colour_idx = -1;
-  }
-  var scale = d3.schemeDark2;
-
-  this._colour_idx++;
-  if(this._colour_idx === scale.length) {
-    this._colour_idx = 0;
-  }
-  return scale[this._colour_idx];
-}
-
-TreePlotter.prototype._draw_tree = function(root, container) {
+TreePlotter.prototype._draw_tree = function(root, container, num_pops) {
   // horiz_padding should be set to the maximum radius of a node, so a node
   // drawn on a boundry won't go over the canvas edge. Since max_area = 8000,
   // we have horiz_padding = sqrt(8000 / pi) =~ 51.
@@ -63,6 +50,7 @@ TreePlotter.prototype._draw_tree = function(root, container) {
       w = 120*max_depth - m[1] - m[3],
       h = 600 - m[0] - m[2],
       i = 0;
+  var colours = ColourAssigner.assign_colours(num_pops);
 
   // Compute the new tree layout.
   var tree = d3.tree().size([h, w]);
@@ -84,7 +72,7 @@ TreePlotter.prototype._draw_tree = function(root, container) {
   // Enter any new nodes at the parent's previous position.
   var nodeEnter = node.enter().append('svg:g');
   nodeEnter.attr('class', 'population')
-    .attr('fill', function(d) { return self._get_next_colour(); })
+    .attr('fill', function(d, i) { return colours[d.data.name]; })
     .attr('transform', function(d) { return 'translate(' + d.y + ',' + d.x + ')'; });
 
   nodeEnter.append('svg:circle')
@@ -170,18 +158,11 @@ TreePlotter.prototype._generate_tree_struct = function(sampnames, adjlist, pops,
   return root;
 }
 
-TreePlotter.prototype._draw = function(populations, structure, root_id, params) {
-  if(params !== undefined) { }
-
-  var root = this._generate_tree_struct(structure, populations, root_id);
-  this._draw_tree(root);
-}
-
 TreePlotter.prototype.plot = function(summ_path, tidx, container) {
   var self = this;
   d3.json(summ_path, function(summary) {
     var root = self._generate_tree_struct(summary.params.samples, summary.trees[tidx].structure, summary.trees[tidx].populations, summary.trees[tidx].root);
-    self._draw_tree(root, container);
+    self._draw_tree(root, container, Object.keys(summary.trees[tidx].populations).length);
   });
 }
 
@@ -235,6 +216,8 @@ PhiMatrix.prototype.plot = function(phi_path, container) {
     var col_label_height = 100;
     var label_padding = 10;
 
+    var colours = ColourAssigner.assign_colours(phi_data['phi'].length);
+
     var svg = d3.select(container).html('').append('svg:svg')
       .attr('width', row_label_width + num_cols * cell_size)
       .attr('height', col_label_height + num_rows * cell_size);
@@ -253,6 +236,7 @@ PhiMatrix.prototype.plot = function(phi_path, container) {
       .enter()
       .append('svg:g')
       .attr('class', 'phis')
+      .attr('fill', function(d, i) { return colours[i + 1]; })
       .attr('transform', function(d, i) { return 'translate(' + row_label_width + ',' + (col_label_height + (i * cell_size)) + ')'; });
     rows.append('svg:text')
       .attr('x', -label_padding)
@@ -265,10 +249,24 @@ PhiMatrix.prototype.plot = function(phi_path, container) {
       .enter()
       .append('svg:rect')
       .attr('width', cell_size)
-      .attr('height', cell_size)
+      .attr('height', function(d, i) { return cell_size; return d*cell_size; })
       .attr('x', function(d, i) { return i * cell_size; })
-      .attr('y', 0)
-      .attr('fill', '#ff0000')
+      .attr('y', function(d, i) { return 0; return 0.5*(1 - d)*cell_size; })
       .attr('fill-opacity', function(d) { return d; });
   });
+}
+
+function ColourAssigner() {
+}
+
+ColourAssigner.assign_colours = function(num_colours) {
+  var scale = d3.schemeDark2;
+  var colours = [];
+  for(var cidx = 0; colours.length < num_colours; cidx++) {
+    if(cidx === scale.length) {
+      cidx = 0;
+    }
+    colours.push(scale[cidx]);
+  }
+  return colours;
 }

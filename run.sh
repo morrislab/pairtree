@@ -36,10 +36,9 @@ function rename_samples {
 }
 
 function calc_pairwise {
-  #rm -f $OUTDIR/*.{pairwise.json,stdout,stderr}
+  rm -f $OUTDIR/*.{pairwise.json,stdout,stderr}
 
-  #for ssmfn in $SSMDIR/*.sampled.ssm; do
-  for ssmfn in $SSMDIR/SJBALL022612.sampled.ssm; do
+  for ssmfn in $SSMDIR/*.sampled.ssm; do
     sampid=$(basename $ssmfn | cut -d . -f1)
     echo "python3 $PROTDIR/pairwise.py "\
       "$sampid" \
