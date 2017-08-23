@@ -161,8 +161,16 @@ TreePlotter.prototype._generate_tree_struct = function(sampnames, adjlist, pops,
 TreePlotter.prototype.plot = function(summ_path, tidx, container) {
   var self = this;
   d3.json(summ_path, function(summary) {
-    var root = self._generate_tree_struct(summary.params.samples, summary.trees[tidx].structure, summary.trees[tidx].populations, summary.trees[tidx].root);
-    self._draw_tree(root, container, Object.keys(summary.trees[tidx].populations).length);
+    var pops = summary.trees[tidx].populations;
+    var struct = summary.trees[tidx].structure;
+    var root = summary.trees[tidx].root;
+    if(struct[root].length !== 1) {
+      throw "Unexpected children from root: " + struct[root];
+    }
+    var clonal = struct[root][0];
+
+    var root = self._generate_tree_struct(summary.params.samples, struct, pops, clonal);
+    self._draw_tree(root, container, Object.keys(pops).length);
   });
 }
 
