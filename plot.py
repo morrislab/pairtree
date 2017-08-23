@@ -290,8 +290,7 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
   variants = common.parse_ssms(sampid, ssmfn)
 
   garbage_ids = handbuilt.load_garbage(handbuiltfn)
-  clusters = handbuilt.load_clusters(handbuiltfn, variants)
-  handbuilt_adjm = handbuilt.load_tree(handbuiltfn)
+  clusters, handbuilt_adjm = handbuilt.load_clusters_and_tree(handbuiltfn, variants)
 
   garbage_variants = remove_garbage(garbage_ids, model_probs, variants, clusters)
   vidxs = sorted(model_probs['variants'].keys(), key = lambda V: int(V[1:]))

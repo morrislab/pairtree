@@ -118,7 +118,7 @@ function main {
   #rename_samples
   #remove_samples
 
-  #calc_pairwise
+  calc_pairwise
   plot
   add_tree_indices
   write_index
