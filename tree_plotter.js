@@ -249,10 +249,10 @@ PhiMatrix.prototype.plot = function(phi_path, container) {
       .enter()
       .append('svg:rect')
       .attr('width', cell_size)
-      .attr('height', function(d, i) { return cell_size; return d*cell_size; })
+      .attr('height', function(d, i) { return d*cell_size; })
       .attr('x', function(d, i) { return i * cell_size; })
-      .attr('y', function(d, i) { return 0; return 0.5*(1 - d)*cell_size; })
-      .attr('fill-opacity', function(d) { return d; });
+      .attr('y', function(d, i) { return (1 - d)*cell_size; })
+      .attr('fill-opacity', function(d) { return 1.0; });
   });
 }
 
@@ -261,6 +261,8 @@ function ColourAssigner() {
 
 ColourAssigner.assign_colours = function(num_colours) {
   var scale = d3.schemeDark2;
+  //var scale = ["#96e97c", "#732a66", "#2eece6", "#b91a29", "#13a64f", "#f33bea", "#17f46f", "#4f28af", "#aebf8a", "#0a4f4e", "#e4ccf1", "#4f4256", "#99def9", "#6e3901", "#5998bc", "#6a7f2f", "#996ddb"];
+
   var colours = [];
   for(var cidx = 0; colours.length < num_colours; cidx++) {
     if(cidx === scale.length) {
