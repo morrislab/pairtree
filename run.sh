@@ -65,6 +65,7 @@ function plot {
     for output_type in $OUTPUT_TYPES; do
       echo "python3 $PROTDIR/plot.py " \
 	"--output-type $output_type " \
+	"--tree-type handbuilt.xeno " \
 	"$sampid" \
 	"$jsonfn" \
 	"$ssmfn" \

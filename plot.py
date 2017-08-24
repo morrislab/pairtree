@@ -271,13 +271,21 @@ def cluster_samples(variants, sampnames):
 
   return (variants, sampnames)
 
-def write_trees(sampid, outf):
-  print('''<script type="text/javascript">$(document).ready(function() {
-    (new TreePlotter()).plot('%s.summ.json', 0, '#tree-handbuilt');
-    (new TreePlotter()).plot('%s.summ.json', 1000, '#tree-sampled'); });
-    </script>''' % (sampid, sampid), file=outf)
-  for tree_type in ('handbuilt', 'sampled'):
-    print('<h2>%s</h2><div id="tree-%s"></div>' % (tree_type, tree_type), file=outf)
+def write_trees(sampid, colourings, outf):
+  print('''<div id="trees"></div>''', file=outf)
+  print('''<script type="text/javascript">$(document).ready(function() {''', file=outf)
+  for tname, tidx in (('handbuilt', 0), ('sampled', 1000)):
+    for colouring in colourings:
+      print('''(new TreePlotter()).plot('%s.summ.json', %s, '%s', '%s', '%s', '#trees');''' % (
+        sampid,
+        tidx,
+        tname,
+        colouring['left'],
+        colouring['right'],
+      ), file=outf)
+  print('});</script>', file=outf)
+  #for tree_type in ('handbuilt', 'sampled'):
+    #print('<h2>%s</h2><div id="tree-%s"></div>' % (tree_type, tree_type), file=outf)
 
 def write_phi_matrix(sampid, outf):
   print('''<script type="text/javascript">$(document).ready(function() {
@@ -285,12 +293,13 @@ def write_phi_matrix(sampid, outf):
   });</script>''' % sampid, file=outf)
   print('<div id="phi_matrix" style="margin: 30px"></div>', file=outf)
 
-def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn, phifn):
+def plot(sampid, model_probs, output_type, tree_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn, phifn):
   sampnames = load_sampnames(paramsfn)
   variants = common.parse_ssms(sampid, ssmfn)
+  #cluster.cluster_patient_vars(sampid, variants, sampnames)
 
-  garbage_ids = handbuilt.load_garbage(handbuiltfn)
-  clusters, handbuilt_adjm = handbuilt.load_clusters_and_tree(handbuiltfn, variants)
+  garbage_ids = handbuilt.load_garbage(handbuiltfn, tree_type)
+  clusters, handbuilt_adjm, node_colourings = handbuilt.load_clusters_and_tree(handbuiltfn, variants, tree_type)
 
   garbage_variants = remove_garbage(garbage_ids, model_probs, variants, clusters)
   vidxs = sorted(model_probs['variants'].keys(), key = lambda V: int(V[1:]))
@@ -306,7 +315,7 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
   sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, clusters, vid2vidx, 1000)
 
   with open(outfn, 'w') as outf:
-    write_header(sampid, output_type, outf)
+    write_header(sampid, '%s, %s' % (output_type, tree_type), outf)
     #try:
     #  mle_adjm = tree_builder.make_adj(supervar_relations)
     #  mle_adjm = add_normal_root(mle_adjm)
@@ -324,11 +333,10 @@ def plot(sampid, model_probs, output_type, ssmfn, paramsfn, spreadsheetfn, handb
 
     phi, eta = fit_phis(sampled_adjm, variants, clusters, tidxs=(0, -1))
     json_writer.write_json(sampid, sampnames, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
-    cluster.cluster_patient_vars(sampid, variants, sampnames)
 
     eta_plotter.plot_eta(eta[0].T, sampnames, outf)
     eta_plotter.write_phi_json(phi[0].T, sampnames, phifn)
-    write_trees(sampid, outf)
+    write_trees(sampid, node_colourings, outf)
     write_phi_matrix(sampid, outf)
     for correct_vafs in (True, False):
       if correct_vafs is True and not vaf_correcter.has_corrections(sampid):
@@ -350,6 +358,7 @@ def main():
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--output-type', dest='output_type', choices=('clustered', 'unclustered', 'condensed'), default='clustered')
+  parser.add_argument('--tree-type', dest='tree_type', required=True)
   parser.add_argument('sampid')
   parser.add_argument('model_probs_fn')
   parser.add_argument('ssm_fn')
@@ -363,7 +372,7 @@ def main():
   args = parser.parse_args()
 
   model_probs = load_model_probs(args.model_probs_fn)
-  plot(args.sampid, model_probs, args.output_type, args.ssm_fn, args.params_fn, args.spreadsheet_fn, args.handbuilt_fn, args.out_fn, args.treesumm_fn, args.mutlist_fn, args.phi_fn)
+  plot(args.sampid, model_probs, args.output_type, args.tree_type, args.ssm_fn, args.params_fn, args.spreadsheet_fn, args.handbuilt_fn, args.out_fn, args.treesumm_fn, args.mutlist_fn, args.phi_fn)
 
 if __name__ == '__main__':
   main()

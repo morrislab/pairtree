@@ -58,7 +58,7 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops) {
   root.descendants().sort(function(a, b) {
     return d3.ascending(parseInt(a.data.name, 10), parseInt(b.data.name, 10));
   });
-  var svg = d3.select(container).html('').append('svg:svg')
+  var svg = container.append('svg:svg')
       .attr('width', w + m[1] + m[3])
       .attr('height', h + m[0] + m[2]);
   var vis = svg.append('svg:g')
@@ -79,13 +79,13 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops) {
     .attr('class', 'outline')
     .attr('r', function(d) { return d.data.radius; });
   nodeEnter.append('svg:path')
-    .attr('class', 'diagnosis')
+    .attr('class', 'left_half')
     .attr('d', function(d) { return describeArc(0, 0, d.data.radius, 180, 360); })
-    .attr('opacity', function (d) { return d.data.patient_cell_prevs.diagnosis; });
+    .attr('opacity', function (d) { return d.data.opacities.left; });
   nodeEnter.append('svg:path')
-    .attr('class', 'relapse')
+    .attr('class', 'right_half')
     .attr('d', function(d) { return describeArc(0, 0, d.data.radius, 0, 180); })
-    .attr('opacity', function (d) { return d.data.patient_cell_prevs.relapse; });
+    .attr('opacity', function (d) { return d.data.opacities.right; });
   nodeEnter.append('svg:path')
     .attr('class', 'divider')
     .attr('stroke', '#aaa')
@@ -123,13 +123,13 @@ TreePlotter.prototype._find_max_ssms = function(populations) {
   return max_ssms;
 }
 
-TreePlotter.prototype._generate_tree_struct = function(sampnames, adjlist, pops, root_id) {
+TreePlotter.prototype._generate_tree_struct = function(sampnames, adjlist, pops, root_id, left_sample, right_sample) {
   var max_ssms = this._find_max_ssms(pops);
 
-  var diag_index = sampnames.indexOf('D');
-  var relapse_index = sampnames.indexOf('R1');
-  if(diag_index === -1 || relapse_index === -1) {
-    throw "Can't find diagnosis or relapse sample in " + sampnames;
+  var left_index = sampnames.indexOf(left_sample);
+  var right_index = sampnames.indexOf(right_sample);
+  if(left_index === -1 || right_index === -1) {
+    throw "Can't find " + left_sample + " or " + right_sample + " samples in " + sampnames;
   }
 
   var _add_node = function(node_id, struct) {
@@ -137,9 +137,9 @@ TreePlotter.prototype._generate_tree_struct = function(sampnames, adjlist, pops,
 
     var num_ssms = pops[node_id]['num_ssms'];
     struct.radius = TreeUtil.calc_radius(num_ssms /  max_ssms);
-    struct.patient_cell_prevs = {
-      'diagnosis': pops[node_id]['cellular_prevalence'][diag_index],
-      'relapse':   pops[node_id]['cellular_prevalence'][relapse_index],
+    struct.opacities = {
+      'left':   pops[node_id]['cellular_prevalence'][left_index],
+      'right':  pops[node_id]['cellular_prevalence'][right_index],
     };
 
     if(typeof adjlist[node_id] === 'undefined') {
@@ -158,7 +158,10 @@ TreePlotter.prototype._generate_tree_struct = function(sampnames, adjlist, pops,
   return root;
 }
 
-TreePlotter.prototype.plot = function(summ_path, tidx, container) {
+TreePlotter.prototype.plot = function(summ_path, tidx, tname, left_sample, right_sample, container) {
+  container = d3.select(container).append('div');
+  container.append('h2').text(tname + ' tidx=' + tidx + ' left=' + left_sample + ' right=' + right_sample);
+
   var self = this;
   d3.json(summ_path, function(summary) {
     var pops = summary.trees[tidx].populations;
@@ -169,7 +172,7 @@ TreePlotter.prototype.plot = function(summ_path, tidx, container) {
     }
     var clonal = struct[root][0];
 
-    var root = self._generate_tree_struct(summary.params.samples, struct, pops, clonal);
+    var root = self._generate_tree_struct(summary.params.samples, struct, pops, clonal, left_sample, right_sample);
     self._draw_tree(root, container, Object.keys(pops).length);
   });
 }
@@ -269,7 +272,6 @@ function ColourAssigner() {
 
 ColourAssigner.assign_colours = function(num_colours) {
   var scale = d3.schemeDark2;
-  //var scale = ["#96e97c", "#732a66", "#2eece6", "#b91a29", "#13a64f", "#f33bea", "#17f46f", "#4f28af", "#aebf8a", "#0a4f4e", "#e4ccf1", "#4f4256", "#99def9", "#6e3901", "#5998bc", "#6a7f2f", "#996ddb"];
 
   var colours = [];
   for(var cidx = 0; colours.length < num_colours; cidx++) {
