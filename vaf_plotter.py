@@ -166,13 +166,15 @@ def augment_variant(V, spreadsheet, correct_vaf):
     if correct_vaf:
       V['vaf'] *= V['vaf_correction']
 
-def plot_unclustered_vafs(sampid, variants, sampnames, spreadsheetfn, outf, patient_samples_only=False):
+def plot_unclustered_vafs(sampid, variants, garbage_variants, sampnames, spreadsheetfn, outf, patient_samples_only=False):
   print('<h2>Unclustered VAFs (corrected, %s samples)</h2>' % ('patient' if patient_samples_only else 'all') , file=outf)
   print('<h3>Corrected variants: %s</h3>' % ', '.join(vaf_correcter.corrected_vars(sampid)), file=outf)
   spreadsheet = load_spreadsheet(spreadsheetfn)
 
   # Copy variant so we don't modify original dict.
   variants = {vid: dict(variants[vid]) for vid in variants.keys()}
+  if garbage_variants is not None:
+    variants.update({vid: dict(garbage_variants[vid]) for vid in garbage_variants.keys()})
   for V in variants.values():
     augment_variant(V, spreadsheet, True)
     V['cluster'] = None

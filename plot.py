@@ -296,6 +296,8 @@ def write_phi_matrix(sampid, outf):
 def plot(sampid, model_probs, output_type, tree_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn, phifn):
   sampnames = load_sampnames(paramsfn)
   variants = common.parse_ssms(sampid, ssmfn)
+  if tree_type == 'handbuilt.patient':
+    variants, sampnames = common.extract_patient_samples(variants, sampnames)
   #cluster.cluster_patient_vars(sampid, variants, sampnames)
 
   garbage_ids = handbuilt.load_garbage(handbuiltfn, tree_type)
@@ -342,8 +344,8 @@ def plot(sampid, model_probs, output_type, tree_type, ssmfn, paramsfn, spreadshe
       if correct_vafs is True and not vaf_correcter.has_corrections(sampid):
         continue
       vaf_plotter.plot_vaf_matrix(sampid, clusters, variants, supervars, garbage_variants, phi[0].T, sampnames, spreadsheetfn, correct_vafs, outf)
-    vaf_plotter.plot_unclustered_vafs(sampid, variants, sampnames, spreadsheetfn, outf, patient_samples_only=False)
-    vaf_plotter.plot_unclustered_vafs(sampid, variants, sampnames, spreadsheetfn, outf, patient_samples_only=True)
+    vaf_plotter.plot_unclustered_vafs(sampid, variants, None,             sampnames, spreadsheetfn, outf, patient_samples_only=False)
+    vaf_plotter.plot_unclustered_vafs(sampid, variants, garbage_variants, sampnames, spreadsheetfn, outf, patient_samples_only=True)
     plot_individual(model_probs, should_cluster, vid2vidx, vidx2vid, outf)
     plot_relations(ssm_relations, should_cluster, vidx2vid, outf)
     write_legend(outf)
