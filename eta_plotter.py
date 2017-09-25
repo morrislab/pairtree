@@ -51,13 +51,13 @@ def hide_unwanted(mat, sampnames):
   return (np.array(mat).T, sampnames)
 
 def rename_samples(sampnames):
-  return [S.replace('Diagnosis Xeno', 'DX').replace('Relapse Xeno', 'RX')  for S in sampnames]
+  return [S.replace('Diagnosis Xeno', 'dPDX').replace('Relapse Xeno', 'rPDX')  for S in sampnames]
 
 def plot_eta(eta, sampnames, outf):
   eta, sampnames = hide_unwanted(eta, sampnames)
   eta, sampnames = reorder_samples(eta, sampnames)
   short_sampnames = rename_samples(sampnames)
-  widths = np.array([1.0 if not common.is_xeno(S) else 0.4 for S in sampnames])
+  widths = np.array([0.9 if not common.is_xeno(S) else 0.5 for S in sampnames])
 
   # eta: KxS, K = # of clusters, S = # of samples
   traces = [go.Bar(
