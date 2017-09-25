@@ -58,18 +58,25 @@ def _load_tree(hb):
     del struct[key]
   return struct
 
-def _calc_dfs_order(tstruct):
+def _calc_dfs_order(tstruct, mean_vafs):
   ordered = []
   def _dfs(node):
     ordered.append(node)
     if node in tstruct:
-      for child in tstruct[node]:
+      for child in sorted(tstruct[node], key=lambda node_idx: -mean_vafs[node_idx]):
         _dfs(child)
   _dfs(0)
   return ordered
 
-def _renumber_clusters(clusters, tstruct):
-  reordered = _calc_dfs_order(tstruct)
+def _renumber_clusters(clusters, tstruct, variants, sampnames, colourings):
+  vafs = [np.array([variants['s%s' % V]['vaf'] for V in C]) for C in clusters]
+  vafs[0] = np.ones(shape=(1, len(sampnames)))
+  mean_vafs = np.array([np.mean(V, axis=0) for V in vafs])
+  left_sampidx = sampnames.index(colourings[0]['left'])
+  left_mean_vafs = mean_vafs[:,left_sampidx]
+
+  print(left_mean_vafs)
+  reordered = _calc_dfs_order(tstruct, left_mean_vafs)
   new_clusters = [clusters[cidx] for cidx in reordered]
   mapping = {old: new for new, old in enumerate(reordered)}
   new_tstruct = {mapping[old_parent]: [mapping[old_child] for old_child in tstruct[old_parent]] for old_parent in tstruct.keys()}
@@ -79,10 +86,11 @@ def load_garbage(handbuilt_jsonfn, tree_type):
   hb = _load_handbuilt(handbuilt_jsonfn, tree_type)
   return hb['garbage']
 
-def load_clusters_and_tree(handbuilt_jsonfn, variants, tree_type):
+def load_clusters_and_tree(handbuilt_jsonfn, variants, tree_type, sampnames):
   hbjson = _load_handbuilt(handbuilt_jsonfn, tree_type)
   clusters = _load_clusters(hbjson, variants)
   tstruct = _load_tree(hbjson)
-  clusters, tstruct = _renumber_clusters(clusters, tstruct)
+  colourings = hbjson['colourings']
+  clusters, tstruct = _renumber_clusters(clusters, tstruct, variants, sampnames, colourings)
   adjm = _convert_adjlist_to_adjmatrix(tstruct)
-  return (clusters, adjm, hbjson['colourings'])
+  return (clusters, adjm, colourings)

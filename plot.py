@@ -301,7 +301,7 @@ def plot(sampid, model_probs, output_type, tree_type, ssmfn, paramsfn, spreadshe
   #cluster.cluster_patient_vars(sampid, variants, sampnames)
 
   garbage_ids = handbuilt.load_garbage(handbuiltfn, tree_type)
-  clusters, handbuilt_adjm, node_colourings = handbuilt.load_clusters_and_tree(handbuiltfn, variants, tree_type)
+  clusters, handbuilt_adjm, node_colourings = handbuilt.load_clusters_and_tree(handbuiltfn, variants, tree_type, sampnames)
 
   garbage_variants = remove_garbage(garbage_ids, model_probs, variants, clusters)
   vidxs = sorted(model_probs['variants'].keys(), key = lambda V: int(V[1:]))
@@ -345,9 +345,9 @@ def plot(sampid, model_probs, output_type, tree_type, ssmfn, paramsfn, spreadshe
         continue
       vaf_plotter.plot_vaf_matrix(sampid, clusters, variants, supervars, garbage_variants, phi[0].T, sampnames, spreadsheetfn, correct_vafs, outf)
     vaf_plotter.plot_unclustered_vafs(sampid, variants, None,             sampnames, spreadsheetfn, outf, patient_samples_only=False)
-    vaf_plotter.plot_unclustered_vafs(sampid, variants, garbage_variants, sampnames, spreadsheetfn, outf, patient_samples_only=True)
-    plot_individual(model_probs, should_cluster, vid2vidx, vidx2vid, outf)
-    plot_relations(ssm_relations, should_cluster, vidx2vid, outf)
+    #vaf_plotter.plot_unclustered_vafs(sampid, variants, garbage_variants, sampnames, spreadsheetfn, outf, patient_samples_only=True)
+    #plot_individual(model_probs, should_cluster, vid2vidx, vidx2vid, outf)
+    #plot_relations(ssm_relations, should_cluster, vidx2vid, outf)
     write_legend(outf)
 
 def load_model_probs(model_probs_fn):
