@@ -44,8 +44,6 @@ def hide_unwanted(mat, sampnames):
   def _is_unwanted(samp):
     if 'cns' in samp.lower() or 'spleen' in samp.lower():
       return True
-    if samp in ('D2', 'D3', 'R2'):
-      return True
     if samp.startswith('Pre-Diagnosis Xeno'):
       return True
     return False
