@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-RUNNAME=xenos
+RUNNAME=xeno
 BASEDIR=~/work/steph
 SSMDIR=$BASEDIR/data/inputs/steph.xenos.nocns
 OUTDIR=$BASEDIR/data/pairwise.$RUNNAME
@@ -60,12 +60,12 @@ function plot {
     spreadsheetfn=$BASEDIR/data/ssms/$sampid.csv
     handbuiltfn="$HANDBUILTDIR/$sampid.json"
 
-    [ -f $handbuiltfn ] || continue
+    [ -f "$handbuiltfn" ] || continue
 
     for output_type in $OUTPUT_TYPES; do
       echo "python3 $PROTDIR/plot.py " \
 	"--output-type $output_type " \
-	"--tree-type handbuilt.xeno " \
+	"--tree-type handbuilt.$RUNNAME " \
 	"$sampid" \
 	"$jsonfn" \
 	"$ssmfn" \
@@ -96,7 +96,7 @@ function write_index {
 function add_tree_indices {
   for jsonfn in $OUTDIR/*.summ.json; do
     sampid=$(basename $jsonfn | cut -d . -f1)
-    gzip "$OUTDIR/$sampid.summ.json" "$OUTDIR/$sampid.muts.json"
+    gzip --force "$OUTDIR/$sampid.summ.json" "$OUTDIR/$sampid.muts.json"
     echo "PYTHONPATH=$PWGSDIR python2 $PROTDIR/add_tree_indices.py" \
       "$OUTDIR/$sampid.summ.json.gz" \
       "$OUTDIR/$sampid.muts.json.gz"
@@ -119,7 +119,7 @@ function main {
   #rename_samples
   #remove_samples
 
-  calc_pairwise
+  #calc_pairwise
   plot
   add_tree_indices
   write_index
