@@ -5,6 +5,9 @@ import common
 import json
 
 def find_xeno_ranges(sampnames):
+  '''
+  Returns half-open intervals [start, end).
+  '''
   assert not common.is_xeno(sampnames[0])
 
   last_was_xeno = False
@@ -33,11 +36,36 @@ def find_xeno_ranges(sampnames):
 
   return xeno_ranges
 
-def reorder_samples(mat, sampnames):
+def reorder_samples(mat, sampnames, samporders):
   xeno_ranges = find_xeno_ranges(sampnames)
+  used_samporders = set()
+
+  print('sn', sampnames)
   for start, end in xeno_ranges:
-    mat, idxs = common.reorder_cols(mat, start, end)
+    print('bounds', start, end)
+    xeno_sampnames = frozenset([S for idx, S in enumerate(sampnames) if start <= idx < end])
+    for S in samporders:
+      if xeno_sampnames == frozenset(S):
+        idxs = [S.index(s) + start for s in S]
+        print('idxs', idxs)
+        idxs = list(range(start)) + idxs + list(range(end, len(sampnames)))
+        print('idxs', idxs, len(sampnames))
+        assert set(idxs) == set(range(len(sampnames)))
+        mat = mat[:,idxs]
+        used_samporders.add(frozenset(S))
+        break
+      else:
+        overlap = len(xeno_sampnames & frozenset(S))
+        if overlap > 0:
+          print('overlap', overlap, xeno_sampnames & frozenset(S))
+          print('xs', xeno_sampnames)
+          print('m1', xeno_sampnames - frozenset(S))
+          print('m2', frozenset(S) - xeno_sampnames)
+    else:
+      mat, idxs = common.reorder_cols(mat, start, end)
     sampnames = [sampnames[I] for I in idxs]
+
+  assert used_samporders == set([frozenset(S) for S in samporders]) and len(used_samporders) == len(samporders)
   return (mat, sampnames)
 
 def hide_unwanted(mat, sampnames):
@@ -53,9 +81,9 @@ def hide_unwanted(mat, sampnames):
 def rename_samples(sampnames):
   return [S.replace('Diagnosis Xeno', 'dPDX').replace('Relapse Xeno', 'rPDX')  for S in sampnames]
 
-def plot_eta(eta, sampnames, outf):
+def plot_eta(eta, sampnames, samporders, outf):
   eta, sampnames = hide_unwanted(eta, sampnames)
-  eta, sampnames = reorder_samples(eta, sampnames)
+  eta, sampnames = reorder_samples(eta, sampnames, samporders)
   short_sampnames = rename_samples(sampnames)
   widths = np.array([0.9 if not common.is_xeno(S) else 0.5 for S in sampnames])
 
@@ -80,9 +108,9 @@ def plot_eta(eta, sampnames, outf):
   )
   print(plot, file=outf)
 
-def write_phi_json(phi, sampnames, jsonfn):
+def write_phi_json(phi, sampnames, samporders, jsonfn):
   phi, sampnames = hide_unwanted(phi, sampnames)
-  phi, sampnames = reorder_samples(phi, sampnames)
+  phi, sampnames = reorder_samples(phi, sampnames, samporders)
   short_sampnames = rename_samples(sampnames)
   with open(jsonfn, 'w') as outf:
     json.dump({

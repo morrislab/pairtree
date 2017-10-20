@@ -94,3 +94,10 @@ def load_clusters_and_tree(handbuilt_jsonfn, variants, tree_type, sampnames):
   clusters, tstruct = _renumber_clusters(clusters, tstruct, variants, sampnames, colourings)
   adjm = _convert_adjlist_to_adjmatrix(tstruct)
   return (clusters, adjm, colourings)
+
+def load_samporders(handbuilt_jsonfn, tree_type):
+  hbjson = _load_handbuilt(handbuilt_jsonfn, tree_type)
+  samporders = hbjson['samporders']
+  for S in samporders:
+    assert len(S) == len(set(S)), 'Duplicate sample names: %s' % set([s for s in S if S.count(s) > 1])
+  return samporders

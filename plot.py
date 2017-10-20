@@ -302,6 +302,7 @@ def plot(sampid, model_probs, output_type, tree_type, ssmfn, paramsfn, spreadshe
 
   garbage_ids = handbuilt.load_garbage(handbuiltfn, tree_type)
   clusters, handbuilt_adjm, node_colourings = handbuilt.load_clusters_and_tree(handbuiltfn, variants, tree_type, sampnames)
+  samporders = handbuilt.load_samporders(handbuiltfn, tree_type)
 
   garbage_variants = remove_garbage(garbage_ids, model_probs, variants, clusters)
   vidxs = sorted(model_probs['variants'].keys(), key = lambda V: int(V[1:]))
@@ -336,8 +337,8 @@ def plot(sampid, model_probs, output_type, tree_type, ssmfn, paramsfn, spreadshe
     phi, eta = fit_phis(sampled_adjm, variants, clusters, tidxs=(0, -1))
     json_writer.write_json(sampid, sampnames, variants, clusters, sampled_adjm, sampled_llh, phi, treesummfn, mutlistfn)
 
-    eta_plotter.plot_eta(eta[0].T, sampnames, outf)
-    eta_plotter.write_phi_json(phi[0].T, sampnames, phifn)
+    eta_plotter.plot_eta(eta[0].T, sampnames, samporders, outf)
+    eta_plotter.write_phi_json(phi[0].T, sampnames, samporders, phifn)
     write_trees(sampid, node_colourings, outf)
     write_phi_matrix(sampid, outf)
     for correct_vafs in (True, False):
