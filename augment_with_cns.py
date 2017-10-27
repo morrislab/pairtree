@@ -25,11 +25,11 @@ def add_samples(dataset, orig_ssm_fn, orig_params_fn, augment_ssm_fn, augment_pa
   augmented_ssms, augmented_fields = parse_ssms(augment_ssm_fn)
   orig_samples, augmented_samples = parse_samples(orig_params_fn), parse_samples(augment_params_fn)
   assert orig_fields == augmented_fields
-  missing = set()
 
   augment_mask = []
   for aug_sampname in augmented_samples:
     augment_mask.append(should_add(dataset, aug_sampname))
+  num_aug_samples = len([V for V in augment_mask if V])
 
   added_samples = [samp for samp, should_include in zip(augmented_samples, augment_mask) if should_include]
   print(dataset, 'adding', added_samples, file=sys.stderr)
@@ -37,17 +37,15 @@ def add_samples(dataset, orig_ssm_fn, orig_params_fn, augment_ssm_fn, augment_pa
 
   for pos, orig_ssm in orig_ssms.items():
     if pos not in augmented_ssms:
-      missing.add(orig_ssm['gene'])
       print(dataset, 'missing', orig_ssm['id'], pos, 'in augmented', file=sys.stderr)
+      for key in ('a', 'd'):
+        orig_ssm[key] += num_aug_samples * [1]
       continue
     augssm = augmented_ssms[pos]
     for key in ('a', 'd'):
       added = [val for val, should_include in zip(augssm[key], augment_mask) if should_include]
       assert len(added) == len(added_samples)
       orig_ssm[key] += added
-
-  for M in missing:
-    del orig_ssms[M]
 
   return (orig_fields, orig_ssms, orig_samples)
 
