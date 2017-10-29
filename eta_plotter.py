@@ -43,11 +43,11 @@ def reorder_samples(mat, sampnames, samporders):
   print('sn', sampnames)
   for start, end in xeno_ranges:
     print('bounds', start, end)
-    xeno_sampnames = frozenset([S for idx, S in enumerate(sampnames) if start <= idx < end])
+    xeno_sampnames = [S for idx, S in enumerate(sampnames) if start <= idx < end]
     for S in samporders:
-      if xeno_sampnames == frozenset(S):
-        idxs = [S.index(s) + start for s in S]
-        print('idxs', idxs)
+      if set(xeno_sampnames) == set(S):
+        idxs = [xeno_sampnames.index(s) + start for s in S]
+        print('idxs', idxs, S)
         idxs = list(range(start)) + idxs + list(range(end, len(sampnames)))
         print('idxs', idxs, len(sampnames))
         assert set(idxs) == set(range(len(sampnames)))
@@ -55,12 +55,12 @@ def reorder_samples(mat, sampnames, samporders):
         used_samporders.add(frozenset(S))
         break
       else:
-        overlap = len(xeno_sampnames & frozenset(S))
+        overlap = len(set(xeno_sampnames) & set(S))
         if overlap > 0:
           print('overlap', overlap, xeno_sampnames & frozenset(S))
           print('xs', xeno_sampnames)
-          print('m1', xeno_sampnames - frozenset(S))
-          print('m2', frozenset(S) - xeno_sampnames)
+          print('m1', xeno_sampnames - set(S))
+          print('m2', set(S) - xeno_sampnames)
     else:
       mat, idxs = common.reorder_cols(mat, start, end)
     sampnames = [sampnames[I] for I in idxs]
