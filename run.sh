@@ -5,7 +5,7 @@ PROTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 RUNNAME=xeno
 BASEDIR=~/work/steph
 SSMDIR=$BASEDIR/data/inputs/steph.xenos.nocns
-OUTDIR=$BASEDIR/data/pairwise.$RUNNAME
+OUTDIR=$BASEDIR/data/pairwise.$RUNNAME.nocns
 HANDBUILTDIR=$BASEDIR/data/handbuilt_trees
 RENAMEDSAMPS=$BASEDIR/misc/renamed.txt
 HIDDENSAMPS=$BASEDIR/misc/hidden.txt
@@ -82,7 +82,7 @@ function plot {
   done | parallel -j40 --halt 1
 }
 
-function write_index {
+function write_plot_index {
   cd $OUTDIR
   for status in $OUTPUT_TYPES; do
     echo "<h3>$status</h3>"
@@ -105,6 +105,28 @@ function add_tree_indices {
 
 }
 
+function calc_concordance {
+  cd $OUTDIR
+  for jsonfn in S*summ.json; do
+    sampid=$(echo $jsonfn | cut -d. -f1)
+    for foo in $sampid.*.json; do
+      echo -n "gzip < $foo > $foo.gz && "
+    done
+    echo "PYTHONPATH=~/.apps/phylowgs python2 ~/work/steph/protocols/pairwise/calc_concordance.py" \
+      "$sampid.{summ,muts}.json.gz" \
+      "$sampid.concord.tsv" \
+      "$sampid.concord.html"
+  done | parallel -j40 --halt 1
+}
+
+function write_concord_index {
+  cd $OUTDIR
+  for htmlfn in S*.concord.html; do
+    sampid=$(basename $htmlfn | cut -d. -f1)
+    echo "<a href=$htmlfn>$sampid</a><br>"
+  done > index.html
+}
+
 function add_to_witness {
   witnessdir=$PWGSDIR/witness/data/steph.$RUNNAME.$(date '+%Y%m%d')
   mkdir -p $witnessdir
@@ -119,11 +141,14 @@ function main {
   #rename_samples
   #remove_samples
 
-  #calc_pairwise
+  calc_pairwise
   plot
   add_tree_indices
-  write_index
+  write_plot_index
   add_to_witness
+
+  #calc_concordance
+  #write_concord_index
 }
 
 main
