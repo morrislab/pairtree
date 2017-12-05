@@ -40,6 +40,21 @@ TreePlotter.prototype._calculate_max_depth = function(root) {
   return _calc_max_depth(root);
 }
 
+TreePlotter.prototype._label_node = function(node_id) {
+  // If we're examining a patient+xeno tree, label the node with the node_id.
+  // Otherwise, we're presumably examining a patient-only tree, so label it
+  // with a letter.
+  if(window.location.toString().indexOf('pairwise.xeno') > -1) {
+    return node_id;
+  }
+  // Restrict to valid alphabet range.
+  if(node_id < 1 || node_id > 26) {
+    return node_id;
+  }
+  var letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  return letters[node_id - 1];
+}
+
 TreePlotter.prototype._draw_tree = function(root, container, num_pops) {
   // horiz_padding should be set to the maximum radius of a node, so a node
   // drawn on a boundry won't go over the canvas edge. Since max_area = 8000,
@@ -95,7 +110,7 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops) {
       .attr('font-size', '30')
       .attr('dominant-baseline', 'central')
       .attr('text-anchor', 'middle')
-      .text(function(d) { return d.data.name; });
+      .text(function(d) { return self._label_node(d.data.name); });
 
   // Update the links.
   var link = vis.selectAll('path.link')
