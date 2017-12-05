@@ -12,14 +12,6 @@
   cursor: pointer;
 }
 
-.population .left_half {
-  fill: #428bca;
-}
-
-.population .right_half {
-  fill: #ca4242;
-}
-
 .divider {
   stroke: #aaa;
   stroke-width: 2px;

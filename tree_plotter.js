@@ -67,6 +67,10 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops) {
       i = 0;
   var colours = ColourAssigner.assign_colours(num_pops);
 
+  var diag_colour    = '#428bca';
+  var relapse_colour = '#ca4242';
+  var node_bgcolour  = '#ffffff';
+
   // Compute the new tree layout.
   var tree = d3.tree().size([h, w]);
   root = tree(d3.hierarchy(root));
@@ -96,11 +100,11 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops) {
   nodeEnter.append('svg:path')
     .attr('class', 'left_half')
     .attr('d', function(d) { return describeArc(0, 0, d.data.radius, 180, 360); })
-    .attr('opacity', function (d) { return d.data.opacities.left; });
+    .attr('fill', function(d) { return Util.rgba2hex(diag_colour, d.data.opacities.left, node_bgcolour); });
   nodeEnter.append('svg:path')
     .attr('class', 'right_half')
     .attr('d', function(d) { return describeArc(0, 0, d.data.radius, 0, 180); })
-    .attr('opacity', function (d) { return d.data.opacities.right; });
+    .attr('fill', function(d) { return Util.rgba2hex(relapse_colour, d.data.opacities.right, node_bgcolour); });
   nodeEnter.append('svg:path')
     .attr('class', 'divider')
     .attr('stroke', '#aaa')
@@ -210,6 +214,27 @@ Util.sort_ints = function(arr) {
     return parseInt(a, 10);
   });
   return converted.sort();
+}
+
+Util.hex2rgb = function(colour) {
+  return {
+    r: parseInt(colour.substring(1, 3), 16),
+    g: parseInt(colour.substring(3, 5), 16),
+    b: parseInt(colour.substring(5, 7), 16)
+  };
+}
+
+Util.rgba2hex = function(base_colour, alpha, bgcolour) {
+  base_colour = Util.hex2rgb(base_colour);
+  bgcolour = Util.hex2rgb(bgcolour);
+
+  var rgb = {};
+  Object.keys(base_colour).forEach(function(channel) {
+    rgb[channel] = Math.round(alpha*base_colour[channel] + (1 - alpha)*bgcolour[channel]);
+  });
+  var hex = '#' + rgb.r.toString(16) + rgb.g.toString(16) + rgb.b.toString(16);
+  console.log([base_colour, alpha, bgcolour, rgb, hex]);
+  return hex;
 }
 
 function PhiMatrix() {
