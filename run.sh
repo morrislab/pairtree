@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-RUNNAME=xeno
+RUNNAME=patient
 BASEDIR=~/work/steph
 SSMDIR=$BASEDIR/data/inputs/steph.xenos.nocns
 OUTDIR=$BASEDIR/data/pairwise.$RUNNAME.nocns
@@ -135,20 +135,35 @@ function add_to_witness {
   python2 index_data.py
 }
 
+function match_clusters {
+  for ssmfn in $SSMDIR/*.sampled.ssm; do
+    sampid=$(basename $ssmfn | cut -d . -f1)
+    echo "python3 $PROTDIR/match_clusters.py "\
+      "$sampid" \
+      "$HANDBUILTDIR/$sampid.json" \
+      "$ssmfn" \
+      "$SSMDIR/$sampid.params.json" \
+      "handbuilt.xeno" \
+      "handbuilt.patient"
+  done | grep SJBALL022609 | parallel -j40 --halt 1
+}
+
 function main {
   mkdir -p $OUTDIR
 
   #rename_samples
   #remove_samples
 
-  calc_pairwise
-  plot
-  add_tree_indices
-  write_plot_index
-  add_to_witness
+  #calc_pairwise
+  #plot
+  #add_tree_indices
+  #write_plot_index
+  #add_to_witness
 
   #calc_concordance
   #write_concord_index
+
+  match_clusters
 }
 
 main
