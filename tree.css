@@ -20,13 +20,20 @@
 
 .population text {
   font-size: 1.8em;
-  font-weight: bold;
-  fill: white;
+  font-weight: 900;
+  font-family: sans-serif;
   paint-order: stroke;
-  stroke: #000;
-  stroke-width: 2px;
+  stroke: #0a0a0a;
+  fill: #fff;
+  stroke-width: 6px;
 }
 
 .link {
   fill: none;
+  stroke: #383838;
+  stroke-width: 1.5px;
+}
+
+#arrowhead {
+  fill: #383838;
 }

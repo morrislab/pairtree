@@ -55,7 +55,7 @@ TreePlotter.prototype._label_node = function(node_id) {
   return letters[node_id - 1];
 }
 
-TreePlotter.prototype._draw_tree = function(root, container, num_pops) {
+TreePlotter.prototype._draw_tree = function(root, container, num_pops, left_sample, right_sample) {
   // horiz_padding should be set to the maximum radius of a node, so a node
   // drawn on a boundry won't go over the canvas edge. Since max_area = 8000,
   // we have horiz_padding = sqrt(8000 / pi) =~ 51.
@@ -69,6 +69,7 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops) {
 
   var diag_colour    = '#428bca';
   var relapse_colour = '#ca4242';
+  var other_colour   = '#d4b831';
   var node_bgcolour  = '#ffffff';
 
   // Compute the new tree layout.
@@ -80,8 +81,20 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops) {
   var svg = container.append('svg:svg')
       .attr('width', w + m[1] + m[3])
       .attr('height', h + m[0] + m[2]);
+  svg.append('svg:defs')
+    .append('svg:marker')
+    .attr('id', 'arrowhead')
+    .attr('orient', 'auto')
+    .attr('markerWidth', 10)
+    .attr('markerHeight', 10)
+    .attr('markerUnits', 'strokeWidth')
+    .attr('refX', 0)
+    .attr('refY', 3)
+    .append('svg:path')
+    .attr('d', 'M0,0 L0,6 L9,3 z');
   var vis = svg.append('svg:g')
       .attr('transform', 'translate(' + m[3] + ',' + m[0] + ')');
+
 
   // Update the nodes.
   var node = vis.selectAll('g.node')
@@ -100,15 +113,23 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops) {
   nodeEnter.append('svg:path')
     .attr('class', 'left_half')
     .attr('d', function(d) { return describeArc(0, 0, d.data.radius, 180, 360); })
-    .attr('fill', function(d) { return Util.rgba2hex(diag_colour, d.data.opacities.left, node_bgcolour); });
+    .attr('fill', function(d) {
+      // Use other_colour for xenos.
+      var base_colour = (left_sample.indexOf('X') > -1) ? other_colour : diag_colour;
+      return Util.rgba2hex(base_colour, d.data.opacities.left, node_bgcolour);
+    });
   nodeEnter.append('svg:path')
     .attr('class', 'right_half')
     .attr('d', function(d) { return describeArc(0, 0, d.data.radius, 0, 180); })
-    .attr('fill', function(d) { return Util.rgba2hex(relapse_colour, d.data.opacities.right, node_bgcolour); });
-  nodeEnter.append('svg:path')
+    .attr('fill', function(d) {
+      // Use other_colour for xenos.
+      var base_colour = (right_sample.indexOf('X') > -1) ? other_colour : relapse_colour;
+      return Util.rgba2hex(base_colour, d.data.opacities.right, node_bgcolour); }
+    );
+  /*nodeEnter.append('svg:path')
     .attr('class', 'divider')
     .attr('stroke', '#aaa')
-    .attr('d', function(d) { return 'M 0 -' + d.data.radius + ' V ' + d.data.radius; });
+    .attr('d', function(d) { return 'M 0 -' + d.data.radius + ' V ' + d.data.radius; });*/
 
   nodeEnter.append('svg:text')
       .attr('font-size', '30')
@@ -118,17 +139,18 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops) {
 
   // Update the links.
   var link = vis.selectAll('path.link')
-      .data(root.links(), function(d) { return d.target.data.name; })
-      .attr('stroke-width', '1.5px')
+      .data(root.links(), function(d) { return d.target.data.name; });
 
   // Enter any new links at the parent's previous position.
-  link.enter().insert('svg:path', 'g')
+  var arrowhead_width = 14;
+  link.enter()
+    .insert('svg:path', 'g')
+    .attr('marker-end', 'url(#arrowhead)')
     .attr('class', 'link')
-    .attr('stroke', '#aaa')
-    .attr('d', d3.linkHorizontal().x(function(d) {
-      return d.y;
-    }).y(function(d) {
-      return d.x;
+    .attr('d', d3.linkHorizontal().source(function(d) {
+      return [d.source.y + d.source.data.radius, d.source.x];
+    }).target(function(d) {
+      return [d.target.y - d.source.data.radius - arrowhead_width, d.target.x];
     }));
 }
 
@@ -192,7 +214,7 @@ TreePlotter.prototype.plot = function(summ_path, tidx, tname, left_sample, right
     var clonal = struct[root][0];
 
     var root = self._generate_tree_struct(summary.params.samples, struct, pops, clonal, left_sample, right_sample);
-    self._draw_tree(root, container, Object.keys(pops).length);
+    self._draw_tree(root, container, Object.keys(pops).length, left_sample, right_sample);
   });
 }
 
@@ -202,7 +224,8 @@ function TreeUtil() {
 TreeUtil.calc_radius = function(scale) {
   var min_area = 700, max_area = 8000;
   // scale must be in [0, 1].
-  var area = min_area + scale*(max_area - min_area);
+  //var area = min_area + scale*(max_area - min_area);
+  var area = 2000;
   return Math.sqrt(area / Math.PI);
 }
 
@@ -233,7 +256,6 @@ Util.rgba2hex = function(base_colour, alpha, bgcolour) {
     rgb[channel] = Math.round(alpha*base_colour[channel] + (1 - alpha)*bgcolour[channel]);
   });
   var hex = '#' + rgb.r.toString(16) + rgb.g.toString(16) + rgb.b.toString(16);
-  console.log([base_colour, alpha, bgcolour, rgb, hex]);
   return hex;
 }
 
@@ -282,6 +304,7 @@ PhiMatrix.prototype.plot = function(phi_path, container) {
       .attr('x', 0)
       .attr('y', 0)
       .text(function(d, i) { return d; });
+
     var rows = svg.selectAll('g.phis')
       .data(ccf)
       .enter()
