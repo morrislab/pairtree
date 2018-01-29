@@ -162,14 +162,19 @@ def get_next_colour():
 get_next_colour._last_idx = -1
 
 def augment_variant(V, spreadsheet, correct_vaf):
-    V['gene'] = find_gene_name(V['chrom'], V['pos'], spreadsheet)
-    if correct_vaf:
-      V['vaf'] *= V['vaf_correction']
+  if spreadsheet is None:
+    return
+  if correct_vaf:
+    V['vaf'] *= V['vaf_correction']
+  V['gene'] = find_gene_name(V['chrom'], V['pos'], spreadsheet)
 
 def plot_unclustered_vafs(sampid, variants, garbage_variants, sampnames, spreadsheetfn, outf, patient_samples_only=False):
   print('<h2>Unclustered VAFs (corrected, %s samples)</h2>' % ('patient' if patient_samples_only else 'all') , file=outf)
   print('<h3>Corrected variants: %s</h3>' % ', '.join(vaf_correcter.corrected_vars(sampid)), file=outf)
-  spreadsheet = load_spreadsheet(spreadsheetfn)
+  if spreadsheetfn is not None:
+    spreadsheet = load_spreadsheet(spreadsheetfn)
+  else:
+    spreadsheet = None
 
   # Copy variant so we don't modify original dict.
   variants = {vid: dict(variants[vid]) for vid in variants.keys()}
