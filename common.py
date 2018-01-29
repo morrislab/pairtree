@@ -1,6 +1,6 @@
 import csv
 import numpy as np
-import sklearn
+import sklearn.cluster
 from collections import namedtuple
 import vaf_correcter
 
