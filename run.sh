@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-RUNNAME=patient
+RUNNAME=xeno
 BASEDIR=~/work/steph
 SSMDIR=$BASEDIR/data/inputs/steph.xenos.nocns
 OUTDIR=$BASEDIR/data/pairwise.$RUNNAME.nocns
@@ -11,7 +11,6 @@ RENAMEDSAMPS=$BASEDIR/misc/renamed.txt
 HIDDENSAMPS=$BASEDIR/misc/hidden.txt
 PWGSDIR=~/.apps/phylowgs
 
-OUTPUT_TYPES="clustered unclustered condensed"
 OUTPUT_TYPES="clustered"
 
 function remove_samples {
@@ -136,16 +135,21 @@ function add_to_witness {
 }
 
 function match_clusters {
+  cd $OUTDIR
   for ssmfn in $SSMDIR/*.sampled.ssm; do
     sampid=$(basename $ssmfn | cut -d . -f1)
+    if [[ $sampid == SJBALL022610 ]]; then
+      continue
+    fi
     echo "python3 $PROTDIR/match_clusters.py "\
       "$sampid" \
       "$HANDBUILTDIR/$sampid.json" \
       "$ssmfn" \
       "$SSMDIR/$sampid.params.json" \
       "handbuilt.xeno" \
-      "handbuilt.patient"
-  done | grep SJBALL022609 | parallel -j40 --halt 1
+      "handbuilt.patient" \
+      "> $sampid.matched.txt"
+  done | parallel -j40 --halt 1
 }
 
 function main {
@@ -154,16 +158,16 @@ function main {
   #rename_samples
   #remove_samples
 
-  #calc_pairwise
-  #plot
-  #add_tree_indices
-  #write_plot_index
-  #add_to_witness
+  calc_pairwise
+  plot
+  add_tree_indices
+  write_plot_index
+  add_to_witness
 
   #calc_concordance
   #write_concord_index
 
-  match_clusters
+  #match_clusters
 }
 
 main
