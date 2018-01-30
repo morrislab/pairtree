@@ -289,8 +289,8 @@ def write_trees(sampid, colourings, outf):
 
 def write_phi_matrix(sampid, outf):
   print('''<script type="text/javascript">$(document).ready(function() {
-  (new PhiMatrix()).plot('%s.phi.json', '#phi_matrix');
-  });</script>''' % sampid, file=outf)
+  (new PhiMatrix()).plot('%s', '%s.phi.json', '#phi_matrix');
+  });</script>''' % (sampid, sampid), file=outf)
   print('<div id="phi_matrix" style="margin: 30px"></div>', file=outf)
 
 def plot(sampid, model_probs, output_type, tree_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn, phifn):

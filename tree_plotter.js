@@ -1,4 +1,7 @@
-function TreePlotter() { }
+var IS_XENO = window.location.toString().indexOf('pairwise.xeno') > -1;
+
+function TreePlotter() {
+}
 
 // Following two functions from https://stackoverflow.com/a/18473154.
 function polarToCartesian(centerX, centerY, radius, angleInDegrees) {
@@ -10,7 +13,7 @@ function polarToCartesian(centerX, centerY, radius, angleInDegrees) {
   };
 }
 
-function describeArc(x, y, radius, startAngle, endAngle){
+function describeArc(x, y, radius, startAngle, endAngle) {
   var start = polarToCartesian(x, y, radius, endAngle);
   var end = polarToCartesian(x, y, radius, startAngle);
 
@@ -21,6 +24,17 @@ function describeArc(x, y, radius, startAngle, endAngle){
     "A", radius, radius, 0, largeArcFlag, 0, end.x, end.y
   ].join(" ");
 
+  return d;
+}
+
+function describeRect(x, y, width, height) {
+  var d = [
+    "M", x, y,
+    "H", x + width,
+    "V", y + height,
+    "H", x,
+    "Z"
+  ].join(" ");
   return d;
 }
 
@@ -44,7 +58,7 @@ TreePlotter.prototype._label_node = function(node_id) {
   // If we're examining a patient+xeno tree, label the node with the node_id.
   // Otherwise, we're presumably examining a patient-only tree, so label it
   // with a letter.
-  if(window.location.toString().indexOf('pairwise.xeno') > -1) {
+  if(IS_XENO) {
     return node_id;
   }
   // Restrict to valid alphabet range.
@@ -63,7 +77,7 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops, left_samp
   var max_depth = this._calculate_max_depth(root);
   var m = [10, horiz_padding, 10, horiz_padding],
       w = 120*max_depth - m[1] - m[3],
-      h = 600 - m[0] - m[2],
+      h = 430 - m[0] - m[2],
       i = 0;
   var colours = ColourAssigner.assign_colours(num_pops);
 
@@ -107,25 +121,48 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops, left_samp
     .attr('fill', function(d, i) { return colours[d.data.name]; })
     .attr('transform', function(d) { return 'translate(' + d.y + ',' + d.x + ')'; });
 
-  nodeEnter.append('svg:circle')
-    .attr('class', 'outline')
-    .attr('r', function(d) { return d.data.radius; });
-  nodeEnter.append('svg:path')
-    .attr('class', 'left_half')
-    .attr('d', function(d) { return describeArc(0, 0, d.data.radius, 180, 360); })
-    .attr('fill', function(d) {
-      // Use other_colour for xenos.
-      var base_colour = (left_sample.indexOf('X') > -1) ? other_colour : diag_colour;
-      return Util.rgba2hex(base_colour, d.data.opacities.left, node_bgcolour);
-    });
-  nodeEnter.append('svg:path')
-    .attr('class', 'right_half')
-    .attr('d', function(d) { return describeArc(0, 0, d.data.radius, 0, 180); })
-    .attr('fill', function(d) {
-      // Use other_colour for xenos.
-      var base_colour = (right_sample.indexOf('X') > -1) ? other_colour : relapse_colour;
-      return Util.rgba2hex(base_colour, d.data.opacities.right, node_bgcolour); }
-    );
+  var add_half = function(side) {
+    nodeEnter.append('svg:path')
+      .attr('class', side + '_half')
+      .attr('d', function(d) {
+        if (IS_XENO) {
+          if(side === 'left') {
+            return describeArc(0, 0, d.data.radius, 180, 360);
+          } else {
+            return describeArc(0, 0, d.data.radius, 0, 180);
+          }
+        } else {
+          if(side === 'left') {
+            return describeRect(-d.data.radius, -d.data.radius, d.data.radius, 2*d.data.radius);
+          } else {
+            return describeRect(0, -d.data.radius, d.data.radius, 2*d.data.radius);
+          }
+        }
+      }).attr('fill', function(d) {
+        // Use other_colour for xenos.
+        if(side === 'left') {
+          var base_colour = (left_sample.indexOf('X') > -1)  ? other_colour : diag_colour;
+        } else {
+          var base_colour = (right_sample.indexOf('X') > -1) ? other_colour : relapse_colour;
+        }
+        return Util.rgba2hex(base_colour, d.data.opacities[side], node_bgcolour);
+      });
+  };
+
+  if(IS_XENO) {
+    nodeEnter.append('svg:circle')
+      .attr('class', 'outline')
+      .attr('r', function(d) { return d.data.radius; });
+  } else {
+    nodeEnter.append('svg:rect')
+      .attr('class', 'outline')
+      .attr('x', function(d) { return -d.data.radius; })
+      .attr('y', function(d) { return -d.data.radius; })
+      .attr('width', function(d) { return 2*d.data.radius; })
+      .attr('height', function(d) { return 2 * d.data.radius; });
+  }
+  add_half('left');
+  add_half('right');
   /*nodeEnter.append('svg:path')
     .attr('class', 'divider')
     .attr('stroke', '#aaa')
@@ -276,9 +313,41 @@ PhiMatrix.prototype._calc_ccf = function(phi) {
   return ccf;
 }
 
-PhiMatrix.prototype.plot = function(phi_path, container) {
+PhiMatrix.prototype._filter_samples = function(phi_matrix, sampnames, samps_to_keep) {
+  var filtered_samps = [];
+  var filtered_phi = [];
+  phi_matrix.forEach(function(row) {
+    filtered_phi.push([]);
+  });
+
+  samps_to_keep.forEach(function(samp) {
+    var sidx = sampnames.indexOf(samp);
+    if(sidx < 0) {
+      throw "Can't find " + samp + " in " + sampnames;
+    }
+    filtered_samps.push(samp);
+    phi_matrix.forEach(function(phi, pidx) {
+      filtered_phi[pidx].push(phi_matrix[pidx][sidx]);
+    });
+  });
+
+  return {'phi': filtered_phi, 'samples': filtered_samps};
+}
+
+PhiMatrix.prototype.plot = function(sampid, phi_path, container) {
   var self = this;
+  var filters = {
+    'SJBALL022609': ['D', 'dPDX 26', 'dPDX 8', 'dPDX 2', 'dPDX 15', 'dPDX 7', 'dPDX 14', 'dPDX 20', 'dPDX 29', 'R1', 'rPDX 25', 'rPDX 2', 'rPDX 17', 'rPDX 21']
+  };
   d3.json(phi_path, function(phi_data) {
+    if(IS_XENO && filters.hasOwnProperty(sampid)) {
+      phi_data = self._filter_samples(
+        phi_data['phi'],
+        phi_data['samples'],
+        filters[sampid]
+      );
+    }
+
     var ccf = self._calc_ccf(phi_data['phi']);
     var sampnames = phi_data['samples'];
 
@@ -286,7 +355,8 @@ PhiMatrix.prototype.plot = function(phi_path, container) {
     var num_cols = ccf[0].length;
     var cell_size = 50;
     var row_label_width = 100;
-    var col_label_height = 100;
+    var col_label_height = 120;
+    var font_size = '24px';
     var label_padding = 10;
 
     var colours = ColourAssigner.assign_colours(phi_data['phi'].length);
@@ -303,6 +373,7 @@ PhiMatrix.prototype.plot = function(phi_path, container) {
       .attr('transform', function(d, i) { return 'translate(' + i * cell_size + ',0) rotate(270)'; })
       .attr('x', 0)
       .attr('y', 0)
+      .attr('font-size', font_size)
       .text(function(d, i) { return d; });
 
     var rows = svg.selectAll('g.phis')
@@ -317,7 +388,9 @@ PhiMatrix.prototype.plot = function(phi_path, container) {
       .attr('y', 0.5 * cell_size)
       .attr('dominant-baseline', 'middle')
       .attr('text-anchor', 'end')
-      .text(function(d, i) { return 'Population ' + (i + 1); });
+      .attr('font-size', font_size)
+      .attr('font-weight', 'bold')
+      .text(function(d, i) { return 'Pop. ' + (i + 1); });
     rows.selectAll('rect')
       .data(function(d) { return d; })
       .enter()
