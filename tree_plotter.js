@@ -364,7 +364,7 @@ PhiMatrix.prototype.plot = function(sampid, phi_path, container) {
 function MatrixBar() {
 }
 
-MatrixBar.prototype.plot = function(mat, row_labels, row_colours, col_labels, col_colours, container) {
+MatrixBar.prototype.plot = function(mat, row_labels, row_colours, col_labels, col_label_colours, container) {
   var num_rows = mat.length;
   var num_cols = mat[0].length;
   var cell_size = 50;
@@ -395,8 +395,8 @@ MatrixBar.prototype.plot = function(mat, row_labels, row_colours, col_labels, co
     .attr('font-size', font_size)
     .attr('font-weight', 'bold')
     .text(function(d, i) { return d; });
-  if(typeof col_colours !== 'undefined' && col_colours.length === num_cols) {
-    cl.attr('fill', function(d, i) { return col_colours[i]; });
+  if(typeof col_label_colours !== 'undefined' && col_label_colours.length === num_cols) {
+    cl.attr('fill', function(d, i) { return col_label_colours[i]; });
   }
 
   var rows = svg.selectAll('g.rows')
