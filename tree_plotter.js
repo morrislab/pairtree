@@ -54,6 +54,12 @@ TreePlotter.prototype._calculate_max_depth = function(root) {
   return _calc_max_depth(root);
 }
 
+TreePlotter.colours = {};
+TreePlotter.colours.diag = '#428bca';
+TreePlotter.colours.relapse = '#ca4242';
+TreePlotter.colours.other = '#d4b831';
+TreePlotter.colours.node_bg = '#ffffff';
+
 TreePlotter.prototype._label_node = function(node_id) {
   // If we're examining a patient+xeno tree, label the node with the node_id.
   // Otherwise, we're presumably examining a patient-only tree, so label it
@@ -80,11 +86,6 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops, left_samp
       h = 430 - m[0] - m[2],
       i = 0;
   var colours = ColourAssigner.assign_colours(num_pops);
-
-  var diag_colour    = '#428bca';
-  var relapse_colour = '#ca4242';
-  var other_colour   = '#d4b831';
-  var node_bgcolour  = '#ffffff';
 
   // Compute the new tree layout.
   var tree = d3.tree().size([h, w]);
@@ -141,11 +142,11 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops, left_samp
       }).attr('fill', function(d) {
         // Use other_colour for xenos.
         if(side === 'left') {
-          var base_colour = (left_sample.indexOf('X') > -1)  ? other_colour : diag_colour;
+          var base_colour = (left_sample.indexOf('X') > -1)  ? TreePlotter.colours.other : TreePlotter.colours.diag;
         } else {
-          var base_colour = (right_sample.indexOf('X') > -1) ? other_colour : relapse_colour;
+          var base_colour = (right_sample.indexOf('X') > -1) ? TreePlotter.colours.other : TreePlotter.colours.relapse;
         }
-        return Util.rgba2hex(base_colour, d.data.opacities[side], node_bgcolour);
+        return Util.rgba2hex(base_colour, d.data.opacities[side], TreePlotter.colours.node_bg);
       });
   };
 
@@ -351,14 +352,19 @@ PhiMatrix.prototype.plot = function(sampid, phi_path, container) {
     var ccf = self._calc_ccf(phi_data['phi']);
     var popnames = ccf.map(function(d, i) { return 'Pop. ' + (i + 1); });
     var sampnames = phi_data['samples'];
-    (new MatrixBar()).plot(ccf, popnames, sampnames, container);
+    var sampcolours = sampnames.map(function(sampname) {
+      return sampname[0].toUpperCase() === 'D' ? TreePlotter.colours.diag : TreePlotter.colours.relapse;
+    });
+    var popcolours = ColourAssigner.assign_colours(ccf.length);
+
+    (new MatrixBar()).plot(ccf, popnames, popcolours, sampnames, sampcolours, container);
   });
 }
 
 function MatrixBar() {
 }
 
-MatrixBar.prototype.plot = function(mat, row_labels, col_labels, container) {
+MatrixBar.prototype.plot = function(mat, row_labels, row_colours, col_labels, col_colours, container) {
   var num_rows = mat.length;
   var num_cols = mat[0].length;
   var cell_size = 50;
@@ -374,12 +380,10 @@ MatrixBar.prototype.plot = function(mat, row_labels, col_labels, container) {
     throw "Wrong number of col labels";
   }
 
-  var colours = ColourAssigner.assign_colours(num_rows);
-
   var svg = d3.select(container).html('').append('svg:svg')
     .attr('width', row_label_width + num_cols * cell_size)
     .attr('height', col_label_height + num_rows * cell_size);
-  svg.append('svg:g')
+  var cl = svg.append('svg:g')
     .attr('transform', function(d, i) { return 'translate(' + (row_label_width + 0.5 * cell_size) + ',' + (col_label_height - label_padding) + ')'; })
     .selectAll('text')
     .data(col_labels)
@@ -389,15 +393,22 @@ MatrixBar.prototype.plot = function(mat, row_labels, col_labels, container) {
     .attr('x', 0)
     .attr('y', 0)
     .attr('font-size', font_size)
+    .attr('font-weight', 'bold')
     .text(function(d, i) { return d; });
+  if(typeof col_colours !== 'undefined' && col_colours.length === num_cols) {
+    cl.attr('fill', function(d, i) { return col_colours[i]; });
+  }
 
   var rows = svg.selectAll('g.rows')
     .data(mat)
     .enter()
     .append('svg:g')
     .attr('class', 'rows')
-    .attr('fill', function(d, i) { return colours[i]; })
     .attr('transform', function(d, i) { return 'translate(' + row_label_width + ',' + (col_label_height + (i * cell_size)) + ')'; });
+  if(typeof row_colours !== 'undefined' && row_colours.length === num_rows) {
+    rows.attr('fill', function(d, i) { return row_colours[i]; });
+  }
+
   rows.append('text')
     .attr('x', -label_padding)
     .attr('y', 0.5 * cell_size)
