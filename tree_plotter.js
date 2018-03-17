@@ -349,58 +349,72 @@ PhiMatrix.prototype.plot = function(sampid, phi_path, container) {
     }
 
     var ccf = self._calc_ccf(phi_data['phi']);
+    var popnames = ccf.map(function(d, i) { return 'Pop. ' + (i + 1); });
     var sampnames = phi_data['samples'];
-
-    var num_rows = ccf.length;
-    var num_cols = ccf[0].length;
-    var cell_size = 50;
-    var row_label_width = 100;
-    var col_label_height = 120;
-    var font_size = '24px';
-    var label_padding = 10;
-
-    var colours = ColourAssigner.assign_colours(phi_data['phi'].length);
-
-    var svg = d3.select(container).html('').append('svg:svg')
-      .attr('width', row_label_width + num_cols * cell_size)
-      .attr('height', col_label_height + num_rows * cell_size);
-    svg.append('svg:g')
-      .attr('transform', function(d, i) { return 'translate(' + (row_label_width + 0.5 * cell_size) + ',' + (col_label_height - label_padding) + ')'; })
-      .selectAll('text')
-      .data(sampnames)
-      .enter()
-      .append('svg:text')
-      .attr('transform', function(d, i) { return 'translate(' + i * cell_size + ',0) rotate(270)'; })
-      .attr('x', 0)
-      .attr('y', 0)
-      .attr('font-size', font_size)
-      .text(function(d, i) { return d; });
-
-    var rows = svg.selectAll('g.phis')
-      .data(ccf)
-      .enter()
-      .append('svg:g')
-      .attr('class', 'phis')
-      .attr('fill', function(d, i) { return colours[i + 1]; })
-      .attr('transform', function(d, i) { return 'translate(' + row_label_width + ',' + (col_label_height + (i * cell_size)) + ')'; });
-    rows.append('svg:text')
-      .attr('x', -label_padding)
-      .attr('y', 0.5 * cell_size)
-      .attr('dominant-baseline', 'middle')
-      .attr('text-anchor', 'end')
-      .attr('font-size', font_size)
-      .attr('font-weight', 'bold')
-      .text(function(d, i) { return 'Pop. ' + (i + 1); });
-    rows.selectAll('rect')
-      .data(function(d) { return d; })
-      .enter()
-      .append('svg:rect')
-      .attr('width', cell_size)
-      .attr('height', function(d, i) { return d*cell_size; })
-      .attr('x', function(d, i) { return i * cell_size; })
-      .attr('y', function(d, i) { return (1 - d)*cell_size; })
-      .attr('fill-opacity', function(d) { return 1.0; });
+    (new MatrixBar()).plot(ccf, popnames, sampnames, container);
   });
+}
+
+function MatrixBar() {
+}
+
+MatrixBar.prototype.plot = function(mat, row_labels, col_labels, container) {
+  var num_rows = mat.length;
+  var num_cols = mat[0].length;
+  var cell_size = 50;
+  var row_label_width = 100;
+  var col_label_height = 120;
+  var font_size = '24px';
+  var label_padding = 10;
+
+  if(row_labels.length !== num_rows) {
+    throw "Wrong number of row labels";
+  }
+  if(col_labels.length !== num_cols) {
+    throw "Wrong number of col labels";
+  }
+
+  var colours = ColourAssigner.assign_colours(num_rows);
+
+  var svg = d3.select(container).html('').append('svg:svg')
+    .attr('width', row_label_width + num_cols * cell_size)
+    .attr('height', col_label_height + num_rows * cell_size);
+  svg.append('svg:g')
+    .attr('transform', function(d, i) { return 'translate(' + (row_label_width + 0.5 * cell_size) + ',' + (col_label_height - label_padding) + ')'; })
+    .selectAll('text')
+    .data(col_labels)
+    .enter()
+    .append('svg:text')
+    .attr('transform', function(d, i) { return 'translate(' + i * cell_size + ',0) rotate(270)'; })
+    .attr('x', 0)
+    .attr('y', 0)
+    .attr('font-size', font_size)
+    .text(function(d, i) { return d; });
+
+  var rows = svg.selectAll('g.rows')
+    .data(mat)
+    .enter()
+    .append('svg:g')
+    .attr('class', 'rows')
+    .attr('fill', function(d, i) { return colours[i]; })
+    .attr('transform', function(d, i) { return 'translate(' + row_label_width + ',' + (col_label_height + (i * cell_size)) + ')'; });
+  rows.append('text')
+    .attr('x', -label_padding)
+    .attr('y', 0.5 * cell_size)
+    .attr('dominant-baseline', 'middle')
+    .attr('text-anchor', 'end')
+    .attr('font-size', font_size)
+    .attr('font-weight', 'bold')
+    .text(function(d, i) { return row_labels[i]; });
+  rows.selectAll('rect')
+    .data(function(d) { return d; })
+    .enter()
+    .append('svg:rect')
+    .attr('width', cell_size)
+    .attr('height', function(d, i) { return d*cell_size; })
+    .attr('x', function(d, i) { return i * cell_size; })
+    .attr('y', function(d, i) { return (1 - d)*cell_size; })
+    .attr('fill-opacity', function(d) { return 1.0; });
 }
 
 function ColourAssigner() {
@@ -410,7 +424,9 @@ ColourAssigner.assign_colours = function(num_colours) {
   var scale = d3.schemeDark2;
 
   var colours = [];
-  for(var cidx = 0; colours.length < num_colours; cidx++) {
+  // Start at cidx=1 rather than cidx=0 to keep colouring of phi matrix
+  // consistent with what it was in past versions.
+  for(var cidx = 1; colours.length < num_colours; cidx++) {
     if(cidx === scale.length) {
       cidx = 0;
     }
