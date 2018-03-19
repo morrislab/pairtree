@@ -293,6 +293,12 @@ def write_phi_matrix(sampid, outf):
   });</script>''' % (sampid, sampid), file=outf)
   print('<div id="phi_matrix" style="margin: 30px"></div>', file=outf)
 
+def write_cluster_matrix(sampid, outf):
+  print('''<script type="text/javascript">$(document).ready(function() {
+  (new ClusterMatrix()).plot('%s.handbuilt.json', 'xeno', 'patient', '#cluster_matrix');
+  });</script>''' % sampid, file=outf)
+  print('<div id="cluster_matrix" style="margin: 30px"></div>', file=outf)
+
 def plot(sampid, model_probs, output_type, tree_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn, phifn):
   sampnames = load_sampnames(paramsfn)
   variants = common.parse_ssms(sampid, ssmfn)
@@ -341,6 +347,7 @@ def plot(sampid, model_probs, output_type, tree_type, ssmfn, paramsfn, spreadshe
     eta_plotter.write_phi_json(phi[0].T, sampnames, samporders, phifn)
     write_trees(sampid, node_colourings, outf)
     write_phi_matrix(sampid, outf)
+    write_cluster_matrix(sampid, outf)
     for correct_vafs in (True, False):
       if correct_vafs is True and not vaf_correcter.has_corrections(sampid):
         continue

@@ -1,8 +1,10 @@
 #!/bin/sh
 set -euo pipefail
 
+#RUNNAME=patient
+RUNNAME=$1
+
 PROTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-RUNNAME=xeno
 BASEDIR=~/work/steph
 SSMDIR=$BASEDIR/data/inputs/steph.xenos.nocns
 OUTDIR=$BASEDIR/data/pairwise.$RUNNAME.nocns
@@ -60,6 +62,7 @@ function plot {
     handbuiltfn="$HANDBUILTDIR/$sampid.json"
 
     [ -f "$handbuiltfn" ] || continue
+    cp -a "$handbuiltfn" "$OUTDIR/$sampid.handbuilt.json"
 
     for output_type in $OUTPUT_TYPES; do
       echo "python3 $PROTDIR/plot.py " \
@@ -135,10 +138,10 @@ function add_to_witness {
 }
 
 function match_clusters {
-  cd $OUTDIR
+  cd $BASEDIR/data/pairwise.xeno.nocns
   for ssmfn in $SSMDIR/*.sampled.ssm; do
     sampid=$(basename $ssmfn | cut -d . -f1)
-    if [[ $sampid == SJBALL022610 ]]; then
+    if [[ $sampid == SJBALL022610 || $sampid == SJETV010 ]]; then
       continue
     fi
     echo "python3 $PROTDIR/match_clusters.py "\
@@ -158,7 +161,7 @@ function main {
   #rename_samples
   #remove_samples
 
-  calc_pairwise
+  #calc_pairwise
   plot
   add_tree_indices
   write_plot_index
@@ -167,7 +170,7 @@ function main {
   #calc_concordance
   #write_concord_index
 
-  #match_clusters
+  match_clusters
 }
 
 main

@@ -445,3 +445,83 @@ ColourAssigner.assign_colours = function(num_colours) {
   }
   return colours;
 }
+
+function ClusterMatrix() {
+}
+
+ClusterMatrix.prototype._zeros = function(M, N) {
+  var Z = [];
+  for(var i = 0; i < M; i++) {
+    Z.push([]);
+    for(var j = 0; j < N; j++) {
+      Z[i][j] = 0;
+    }
+  }
+  return Z;
+}
+
+ClusterMatrix.prototype._move_garbage = function(clusters, garbage) {
+  if(clusters[0].length > 0) {
+    throw "Node 0 is not empty";
+  }
+  clusters[0] = garbage;
+  return clusters;
+}
+
+ClusterMatrix.prototype._calc_ass = function(hb, run1, run2) {
+  var R1 = hb['handbuilt.' + run1];
+  var R2 = hb['handbuilt.' + run2];
+
+  var run1_clusters = this._move_garbage(R1.clusters, R1.garbage);
+  var run2_clusters = this._move_garbage(R2.clusters, R2.garbage);
+  var M = run1_clusters.length;
+  var N = run2_clusters.length;
+  var ass = this._zeros(M, N);
+
+  var T_run1 = run1_clusters.reduce(function(sum, C) { return sum + C.length; }, 0);
+  var T_run2 = run2_clusters.reduce(function(sum, C) { return sum + C.length; }, 0);
+  if(T_run1 !== T_run2) { throw "Different numbers of SSMs in runs"; }
+  var T = T_run1;
+
+  var run2_revass = {};
+  run2_clusters.forEach(function(C, idx_C) {
+    C.forEach(function(S) {
+      run2_revass[S] = idx_C;
+    });
+  });
+
+  run1_clusters.forEach(function(C, idx_C_run1) {
+    C.forEach(function(S) {
+      var idx_C_run2 = run2_revass[S];
+      ass[idx_C_run1][idx_C_run2] += 1/T;
+    });
+  });
+
+  var sum = 0;
+  for(var i = 0; i < M; i++) {
+    for(var j = 0; j < N; j++) {
+      sum += ass[i][j];
+    }
+  }
+  if(Math.abs(1 - sum) > 0.0001) {
+    throw "sum not equal to 1";
+  }
+  return ass;
+}
+
+ClusterMatrix.prototype.plot = function(hbjson_path, run1, run2, container) {
+  var self = this;
+  d3.json(hbjson_path, function(hb) {
+    var ass = self._calc_ass(hb, run1, run2);
+
+    var row_labels = ass.map(function(row, idx) {
+      return idx === 0 ? 'Garbage' : 'Pop. ' + idx;
+    });
+    var col_labels = ass[0].map(function(col, idx) {
+      return idx === 0 ? 'Garbage' : 'Pop. ' + idx;
+    });
+    var row_colours = ColourAssigner.assign_colours(ass.length);
+    var col_label_colours = undefined;
+    (new MatrixBar()).plot(ass, row_labels, row_colours, col_labels, col_label_colours, container);
+  });
+}
