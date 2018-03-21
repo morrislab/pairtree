@@ -78,6 +78,7 @@ function plot {
 	"$OUTDIR/$sampid.summ.json" \
 	"$OUTDIR/$sampid.muts.json" \
 	"$OUTDIR/$sampid.phi.json" \
+	"$OUTDIR/$sampid.clustermat.json" \
 	">  $OUTDIR/$sampid.plot.stdout" \
 	"2> $OUTDIR/$sampid.plot.stderr"
     done

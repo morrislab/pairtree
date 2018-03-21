@@ -16,6 +16,7 @@ import pairwise
 import eta_plotter
 import vaf_correcter
 import cluster
+import clustermat
 
 np.set_printoptions(threshold=np.nan)
 np.random.seed(1)
@@ -295,11 +296,11 @@ def write_phi_matrix(sampid, outf):
 
 def write_cluster_matrix(sampid, outf):
   print('''<script type="text/javascript">$(document).ready(function() {
-  (new ClusterMatrix()).plot('%s.handbuilt.json', 'xeno', 'patient', '#cluster_matrix');
+  (new ClusterMatrix()).plot('%s.clustermat.json', '#cluster_matrix');
   });</script>''' % sampid, file=outf)
   print('<div id="cluster_matrix" style="margin: 30px"></div>', file=outf)
 
-def plot(sampid, model_probs, output_type, tree_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn, phifn):
+def plot(sampid, model_probs, output_type, tree_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn, phifn, clustermatfn):
   sampnames = load_sampnames(paramsfn)
   variants = common.parse_ssms(sampid, ssmfn)
   if tree_type == 'handbuilt.patient':
@@ -347,6 +348,7 @@ def plot(sampid, model_probs, output_type, tree_type, ssmfn, paramsfn, spreadshe
     eta_plotter.write_phi_json(phi[0].T, sampnames, samporders, phifn)
     write_trees(sampid, node_colourings, outf)
     write_phi_matrix(sampid, outf)
+    clustermat.write_clustermat_json(sampid, handbuiltfn, paramsfn, ssmfn, clustermatfn)
     write_cluster_matrix(sampid, outf)
     for correct_vafs in (True, False):
       if correct_vafs is True and not vaf_correcter.has_corrections(sampid):
@@ -379,10 +381,11 @@ def main():
   parser.add_argument('treesumm_fn')
   parser.add_argument('mutlist_fn')
   parser.add_argument('phi_fn')
+  parser.add_argument('clustermat_fn')
   args = parser.parse_args()
 
   model_probs = load_model_probs(args.model_probs_fn)
-  plot(args.sampid, model_probs, args.output_type, args.tree_type, args.ssm_fn, args.params_fn, args.spreadsheet_fn, args.handbuilt_fn, args.out_fn, args.treesumm_fn, args.mutlist_fn, args.phi_fn)
+  plot(args.sampid, model_probs, args.output_type, args.tree_type, args.ssm_fn, args.params_fn, args.spreadsheet_fn, args.handbuilt_fn, args.out_fn, args.treesumm_fn, args.mutlist_fn, args.phi_fn, args.clustermat_fn)
 
 if __name__ == '__main__':
   main()
