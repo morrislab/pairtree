@@ -4,42 +4,18 @@ import numpy as np
 import plot
 import json
 
-def write_cluster_matrix(sampid, outf):
-  print('''<script type="text/javascript">$(document).ready(function() {
-  (new ClusterMatrix()).plot('%s.handbuilt.json', 'xeno', 'patient', '#cluster_matrix');
-  });</script>''' % sampid, file=outf)
-  print('<div id="cluster_matrix" style="margin: 30px"></div>', file=outf)
+def make_clustermat(clusters1, garbage1, clusters2, garbage2):
+  assert len(clusters1[0]) == len(clusters2[0]) == 0
+  clusters1[0] = garbage1
+  clusters2[0] = garbage2
+  assert sum([len(C) for C in clusters1]) == sum([len(C) for C in clusters2])
 
-def load_xeno_and_patient_clusters(sampid, handbuiltfn, paramsfn, ssmfn):
-  xeno = {
-    'variants':  common.parse_ssms(sampid, ssmfn),
-    'sampnames': plot.load_sampnames(paramsfn),
-    'tree_type': 'handbuilt.xeno',
-  }
-  patient = {
-    'tree_type': 'handbuilt.patient'
-  }
-  patient['variants'], patient['sampnames'] = common.extract_patient_samples(xeno['variants'], xeno['sampnames'])
-
-  xeno['garbage']    = handbuilt.load_garbage(handbuiltfn, xeno['tree_type'])
-  patient['garbage'] = handbuilt.load_garbage(handbuiltfn, patient['tree_type'])
-
-  xeno['clusters'], _, _    = handbuilt.load_clusters_and_tree(handbuiltfn, xeno['variants'], xeno['tree_type'], xeno['sampnames'])
-  patient['clusters'], _, _ = handbuilt.load_clusters_and_tree(handbuiltfn, patient['variants'], patient['tree_type'], patient['sampnames'])
-
-  assert len(xeno['clusters'][0]) == len(patient['clusters'][0]) == 0
-  xeno['clusters'][0] = xeno['garbage']
-  patient['clusters'][0] = patient['garbage']
-  assert sum([len(C) for C in xeno['clusters']]) == sum([len(C) for C in patient['clusters']])
-  return (xeno['clusters'], patient['clusters'])
-
-def make_clustermat(xeno_clusters, patient_clusters):
-  M, N = len(xeno_clusters), len(patient_clusters)
+  M, N = len(clusters1), len(clusters2)
   clustermat = np.zeros((M, N))
-  T = sum([len(C) for C in patient_clusters])
+  T = sum([len(C) for C in clusters2])
   for i in range(M):
     for j in range(N):
-      clustermat[i,j] = len(set(xeno_clusters[i]) & set(patient_clusters[j]))
+      clustermat[i,j] = len(set(clusters1[i]) & set(clusters2[j]))
   assert np.isclose(T, np.sum(clustermat))
 
   clustermat /= T
@@ -54,11 +30,14 @@ def make_clustermat(xeno_clusters, patient_clusters):
     clustermat[idx] = row / np.sum(row)
   return clustermat
 
-def write_clustermat_json(sampid, handbuiltfn, paramsfn, ssmfn, clustermatfn):
-  xeno_clusters, patient_clusters = load_xeno_and_patient_clusters(sampid, handbuiltfn, paramsfn, ssmfn)
-  clustermat = make_clustermat(xeno_clusters, patient_clusters)
-
+def write_clustermat_json(clustermat, clustermatfn):
   with open(clustermatfn, 'w') as outf:
     json.dump({
       'clustermat': clustermat.tolist()
     }, outf)
+
+def make_clustermat_html(clustermatfn):
+  return '''<script type="text/javascript">$(document).ready(function() {
+  (new ClusterMatrix()).plot('%s', '#cluster_matrix');
+  });</script>
+  <div id="cluster_matrix" style="margin: 30px"></div>''' % clustermatfn

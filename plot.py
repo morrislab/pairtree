@@ -17,6 +17,7 @@ import eta_plotter
 import vaf_correcter
 import cluster
 import clustermat
+import os
 
 np.set_printoptions(threshold=np.nan)
 np.random.seed(1)
@@ -294,11 +295,25 @@ def write_phi_matrix(sampid, outf):
   });</script>''' % (sampid, sampid), file=outf)
   print('<div id="phi_matrix" style="margin: 30px"></div>', file=outf)
 
-def write_cluster_matrix(sampid, outf):
-  print('''<script type="text/javascript">$(document).ready(function() {
-  (new ClusterMatrix()).plot('%s.clustermat.json', '#cluster_matrix');
-  });</script>''' % sampid, file=outf)
-  print('<div id="cluster_matrix" style="margin: 30px"></div>', file=outf)
+def load_xeno_and_patient_clusters(sampid, handbuiltfn, paramsfn, ssmfn):
+  xeno = {
+    'variants':  common.parse_ssms(sampid, ssmfn),
+    'sampnames': load_sampnames(paramsfn),
+    'tree_type': 'handbuilt.xeno',
+  }
+  patient = {
+    'tree_type': 'handbuilt.patient'
+  }
+  patient['variants'], patient['sampnames'] = common.extract_patient_samples(xeno['variants'], xeno['sampnames'])
+
+  xeno['garbage']    = handbuilt.load_garbage(handbuiltfn, xeno['tree_type'])
+  patient['garbage'] = handbuilt.load_garbage(handbuiltfn, patient['tree_type'])
+
+  xeno['clusters'], _, _    = handbuilt.load_clusters_and_tree(handbuiltfn, xeno['variants'], xeno['tree_type'], xeno['sampnames'])
+  patient['clusters'], _, _ = handbuilt.load_clusters_and_tree(handbuiltfn, patient['variants'], patient['tree_type'], patient['sampnames'])
+
+  assert sum([len(C) for C in xeno['clusters']]) + len(xeno['garbage']) == sum([len(C) for C in patient['clusters']]) + len(patient['garbage'])
+  return (xeno['clusters'], xeno['garbage'], patient['clusters'], patient['garbage'])
 
 def plot(sampid, model_probs, output_type, tree_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn, phifn, clustermatfn):
   sampnames = load_sampnames(paramsfn)
@@ -348,8 +363,13 @@ def plot(sampid, model_probs, output_type, tree_type, ssmfn, paramsfn, spreadshe
     eta_plotter.write_phi_json(phi[0].T, sampnames, samporders, phifn)
     write_trees(sampid, node_colourings, outf)
     write_phi_matrix(sampid, outf)
-    clustermat.write_clustermat_json(sampid, handbuiltfn, paramsfn, ssmfn, clustermatfn)
-    write_cluster_matrix(sampid, outf)
+
+    xeno_clusters, xeno_garbage, patient_clusters, patient_garbage = load_xeno_and_patient_clusters(sampid, handbuiltfn, paramsfn, ssmfn)
+    cmat = clustermat.make_clustermat(xeno_clusters, xeno_garbage, patient_clusters, patient_garbage)
+    clustermat.write_clustermat_json(cmat, clustermatfn)
+    cmathtml = clustermat.make_clustermat_html(os.path.basename(clustermatfn))
+    print(cmathtml, file=outf)
+
     for correct_vafs in (True, False):
       if correct_vafs is True and not vaf_correcter.has_corrections(sampid):
         continue
