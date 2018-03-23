@@ -3,6 +3,7 @@ import numpy as np
 import sklearn.cluster
 from collections import namedtuple
 import vaf_correcter
+import json
 
 class Models:
   _all = ('garbage', 'cocluster', 'A_B', 'B_A', 'diff_branches')
@@ -26,6 +27,7 @@ def parse_ssms(sampid, ssmfn):
         'ref_reads': np.array([float(V) for V in row['a'].split(',')]),
         'total_reads': np.array([float(V) for V in row['d'].split(',')]),
         'mu_v': float(row['mu_v']),
+        'mu_r': float(row['mu_r']),
       }
       variant['var_reads'] = variant['total_reads'] - variant['ref_reads']
       variant['vaf'] = variant['var_reads'] / variant['total_reads']
@@ -143,6 +145,9 @@ def reorder_rows(mat, start=None, end=None):
   return (mat, fullidxs)
 
 def reorder_cols(mat, start=None, end=None):
+  # Disable reordering for Pieter's data, since he has a defined sample order
+  # he needs.
+  #return (mat, np.array(range(len(mat.T))))
   mat = mat.T
   mat, idxs = reorder_rows(mat, start, end)
   return (mat.T, idxs)
@@ -169,3 +174,9 @@ def extract_patient_samples(variants, sampnames):
   variants = munged
   sampnames = [S for (S, is_patient) in zip(sampnames, patient_mask) if is_patient]
   return (variants, sampnames)
+
+def load_sampnames(paramsfn):
+  with open(paramsfn) as P:
+    params = json.load(P)
+  sampnames = params['samples']
+  return sampnames

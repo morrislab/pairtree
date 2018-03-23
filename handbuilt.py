@@ -75,7 +75,6 @@ def _renumber_clusters(clusters, tstruct, variants, sampnames, colourings):
   left_sampidx = sampnames.index(colourings[0]['left'])
   left_mean_vafs = mean_vafs[:,left_sampidx]
 
-  print(left_mean_vafs)
   reordered = _calc_dfs_order(tstruct, left_mean_vafs)
   new_clusters = [clusters[cidx] for cidx in reordered]
   mapping = {old: new for new, old in enumerate(reordered)}

@@ -256,12 +256,6 @@ def remove_garbage(garbage_ids, model_probs, variants, clusters):
 
   return garbage_variants
 
-def load_sampnames(paramsfn):
-  with open(paramsfn) as P:
-    params = json.load(P)
-  sampnames = params['samples']
-  return sampnames
-
 def cluster_samples(variants, sampnames):
   vaf = make_vaf_matrix(variants)
   _, idxs = cluster_cols(vaf)
@@ -298,7 +292,7 @@ def write_phi_matrix(sampid, outf):
 def load_xeno_and_patient_clusters(sampid, handbuiltfn, paramsfn, ssmfn):
   xeno = {
     'variants':  common.parse_ssms(sampid, ssmfn),
-    'sampnames': load_sampnames(paramsfn),
+    'sampnames': common.load_sampnames(paramsfn),
     'tree_type': 'handbuilt.xeno',
   }
   patient = {
@@ -308,15 +302,14 @@ def load_xeno_and_patient_clusters(sampid, handbuiltfn, paramsfn, ssmfn):
 
   xeno['garbage']    = handbuilt.load_garbage(handbuiltfn, xeno['tree_type'])
   patient['garbage'] = handbuilt.load_garbage(handbuiltfn, patient['tree_type'])
-
-  xeno['clusters'], _, _    = handbuilt.load_clusters_and_tree(handbuiltfn, xeno['variants'], xeno['tree_type'], xeno['sampnames'])
-  patient['clusters'], _, _ = handbuilt.load_clusters_and_tree(handbuiltfn, patient['variants'], patient['tree_type'], patient['sampnames'])
+  xeno['clusters']    = handbuilt.load_clusters(handbuiltfn, xeno['variants'], xeno['tree_type'], xeno['sampnames'])
+  patient['clusters'] = handbuilt.load_clusters(handbuiltfn, patient['variants'], patient['tree_type'], patient['sampnames'])
 
   assert sum([len(C) for C in xeno['clusters']]) + len(xeno['garbage']) == sum([len(C) for C in patient['clusters']]) + len(patient['garbage'])
   return (xeno['clusters'], xeno['garbage'], patient['clusters'], patient['garbage'])
 
 def plot(sampid, model_probs, output_type, tree_type, ssmfn, paramsfn, spreadsheetfn, handbuiltfn, outfn, treesummfn, mutlistfn, phifn, clustermatfn):
-  sampnames = load_sampnames(paramsfn)
+  sampnames = common.load_sampnames(paramsfn)
   variants = common.parse_ssms(sampid, ssmfn)
   if tree_type == 'handbuilt.patient':
     variants, sampnames = common.extract_patient_samples(variants, sampnames)

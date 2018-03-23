@@ -7,6 +7,7 @@ SSMDIR=$BASEDIR/data/inputs/steph.xenos.nocns
 RUN=xeno
 SCINPUTSDIR=$BASEDIR/data/sciclone/inputs/$RUN
 SCRESULTSDIR=$BASEDIR/data/sciclone/results/$RUN
+HANDBUILTDIR=$BASEDIR/data/handbuilt_trees
 
 function makedirs {
   mkdir -p $SCINPUTSDIR $SCRESULTSDIR
@@ -62,22 +63,36 @@ function plot {
     paramsfn=$SSMDIR/$sampid.params.json
     spreadsheetfn=$BASEDIR/data/ssms/$sampid.csv
     pairwisefn=$BASEDIR/data/pairwise.$RUN.nocns/$sampid.pairwise.json
+    orig_handbuiltfn=$HANDBUILTDIR/$sampid.json
 
-    echo "python3 $PROTDIR/plot.py" \
-      "--tree-type handbuilt.$RUN" \
-      "$sampid" \
-      "$pairwisefn" \
-      "$ssmfn" \
-      "$paramsfn" \
-      "$spreadsheetfn" \
-      "$handbuiltfn" \
-      "$SCRESULTSDIR/$sampid.pairwise.html" \
-      "$SCRESULTSDIR/$sampid.summ.json" \
-      "$SCRESULTSDIR/$sampid.muts.json" \
-      "$SCRESULTSDIR/$sampid.phi.json" \
-      "$SCRESULTSDIR/$sampid.clustermat.json" \
-      ">  $SCRESULTSDIR/$sampid.plot.stdout" \
-      "2> $SCRESULTSDIR/$sampid.plot.stderr"
+    cmd="python3 $PROTDIR/plot.py
+      --tree-type handbuilt.$RUN
+      $sampid
+      $pairwisefn
+      $ssmfn
+      $paramsfn
+      $spreadsheetfn
+      $handbuiltfn
+      $SCRESULTSDIR/$sampid.pairwise.html
+      $SCRESULTSDIR/$sampid.summ.json
+      $SCRESULTSDIR/$sampid.muts.json
+      $SCRESULTSDIR/$sampid.phi.json
+      $SCRESULTSDIR/$sampid.clustermat.json
+      >  $SCRESULTSDIR/$sampid.plot.stdout
+      2> $SCRESULTSDIR/$sampid.plot.stderr"
+    if [[ -f $orig_handbuiltfn ]]; then
+      cmd+=" && python3 $PROTDIR/clustermat.py
+	--sampid $sampid
+	--ssms $ssmfn
+	--params $paramsfn
+	--handbuilt1 $orig_handbuiltfn
+	--handbuilt2 $handbuiltfn
+	--treetype1 handbuilt.xeno
+	--treetype2 handbuilt.xeno
+	$SCRESULTSDIR/$sampid.sciclone_vs_handbuilt.clustermat.json
+	>> $SCRESULTSDIR/$sampid.pairwise.html"
+    fi
+    echo $cmd
   done | parallel -j40 --halt 1
 }
 
@@ -85,7 +100,7 @@ function main {
   #makedirs
   #convert_inputs
   #run_sciclone
-  convert_outputs
+  #convert_outputs
   plot
 }
 
