@@ -20,6 +20,7 @@ function convert_inputs {
     paramsfn=$SSMDIR/$sampid.params.json
     out=$SCINPUTSDIR/$sampid
     mkdir -p $out
+    rm -f $out/*.dat
     python3 "$PROTDIR/convert_to_sciclone.py" \
       "$sampid" \
       "$ssmfn" \
@@ -31,9 +32,11 @@ function convert_inputs {
 function run_sciclone {
   cd $SCINPUTSDIR
   for sampid in *; do
+    rm -f "$SCRESULTSDIR/$sampid.results.txt"
     echo "Rscript --vanilla $PROTDIR/run_sciclone.R" \
       "$PWD/$sampid/*.dat" \
       "$SCRESULTSDIR/$sampid.results.txt" \
+      "$SCRESULTSDIR/$sampid.sampnames.json" \
       ">  $SCRESULTSDIR/$sampid.stdout" \
       "2> $SCRESULTSDIR/$sampid.stderr"
   done | parallel -j40 --halt 1
@@ -97,10 +100,10 @@ function plot {
 }
 
 function main {
-  #makedirs
-  #convert_inputs
-  #run_sciclone
-  #convert_outputs
+  makedirs
+  convert_inputs
+  run_sciclone
+  convert_outputs
   plot
 }
 
