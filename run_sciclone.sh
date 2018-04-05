@@ -4,37 +4,31 @@ set -euo pipefail
 PROTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 BASEDIR=~/work/steph
 SSMDIR=$BASEDIR/data/inputs/steph.xenos.nocns
-RUN=xeno
-SCINPUTSDIR=$BASEDIR/data/sciclone/inputs/$RUN
-SCRESULTSDIR=$BASEDIR/data/sciclone/results/$RUN
+SCINPUTSDIR=$BASEDIR/data/sciclone/inputs
+
+RUN=$1
 HANDBUILTDIR=$BASEDIR/data/handbuilt_trees
-
-function makedirs {
-  mkdir -p $SCINPUTSDIR $SCRESULTSDIR
-}
-
-function convert_inputs {
-  cd $SSMDIR
-  for ssmfn in *.sampled.ssm; do
-    sampid=$(basename $ssmfn | cut -d. -f1)
-    paramsfn=$SSMDIR/$sampid.params.json
-    out=$SCINPUTSDIR/$sampid
-    mkdir -p $out
-    rm -f $out/*.dat
-    python3 "$PROTDIR/convert_to_sciclone.py" \
-      "$sampid" \
-      "$ssmfn" \
-      "$paramsfn" \
-      "$out"
-  done
-}
+SCRESULTSDIR=$BASEDIR/data/sciclone/results/$RUN
 
 function run_sciclone {
+  mkdir -p $SCRESULTSDIR
+
   cd $SCINPUTSDIR
   for sampid in *; do
     rm -f "$SCRESULTSDIR/$sampid.results.txt"
+    if [[ $RUN == "xeno" ]]; then
+      inputs="$PWD/$sampid/*.dat"
+    else
+      inputs=$(for foo in "$PWD/$sampid/"*.dat; do
+	if [[ $foo =~ "Xeno" ]]; then
+	  continue
+	fi
+	echo \"$foo\"
+      done | paste -sd' ')
+    fi
+
     echo "Rscript --vanilla $PROTDIR/run_sciclone.R" \
-      "$PWD/$sampid/*.dat" \
+      "$inputs" \
       "$SCRESULTSDIR/$sampid.results.txt" \
       "$SCRESULTSDIR/$sampid.sampnames.json" \
       ">  $SCRESULTSDIR/$sampid.stdout" \
@@ -90,8 +84,8 @@ function plot {
 	--params $paramsfn
 	--handbuilt1 $orig_handbuiltfn
 	--handbuilt2 $handbuiltfn
-	--treetype1 handbuilt.xeno
-	--treetype2 handbuilt.xeno
+	--treetype1 handbuilt.$RUN
+	--treetype2 handbuilt.$RUN
 	$SCRESULTSDIR/$sampid.sciclone_vs_handbuilt.clustermat.json
 	>> $SCRESULTSDIR/$sampid.pairwise.html"
     fi
@@ -100,9 +94,7 @@ function plot {
 }
 
 function main {
-  makedirs
-  convert_inputs
-  run_sciclone
+  #run_sciclone
   convert_outputs
   plot
 }
