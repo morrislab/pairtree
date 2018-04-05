@@ -280,8 +280,6 @@ def write_trees(sampid, colourings, outf):
         colouring['right'],
       ), file=outf)
   print('});</script>', file=outf)
-  #for tree_type in ('handbuilt', 'sampled'):
-    #print('<h2>%s</h2><div id="tree-%s"></div>' % (tree_type, tree_type), file=outf)
 
 def write_phi_matrix(sampid, outf):
   print('''<script type="text/javascript">$(document).ready(function() {
@@ -326,7 +324,6 @@ def plot(sampid, model_probs, output_type, tree_type, ssmfn, paramsfn, spreadshe
 
   supervars, svid2svidx, svidx2svid = common.make_cluster_supervars(clusters, variants)
 
-  should_cluster = not (output_type == 'unclustered')
   model_probs_tensor = create_model_prob_tensor(model_probs, vid2vidx)
   ssm_relations = calc_relations(model_probs_tensor)
   #supervar_relations = plot_cluster_mle_relations(supervars, svid2svidx, svidx2svid, outf)
@@ -369,6 +366,7 @@ def plot(sampid, model_probs, output_type, tree_type, ssmfn, paramsfn, spreadshe
       vaf_plotter.plot_vaf_matrix(sampid, clusters, variants, supervars, garbage_variants, phi[0].T, sampnames, spreadsheetfn, correct_vafs, outf)
     vaf_plotter.plot_unclustered_vafs(sampid, variants, None,             sampnames, spreadsheetfn, outf, patient_samples_only=False)
     #vaf_plotter.plot_unclustered_vafs(sampid, variants, garbage_variants, sampnames, spreadsheetfn, outf, patient_samples_only=True)
+    #should_cluster = not (output_type == 'unclustered')
     #plot_individual(model_probs, should_cluster, vid2vidx, vidx2vid, outf)
     #plot_relations(ssm_relations, should_cluster, vidx2vid, outf)
     write_legend(outf)

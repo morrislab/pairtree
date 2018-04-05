@@ -3,7 +3,7 @@ import json
 import common
 import csv
 
-def convert_clusters(scresultsfn, handbuiltfn, varid_map):
+def convert_clusters(scresultsfn, varid_map):
   clusters = []
   garbage = []
   with open(scresultsfn) as F:
@@ -30,6 +30,20 @@ def make_structure(clusters):
   # Make linear tree.
   return {idx: [idx + 1] for idx in range(len(clusters) - 1)}
 
+def add_missing_sex_variants_to_garbage(variants, clusters, garbage):
+  # I run SciClone without sex variants, since I don't know how to specify
+  # total numbers of locus according to their inputs -- maybe I need to make a
+  # quasi-CNA covering all of X and Y in males, but I looked into this and
+  # couldn't figure it out. As such, just mark all sex variants as garbage.
+  existing = set([V for C in clusters for V in C] + list(garbage))
+  vids = sorted([int(V[1:]) for V in variants.keys()])
+  for vid, var in variants.items():
+    vid = int(vid[1:])
+    if vid in existing:
+      continue
+    assert var['chrom'] in ('X', 'Y')
+    garbage.append(vid)
+
 def write_results(clusters, garbage, handbuilt_outfn):
   J = {
     'clusters': clusters,
@@ -40,7 +54,7 @@ def write_results(clusters, garbage, handbuilt_outfn):
   }
   tree_types = ('xeno', 'patient')
   J = {'handbuilt.%s' % tt: J for tt in tree_types}
-  with open(handbuiltfn, 'w') as F:
+  with open(handbuilt_outfn, 'w') as F:
     json.dump(J, F)
 
 def main():
@@ -51,13 +65,13 @@ def main():
   parser.add_argument('sampid')
   parser.add_argument('ssm_fn')
   parser.add_argument('scresults_fn')
-  parser.add_argument('handbuilt_existing_fn')
   parser.add_argument('handbuilt_out_fn')
   args = parser.parse_args()
 
   variants = common.parse_ssms(args.sampid, args.ssm_fn)
   varid_map = build_variant_to_varid_map(variants)
-  clusters, garbage = convert_clusters(args.scresults_fn, args.handbuilt_out_fn, varid_map)
-  write_results(clusters, garbage, args.handbuilt_fn)
+  clusters, garbage = convert_clusters(args.scresults_fn, varid_map)
+  add_missing_sex_variants_to_garbage(variants, clusters, garbage)
+  write_results(clusters, garbage, args.handbuilt_out_fn)
 
 main()
