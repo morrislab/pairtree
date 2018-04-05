@@ -71,8 +71,17 @@ def _calc_model_prob(var1, var2):
   normpm = np.exp(logpm) / np.sum(np.exp(logpm))
   return (normpm, logpm + B)
 
+def _calc_dummy_prob(var1, var2):
+  # Just specify uniform posterior over possible relations between `var1` and
+  # `var2`. This makes model computation tractable in scenarios for which we
+  # have too many variants to compute this efficiently (e.g., SJETV010).
+  M = len(Models._all)
+  posterior = np.ones(M) / M
+  evidence = np.log(posterior)
+  return (posterior, evidence)
+
 #@jit
-def calc_posterior(variants):
+def calc_posterior(variants, use_dummy):
   N = len(variants)
   done = 0
   posterior = {}
@@ -80,7 +89,10 @@ def calc_posterior(variants):
 
   for vidx1 in variants.keys():
     for vidx2 in variants.keys():
-      posterior[(vidx1,vidx2)], evidence[(vidx1,vidx2)] = _calc_model_prob(variants[vidx1], variants[vidx2])
+      if use_dummy:
+        posterior[(vidx1,vidx2)], evidence[(vidx1,vidx2)] = _calc_dummy_prob(variants[vidx1], variants[vidx2])
+      else:
+        posterior[(vidx1,vidx2)], evidence[(vidx1,vidx2)] = _calc_model_prob(variants[vidx1], variants[vidx2])
       done += 1
       print(vidx1, vidx2, '%.1f%%' % (100*(done / N**2)), posterior[(vidx1,vidx2)], sep='\t')
 
@@ -110,13 +122,15 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('--dummy', dest='use_dummy', action='store_true',
+    help='Rather than calculating posterior and evidence, use uniform to save computation time')
   parser.add_argument('sampid')
   parser.add_argument('ssm_fn')
   parser.add_argument('out_fn')
   args = parser.parse_args()
 
   variants = parse_ssms(args.sampid, args.ssm_fn)
-  posterior, evidence = calc_posterior(variants)
+  posterior, evidence = calc_posterior(variants, args.use_dummy)
   results = generate_results (posterior, evidence, variants)
   write_results(results, args.out_fn)
 
