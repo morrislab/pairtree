@@ -44,7 +44,7 @@ def add_missing_sex_variants_to_garbage(variants, clusters, garbage):
     assert var['chrom'] in ('X', 'Y')
     garbage.append(vid)
 
-def write_results(clusters, garbage, handbuilt_outfn):
+def write_results(clusters, garbage, tree_type, handbuilt_outfn):
   J = {
     'clusters': clusters,
     'garbage': garbage,
@@ -52,8 +52,7 @@ def write_results(clusters, garbage, handbuilt_outfn):
     'colourings': [{'left': 'D', 'right': 'R1'}],
     'samporders': [],
   }
-  tree_types = ('xeno', 'patient')
-  J = {'handbuilt.%s' % tt: J for tt in tree_types}
+  J = {'handbuilt.%s' % tree_type: J}
   with open(handbuilt_outfn, 'w') as F:
     json.dump(J, F)
 
@@ -63,6 +62,7 @@ def main():
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('sampid')
+  parser.add_argument('tree_type')
   parser.add_argument('ssm_fn')
   parser.add_argument('scresults_fn')
   parser.add_argument('handbuilt_out_fn')
@@ -72,6 +72,6 @@ def main():
   varid_map = build_variant_to_varid_map(variants)
   clusters, garbage = convert_clusters(args.scresults_fn, varid_map)
   add_missing_sex_variants_to_garbage(variants, clusters, garbage)
-  write_results(clusters, garbage, args.handbuilt_out_fn)
+  write_results(clusters, garbage, args.tree_type, args.handbuilt_out_fn)
 
 main()

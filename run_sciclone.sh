@@ -42,6 +42,7 @@ function convert_outputs {
     sampid=$(basename $resultsfn | cut -d. -f1)
     python3 "$PROTDIR/convert_sciclone_results.py" \
       "$sampid" \
+      "$RUN" \
       "$SSMDIR/$sampid.sampled.ssm" \
       "$resultsfn" \
       "$sampid.handbuilt.json"
@@ -96,7 +97,7 @@ function plot {
 function main {
   #run_sciclone
   convert_outputs
-  plot
+  #plot
 }
 
 main
