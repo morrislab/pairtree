@@ -4,6 +4,7 @@ import json
 import sys
 from collections import defaultdict
 import common
+import vaf_plotter
 
 def load_handbuilt(handbuiltfn):
   with open(handbuiltfn) as F:
@@ -50,26 +51,57 @@ def write_varlist(S, outfn):
     print('Chrom,Pos', file=F)
     print(*['%s,%s' % V for V in S], file=F, sep='\n')
 
+def convert_hb_to_steph(hb_clusters, hb_garbage, variants):
+  def _print_row(ssmid, cidx):
+    V = variants['s%s' % ssmid]
+    vals = [
+      find_gene_name(V['chrom'], V['pos']),
+      V['chrom'],
+      str(V['pos']),
+      str(cidx),
+    ]
+    print(','.join(vals))
+
+  outf = sys.stdout
+  print('Gene,Chrom,Pos,Cluster', file=outf)
+  for cidx, C in enumerate(hb_clusters):
+    for ssmid in C:
+      _print_row(ssmid, cidx)
+  for ssmid in hb_garbage:
+    _print_row(ssmid, 'garbage')
+
+def find_gene_name(chrom, pos):
+  if not hasattr(find_gene_name, 'spreadsheet_rows'):
+    raise Exception('find_gene_name not initialized')
+  return vaf_plotter.find_gene_name(chrom, pos, find_gene_name.spreadsheet_rows)
+
 def main():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('sampid')
-  parser.add_argument('ssmfn')
-  parser.add_argument('tree_type')
-  parser.add_argument('steph_clustersfn')
-  parser.add_argument('handbuiltfn')
-  parser.add_argument('outfn')
+  parser.add_argument('--direction', choices=('steph_to_hb', 'hb_to_steph'), required=True)
+  parser.add_argument('--sampid', required=True)
+  parser.add_argument('--ssms', dest='ssmfn', required=True)
+  parser.add_argument('--tree-type', required=True)
+  parser.add_argument('--steph-clusters', dest='steph_clusters_fn')
+  parser.add_argument('--handbuilt', dest='handbuilt_fn', required=True)
+  parser.add_argument('--spreadsheet', dest='spreadsheet_fn', required=True)
   args = parser.parse_args()
 
-  hb = load_handbuilt(args.handbuiltfn)
+  find_gene_name.spreadsheet_rows = vaf_plotter.load_spreadsheet(args.spreadsheet_fn)
+
+  hb = load_handbuilt(args.handbuilt_fn)
   hb_clusters = hb[args.tree_type]['clusters']
   hb_garbage = hb[args.tree_type]['garbage']
   hb_garage = hb[args.tree_type]['garbage']
-  steph_clusters = load_steph_clusters(args.steph_clustersfn)
   variants = common.parse_ssms(args.sampid, args.ssmfn)
 
-  remap_clusters(hb_clusters, hb_garbage, steph_clusters, variants)
+  if args.direction == 'steph_to_hb':
+    steph_clusters = load_steph_clusters(args.steph_clusters_fn)
+    remap_clusters(hb_clusters, hb_garbage, steph_clusters, variants)
+  else:
+    convert_hb_to_steph(hb_clusters, hb_garbage, variants)
+
 
 main()
