@@ -6,11 +6,6 @@ from collections import defaultdict
 import vaf_correcter
 import common
 
-def load_spreadsheet(spreadsheetfn):
-  with open(spreadsheetfn) as S:
-    reader = csv.DictReader(S)
-    return list(reader)
-
 def find_gene_name(chrom, pos, spreadsheet_rows):
   for row in spreadsheet_rows:
     assert row['CHR'].startswith('chr')
