@@ -24,8 +24,12 @@ def remove_hypermutator_vars(variants, sampnames, nonzero_samps):
   varids = list(variants.keys())
   nonzero_sidxs = [sampnames.index(S) for S in nonzero_samps]
   for varid in varids:
-    if np.all(variants[varid]['var_reads'][nonzero_sidxs] == 0):
+    if np.all(variants[varid]['vaf'][nonzero_sidxs] < 0.01):
+      idxs = [sampnames.index(S) for S in ['D', 'R1', 'R2']]
+      print('Removing', '%s_%s' % (variants[varid]['chrom'], variants[varid]['pos']), variants[varid]['vaf'][idxs])
       del variants[varid]
+    else:
+      print('Keeping', '%s_%s' % (variants[varid]['chrom'], variants[varid]['pos']), variants[varid]['vaf'][idxs])
 
 def write_modified(variants, outfn):
   with open(outfn, 'w') as F:
@@ -58,6 +62,7 @@ def main():
   variants = common.parse_ssms(args.sampid, args.ssm_fn)
   sampnames = load_sampnames(args.params_fn)
 
+  # R2 is the hypermutator.
   nonzero_samps = ('D', 'R1')
   remove_hypermutator_vars(variants, sampnames, nonzero_samps)
   write_modified(variants, args.out_ssm_fn)
