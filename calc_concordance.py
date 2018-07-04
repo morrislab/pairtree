@@ -8,10 +8,17 @@ import itertools
 import plotly
 import plotly.graph_objs as go
 
+# Interpreting: cd ~/work/steph/data/pairwise.xeno.nocns && for foo in *tsv; do cat $foo | grep -v absent | tail -n+2 | tr ' ' , | while read blah; do echo $(echo $foo | cut -d. -f1),$blah; done; done  | awk -F',' '{print $0","(($6 >= 0.3 && $5 >= 0) ? "True" : "False") }' | grep True | sort -nk5 -t, > /tmp/blah.txt
+
+DEBUG = False
+
 def lpdist(A, B, p=2):
   A, B = np.array(A), np.array(B)
   dist = np.sum(np.abs(A - B)**p)**(1./p)
   assert dist >= 0
+  if DEBUG:
+    from IPython import embed
+    embed()
   return dist
 
 def compare(s1idx, s2idx, tidx, treesumm):
@@ -22,12 +29,16 @@ def compare(s1idx, s2idx, tidx, treesumm):
   for pop in pops.values():
     s1cp.append(pop['cellular_prevalence'][s1idx])
     s2cp.append(pop['cellular_prevalence'][s2idx])
-  return lpdist(s1cp, s2cp, p=1)
+
+  dist = lpdist(s1cp, s2cp, p=1)
+  norm_dist = dist / len(pops)
+  return (dist, norm_dist)
 
 def plot_concordance_cdf(dists, samples, num_samps, outfn):
-  pairs = dists.keys()
+  pairs = [(D['A'], D['B']) for D in dists]
+  pairdists = [D['dist'] for D in dists]
   num_pairs = len(pairs)
-  pairdists = [dists[P][0] for P in pairs]
+
   X, Y, L = cdf(pairdists, pairs)
   traces = []
   traces.append(go.Scatter(
@@ -89,33 +100,36 @@ def calc_concordance(samples, treesumm, tablefn, plotfn):
   allsampidxs = [idx for idx, S in enumerate(samples) if re.search(r'^Diagnosis Xeno', S)]
   distlist = []
   for A, B in itertools.combinations(allsampidxs, 2):
-    dist = compare(A, B, tidx, treesumm)
-    distlist.append(( (A, B), dist  ))
-  distlist.sort(key = lambda E: E[-1])
+    prefix = 'Diagnosis Xeno 7'
+    DEBUG = samples[A].startswith(prefix) and samples[B].startswith(prefix)
 
-  dists = {}
-  for pos, ((A, B), dist) in enumerate(distlist):
-    dists[(A, B)] = (dist, (pos + 1.) / len(distlist))
-  plot_concordance_cdf(dists, samples, len(allsampidxs), plotfn)
-  for (A, B), val in distlist:
-    dists[(B, A)] = val
+    dist, norm_dist = compare(A, B, tidx, treesumm)
+    distlist.append({'A': A, 'B': B, 'dist': dist, 'norm_dist': norm_dist})
+  distlist.sort(key = lambda E: E['dist'])
+
+  for pos, dist in enumerate(distlist):
+    dist['rank'] = (pos + 1.) / len(distlist)
+  plot_concordance_cdf(distlist, samples, len(allsampidxs), plotfn)
+
+  dists_indexed = {}
+  for dist in distlist:
+    A, B = dist['A'], dist['B']
+    dists_indexed[(A, B)] = dists_indexed[(B, A)] = dist
 
   with open(tablefn, 'w') as tablef:
-    print('sample1', 'sample2', 'distance', 'rank', sep='\t', file=tablef)
+    print('sample1', 'sample2', 'distance', 'norm_dist', 'rank', sep='\t', file=tablef)
     for sampidx, sampname in enumerate(samples):
       if not re.search(r'^Diagnosis Xeno \d+$', sampname):
         continue
-      matches = [('%s %s' % (sampname, suffix)) in samples for suffix in ('CNS', 'Spleen')]
       for suffix in ('CNS', 'Spleen'):
         other = '%s %s' % (sampname, suffix)
         if other not in samples:
-          print(sampname, other, 'absent', 'absent', sep='\t', file=tablef)
+          print(sampname, other, 'absent', 'absent', 'absent', 'absent', sep='\t', file=tablef)
           continue
         otheridx = samples.index(other)
-        # Since every CP is in [0, 1], we can get normalized distance by dividing
-        # by numer of samples.
-        dist, rank = dists[(sampidx, otheridx)]
-        print(sampname, other, dist, rank, sep='\t', file=tablef)
+
+        D = dists_indexed[(sampidx, otheridx)]
+        print(sampname, other, D['dist'], D['norm_dist'], D['rank'], sep='\t', file=tablef)
 
 def scatter(traces, title, xtitle, ytitle, outfn, extra_shapes=None):
   if extra_shapes is None:
