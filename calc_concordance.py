@@ -1,3 +1,4 @@
+# Interpreting: cd ~/work/steph/data/pairwise.xeno.nocns && for foo in *tsv; do cat $foo | grep -v absent | tail -n+2 | tr $'\t' , | while read blah; do echo $(echo $foo | cut -d. -f1),$blah; done; done  | awk -F',' '{print $0","(($6 >= 0.3 && $5 >= 0) ? "True" : "False") }' | grep True | sort -nk5 -t, > /tmp/blah.txt
 from __future__ import print_function
 from pwgsresults.result_loader import ResultLoader as PwgsResults
 import re
@@ -8,7 +9,6 @@ import itertools
 import plotly
 import plotly.graph_objs as go
 
-# Interpreting: cd ~/work/steph/data/pairwise.xeno.nocns && for foo in *tsv; do cat $foo | grep -v absent | tail -n+2 | tr ' ' , | while read blah; do echo $(echo $foo | cut -d. -f1),$blah; done; done  | awk -F',' '{print $0","(($6 >= 0.3 && $5 >= 0) ? "True" : "False") }' | grep True | sort -nk5 -t, > /tmp/blah.txt
 
 DEBUG = False
 
