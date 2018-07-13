@@ -51,9 +51,10 @@ def main():
   args = parser.parse_args()
 
   should_remove = [
-    lambda dataset, sampname: 'CNS' in sampname,
-    lambda dataset, sampname: dataset == 'SJETV047' and sampname == 'R2',
-    lambda dataset, sampname: dataset == 'SJBALL022611' and sampname == 'Relapse Xeno 11',
+    lambda dataset, sampname: ('CNS' in sampname),
+    lambda dataset, sampname: (dataset == 'SJETV047' and sampname == 'R2'),
+    lambda dataset, sampname: (dataset == 'SJBALL022611' and sampname == 'Relapse Xeno 11'),
+    lambda dataset, sampname: (dataset == 'SJETV010steph' and sampname == 'R1'),
   ]
   remove(args.dataset, args.ssm_fn, args.params_fn, should_remove)
 
