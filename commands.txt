@@ -1,2 +1,0 @@
-Listing gene names:
-  cat | awk '{print $2}' | cut -c2- | sort -n | paste -sd, | sed 's/,/,\n/g'
