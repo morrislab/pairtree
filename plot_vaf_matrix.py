@@ -37,7 +37,11 @@ def parse_ssms(sampid, ssmfn):
 
       variant['var_reads'] = variant['total_reads'] - variant['ref_reads']
       variant['vaf'] = variant['var_reads'] / variant['total_reads']
-      variant['chrom'], variant['pos'] = variant['name'].split('.')[1].split('_')
+      if '.' in variant['name']:
+        name = variant['name'].split('.', 1)[1]
+      else:
+        name = variant['name']
+      variant['chrom'], variant['pos'] = name.split('_', 2)
       variant['pos'] = int(variant['pos'])
       variants[row['id']] = variant
 
