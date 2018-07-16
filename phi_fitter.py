@@ -29,10 +29,10 @@ def calc_llh(var_reads, ref_reads, A, Z, psi):
   mut_probs = scipy.stats.binom.logpmf(var_reads, total_reads, mut_p)
   return np.sum(mut_probs)
 
-def fit_phis(adj, clusters, variants):
-  supervars, _, _ = common.make_cluster_supervars(clusters, variants)
-  ref_reads = np.array([supervars[cid]['ref_reads'] for cid in sorted(supervars.keys(), key = lambda C: int(C[1:]))])
-  var_reads = np.array([supervars[cid]['var_reads'] for cid in sorted(supervars.keys(), key = lambda C: int(C[1:]))])
+def fit_phis(adj, superclusters, supervars):
+  supervar_ids = sorted(supervars.keys(), key = lambda C: int(C[1:]))
+  ref_reads = np.array([supervars[cid]['ref_reads'] for cid in supervar_ids])
+  var_reads = np.array([supervars[cid]['var_reads'] for cid in supervar_ids])
   assert len(supervars) == len(adj) - 1
   # Supervar `i` is in cluster `i`. Cluster 0 is empty.
   A = np.insert(np.eye(len(supervars)), 0, 0, axis=1)

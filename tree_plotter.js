@@ -1,4 +1,5 @@
 var IS_XENO = window.location.toString().indexOf('pairwise.xeno') > -1;
+IS_XENO = true;
 
 function TreePlotter() {
 }
@@ -338,7 +339,7 @@ PhiMatrix.prototype._filter_samples = function(phi_matrix, sampnames, samps_to_k
 PhiMatrix.prototype.plot = function(sampid, phi_path, container) {
   var self = this;
   var filters = {
-    'SJBALL022609': ['D', 'dPDX 26', 'dPDX 8', 'dPDX 2', 'dPDX 15', 'dPDX 7', 'dPDX 14', 'dPDX 20', 'dPDX 29', 'R1', 'rPDX 25', 'rPDX 2', 'rPDX 17', 'rPDX 21']
+    //'SJBALL022609': ['D', 'dPDX 26', 'dPDX 8', 'dPDX 2', 'dPDX 15', 'dPDX 7', 'dPDX 14', 'dPDX 20', 'dPDX 29', 'R1', 'rPDX 25', 'rPDX 2', 'rPDX 17', 'rPDX 21']
   };
   d3.json(phi_path, function(phi_data) {
     if(IS_XENO && filters.hasOwnProperty(sampid)) {

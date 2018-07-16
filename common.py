@@ -11,6 +11,7 @@ for idx, M in enumerate(Models._all):
   setattr(Models, M, idx)
 
 def parse_ssms(sampid, ssmfn):
+  # TODO: remove sampid as argument.
   vaf = []
   ssm_ids = []
   var_names = []
@@ -63,7 +64,6 @@ def make_ancestral_from_adj(adj):
 
 def make_cluster_supervars(clusters, variants):
   cluster_supervars = {}
-  svid2svidx = {}
 
   for cidx, cluster in enumerate(clusters):
     if len(cluster) == 0:
@@ -77,25 +77,31 @@ def make_cluster_supervars(clusters, variants):
     vaf_corrections = np.array([V['vaf_correction'] for V in cvars])[:,np.newaxis]
     cluster_var_reads = np.round(vaf_corrections * (cluster_var_reads / (2*(1 - mu_v))))
 
+    S_name = 'C%s' % len(cluster_supervars)
     S = {
       'gene': None,
-      'id': 'C%s' % cidx,
-      'name': 'C%s' % cidx,
+      'id': S_name,
+      'name': S_name,
       'chrom': None,
       'pos': None,
       'cluster': cidx,
       'mu_v': 0.499,
       'var_reads': np.sum(cluster_var_reads, axis=0),
       'total_reads': np.sum(cluster_total_reads, axis=0),
+      'vaf_correction': 1.,
     }
     S['ref_reads'] = S['total_reads'] - S['var_reads']
     S['vaf'] = S['var_reads'] / S['total_reads']
 
-    svid2svidx[S['id']] = len(cluster_supervars)
-    cluster_supervars[S['id']] = S
+    cluster_supervars[S_name] = S
 
-  svidx2svid = {V: K for K, V in svid2svidx.items()}
-  return (cluster_supervars, svid2svidx, svidx2svid)
+  return cluster_supervars
+
+def make_superclusters(supervars):
+  N = len(supervars)
+  superclusters = [[C] for C in range(N)]
+  superclusters.insert(0, [])
+  return superclusters
 
 def agglo_children_to_adjlist(children, nleaves):
   assert len(children) == nleaves - 1

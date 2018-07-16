@@ -16,10 +16,10 @@ def create_var(phihat, S, T):
 
 def summarize(vec):
   vec = np.array(vec)
-  print('mean=%s\tvar=%s' % (np.mean(vec, axis=0), np.var(vec, axis=0)))
+  print('mean=%s\tstdev=%s' % (np.mean(vec, axis=0), np.std(vec, axis=0)))
 
 def main():
-  np.set_printoptions(suppress=True, threshold=np.nan, linewidth=300) 
+  np.set_printoptions(suppress=True, threshold=np.nan, linewidth=300, precision=3)
   params = {
     'trials': 100,
     'phihat1': 0.9,

@@ -19,7 +19,6 @@ def generate_logprob_phi(N):
   for i in range(N):
     # cocluster
     prob['cocluster'][i,i] = 1./N
-
     for j in range(N):
       # B_A
       if i <= j:
@@ -35,8 +34,8 @@ def generate_logprob_phi(N):
   for M in prob.keys():
     assert np.isclose(np.sum(prob[M]), 1)
     logprob[M] = np.zeros(prob[M].shape)
-    logprob[M][prob[M] == 0] = -100
     logprob[M][prob[M] != 0] = np.log(prob[M][prob[M] != 0])
+    logprob[M][prob[M] == 0] = -100
     assert np.sum(logprob[M] == 0) == 0
 
   return logprob
@@ -68,8 +67,9 @@ def _calc_model_prob(var1, var2):
   logpm = np.sum(logprob_models, axis=0)
   B = np.max(logpm)
   logpm -= B
-  normpm = np.exp(logpm) / np.sum(np.exp(logpm))
-  return (normpm, logpm + B)
+  posterior = np.exp(logpm) / np.sum(np.exp(logpm))
+  evidence = logpm + B
+  return (posterior, evidence)
 
 def _calc_dummy_prob(var1, var2):
   # Just specify uniform posterior over possible relations between `var1` and
@@ -81,7 +81,7 @@ def _calc_dummy_prob(var1, var2):
   return (posterior, evidence)
 
 #@jit
-def calc_posterior(variants, use_dummy):
+def calc_posterior(variants, use_dummy=False):
   N = len(variants)
   done = 0
   posterior = {}
