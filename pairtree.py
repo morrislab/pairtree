@@ -59,6 +59,7 @@ def write_header(sampid, outf):
 def write_trees(sampid, tidx, outf):
   colourings = {
     'SJBALL022609': [{'left': 'D', 'right': 'R1'}],
+    'SJETV010steph': [{'left': 'D', 'right': 'R1'}],
   }
 
   print('''<div id="trees"></div>''', file=outf)
@@ -109,41 +110,23 @@ def main():
   supervars = common.make_cluster_supervars(clusters, variants)
   superclusters = common.make_superclusters(supervars)
 
-  import os
-  import pickle
-  if os.path.exists('/tmp/lol.pickle'):
-    with open('/tmp/lol.pickle', 'rb') as F:
-      serialized = pickle.load(F)
-      sampled_adjm = serialized['sampled_adjm']
-      sampled_llh = serialized['sampled_llh']
-      phi = serialized['phi']
-      eta = serialized['eta']
-  else:
-    posterior, evidence = pairwise.calc_posterior(supervars)
-    results = pairwise.generate_results(posterior, evidence, supervars)
+  posterior, evidence = pairwise.calc_posterior(supervars)
+  results = pairwise.generate_results(posterior, evidence, supervars)
 
-    model_probs_tensor = create_model_prob_tensor(results)
-    sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, superclusters, args.struct_iterations)
-    phi, eta = fit_phis(sampled_adjm, supervars, superclusters, tidxs=(-1,))
-    json_writer.write_json(
-      args.sampid,
-      sampnames,
-      variants,
-      clusters,
-      sampled_adjm,
-      sampled_llh,
-      phi,
-      '%s.summ.json' % args.sampid,
-      '%s.muts.json' % args.sampid,
-    )
-
-    with open('/tmp/lol.pickle', 'wb') as F:
-      pickle.dump({
-        'sampled_adjm': sampled_adjm,
-        'sampled_llh': sampled_llh,
-        'phi': phi,
-        'eta': eta,
-      }, F)
+  model_probs_tensor = create_model_prob_tensor(results)
+  sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, superclusters, args.struct_iterations)
+  phi, eta = fit_phis(sampled_adjm, supervars, superclusters, tidxs=(-1,))
+  json_writer.write_json(
+    args.sampid,
+    sampnames,
+    variants,
+    clusters,
+    sampled_adjm,
+    sampled_llh,
+    phi,
+    '%s.summ.json' % args.sampid,
+    '%s.muts.json' % args.sampid,
+  )
 
   write_phi_json(phi[-1].T, sampnames, '%s.phi.json' % args.sampid)
 
