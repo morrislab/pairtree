@@ -3,9 +3,8 @@ import numpy as np
 import scipy.stats, scipy.misc
 import json
 from common import parse_ssms, Models
-
-np.seterr(divide='raise')
-np.set_printoptions(threshold=np.nan, linewidth=120)
+import concurrent.futures
+from tqdm import tqdm
 
 #from numba import jit
 
@@ -81,20 +80,24 @@ def _calc_dummy_prob(var1, var2):
   return (posterior, evidence)
 
 #@jit
-def calc_posterior(variants, use_dummy=False):
+def calc_posterior(variants, use_dummy=False, parallel=1):
   N = len(variants)
-  done = 0
   posterior = {}
   evidence = {}
 
-  for vidx1 in variants.keys():
-    for vidx2 in variants.keys():
-      if use_dummy:
-        posterior[(vidx1,vidx2)], evidence[(vidx1,vidx2)] = _calc_dummy_prob(variants[vidx1], variants[vidx2])
-      else:
-        posterior[(vidx1,vidx2)], evidence[(vidx1,vidx2)] = _calc_model_prob(variants[vidx1], variants[vidx2])
-      done += 1
-      print(vidx1, vidx2, '%.1f%%' % (100*(done / N**2)), posterior[(vidx1,vidx2)], sep='\t')
+  _calc_prob = _calc_dummy_prob if use_dummy else _calc_model_prob
+
+  pairs = []
+  futures = []
+  with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
+    for vidx1 in sorted(variants.keys()):
+      for vidx2 in sorted(variants.keys()):
+        pairs.append((vidx1, vidx2))
+        futures.append(ex.submit(_calc_prob, variants[vidx1], variants[vidx2]))
+    for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Computing relations', unit=' pairs'):
+      pass
+  for pair, F in zip(pairs, futures):
+    posterior[pair], evidence[pair] = F.result()
 
   return (posterior, evidence)
 

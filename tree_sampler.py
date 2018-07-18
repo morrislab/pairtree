@@ -1,6 +1,8 @@
 import common
 import numpy as np
-np.set_printoptions(linewidth=200)
+from tqdm import tqdm
+import concurrent.futures
+import multiprocessing
 Models = common.Models
 
 def make_mutrel_tensor_from_cluster_adj(cluster_adj, clusters):
@@ -38,10 +40,16 @@ def calc_llh(data_mutrel, tree_mutrel):
   llh = np.sum(np.log(probs))
   return llh
 
-def init_cluster_adj(K):
+def init_cluster_adj_linear(K):
   cluster_adj = np.eye(K)
   for k in range(1, K):
     cluster_adj[k-1,k] = 1
+  return cluster_adj
+
+def init_cluster_adj_branching(K):
+  cluster_adj = np.eye(K)
+  cluster_adj[0,1] = 1
+  cluster_adj[1,range(2,K)] = 1
   return cluster_adj
 
 def permute_adj(adj):
@@ -88,28 +96,54 @@ def permute_adj(adj):
   return adj
 permute_adj.blah = set()
 
-def sample_trees(data_mutrel, clusters, nsamples):
+def run_chain(data_mutrel, clusters, nsamples, progress_queue):
+  # Ensure each chain gets a new random state.
+  np.random.seed()
   assert nsamples > 0
   K = len(clusters)
 
+  init_choices = (init_cluster_adj_linear, init_cluster_adj_branching)
+  init_cluster_adj = init_choices[np.random.choice(len(init_choices))]
   cluster_adj = [init_cluster_adj(K)]
   tree_mutrel = make_mutrel_tensor_from_cluster_adj(cluster_adj[0], clusters)
   llh = [calc_llh(data_mutrel, tree_mutrel)]
+  progress_queue.put(0)
 
   for I in range(1, nsamples):
+    progress_queue.put(I)
     old_llh, old_adj = llh[-1], cluster_adj[-1]
     new_adj = permute_adj(old_adj)
     tree_mutrel = make_mutrel_tensor_from_cluster_adj(new_adj, clusters)
     new_llh = calc_llh(data_mutrel, tree_mutrel)
-    if False or new_llh - old_llh > np.log(np.random.uniform()):
+    if new_llh - old_llh > np.log(np.random.uniform()):
       # Accept.
       cluster_adj.append(new_adj)
       llh.append(new_llh)
-      print(I, llh[-1], 'accept', sep='\t')
+      #print(I, llh[-1], 'accept', sep='\t')
     else:
       # Reject.
       cluster_adj.append(old_adj)
       llh.append(old_llh)
-      print(I, llh[-1], 'reject', sep='\t')
+      #print(I, llh[-1], 'reject', sep='\t')
 
-  return (cluster_adj, llh)
+  #print('Last LLH:', llh[-1])
+  return (cluster_adj[-1], llh[-1])
+
+def sample_trees(data_mutrel, clusters, nsamples, nchains=1):
+  jobs = []
+  total = nchains * nsamples
+
+  manager = multiprocessing.Manager()
+  progress_queue = manager.Queue()
+  with tqdm(total=total, desc='Sampling trees', unit=' trees') as progress_bar:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=nchains) as ex:
+      for C in range(nchains):
+        jobs.append(ex.submit(run_chain, data_mutrel, clusters, nsamples, progress_queue))
+      for _ in range(total):
+        progress_queue.get()
+        progress_bar.update()
+  results = [J.result() for J in jobs]
+
+  results.sort(key = lambda result: result[1]) # Sort by LLH
+  adj, llh = zip(*results)
+  return (adj, llh)

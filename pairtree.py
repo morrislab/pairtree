@@ -14,7 +14,6 @@ def create_matrix(model, model_probs, variants):
   mat = np.zeros((N, N))
   for vids, P in model_probs.items():
     assert 0 <= P <= 1
-    print(vids)
     vidx1, vidx2 = [int(V[1:]) for V in vids.split(',')]
     mat[(vidx1, vidx2)] = P
   if model in ('cocluster', 'diff_branches'):
@@ -31,7 +30,7 @@ def create_model_prob_tensor(model_probs):
     tensor[:,:,midx] = create_matrix(mdl, model_probs['model_probs'][mdl], model_probs['variants'])
   return tensor
 
-def fit_phis(adjm, variants, clusters, tidxs=None):
+def fit_phis(adjm, variants, clusters, tidxs=None, parallel=1):
   ntrees = len(adjm)
   nsamples = len(list(variants.values())[0]['total_reads'])
 
@@ -41,7 +40,7 @@ def fit_phis(adjm, variants, clusters, tidxs=None):
   if tidxs is None:
     tidxs = range(ntrees)
   for tidx in tidxs:
-    phi[tidx,:,:], eta[tidx,:,:] = phi_fitter.fit_phis(adjm[tidx], clusters, variants)
+    phi[tidx,:,:], eta[tidx,:,:] = phi_fitter.fit_phis(adjm[tidx], clusters, variants, parallel)
 
   return (phi, eta)
 
@@ -59,7 +58,8 @@ def write_header(sampid, outf):
 def write_trees(sampid, tidx, outf):
   colourings = {
     'SJBALL022609': [{'left': 'D', 'right': 'R1'}],
-    'SJETV010steph': [{'left': 'D', 'right': 'R1'}],
+    'SJETV010steph': [{'left': 'D', 'right': 'R2'}],
+    'SJBALL022610steph': [{'left': 'D', 'right': 'R1'}],
   }
 
   print('''<div id="trees"></div>''', file=outf)
@@ -88,7 +88,9 @@ def write_phi_json(phi, sampnames, phifn):
     }, outf)
 
 def main():
-  np.set_printoptions(threshold=np.nan)
+  np.set_printoptions(threshold=np.nan, linewidth=120)
+  np.seterr(divide='raise', invalid='raise')
+
   np.random.seed(1)
 
   parser = argparse.ArgumentParser(
@@ -96,6 +98,7 @@ def main():
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--struct-iterations', dest='struct_iterations', type=int, default=1000)
+  parser.add_argument('--parallel', dest='parallel', type=int, default=1)
   parser.add_argument('sampid')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
@@ -110,12 +113,12 @@ def main():
   supervars = common.make_cluster_supervars(clusters, variants)
   superclusters = common.make_superclusters(supervars)
 
-  posterior, evidence = pairwise.calc_posterior(supervars)
+  posterior, evidence = pairwise.calc_posterior(supervars, parallel=args.parallel)
   results = pairwise.generate_results(posterior, evidence, supervars)
 
   model_probs_tensor = create_model_prob_tensor(results)
-  sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, superclusters, args.struct_iterations)
-  phi, eta = fit_phis(sampled_adjm, supervars, superclusters, tidxs=(-1,))
+  sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, superclusters, nsamples=args.struct_iterations, nchains=args.parallel)
+  phi, eta = fit_phis(sampled_adjm, supervars, superclusters, tidxs=(-1,), parallel=args.parallel)
   json_writer.write_json(
     args.sampid,
     sampnames,
@@ -127,12 +130,11 @@ def main():
     '%s.summ.json' % args.sampid,
     '%s.muts.json' % args.sampid,
   )
-
   write_phi_json(phi[-1].T, sampnames, '%s.phi.json' % args.sampid)
 
   with open('%s.results.html' % args.sampid, 'w') as outf:
     write_header(args.sampid, outf)
-    write_trees(args.sampid, args.struct_iterations - 1, outf)
+    write_trees(args.sampid, len(sampled_adjm) - 1, outf)
     write_phi_matrix(args.sampid, outf)
 
 main()

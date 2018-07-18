@@ -1,7 +1,8 @@
 import numpy as np
 import scipy.stats
 import common
-np.seterr(invalid='raise')
+import concurrent.futures
+from tqdm import tqdm
 
 # Matrices: M mutations, K clusters, S samples
 #   adj: KxK, adjacency matrix -- adj[a,b]=1 iff a is parent of b (with 1 on diagonal)
@@ -29,16 +30,23 @@ def calc_llh(var_reads, ref_reads, A, Z, psi):
   mut_probs = scipy.stats.binom.logpmf(var_reads, total_reads, mut_p)
   return np.sum(mut_probs)
 
-def fit_phis(adj, superclusters, supervars):
+def fit_phis(adj, superclusters, supervars, parallel):
   supervar_ids = sorted(supervars.keys(), key = lambda C: int(C[1:]))
   ref_reads = np.array([supervars[cid]['ref_reads'] for cid in supervar_ids])
   var_reads = np.array([supervars[cid]['var_reads'] for cid in supervar_ids])
   assert len(supervars) == len(adj) - 1
   # Supervar `i` is in cluster `i`. Cluster 0 is empty.
   A = np.insert(np.eye(len(supervars)), 0, 0, axis=1)
-  return fit_all_phis(adj, A, ref_reads, var_reads)
+  return fit_all_phis(adj, A, ref_reads, var_reads, parallel)
 
-def fit_all_phis(adj, A, ref_reads, var_reads):
+def fit_phi_S(eta_S, var_reads_S, ref_reads_S, A, Z):
+  eta_S = np.maximum(1e-10, eta_S)
+  psi_S = np.log(eta_S)
+  psi_S = grad_desc(var_reads_S, ref_reads_S, A, Z, psi_S)
+  eta_S = softmax(psi_S)
+  return eta_S
+
+def fit_all_phis(adj, A, ref_reads, var_reads, parallel):
   Z = common.make_ancestral_from_adj(adj)
   M, K = A.shape
   _, S = ref_reads.shape
@@ -48,22 +56,24 @@ def fit_all_phis(adj, A, ref_reads, var_reads):
   phi_implied = np.insert(phi_implied, 0, 1, axis=0)
   # Since phi = Z.eta, we have eta = (Z^-1)phi.
   eta = np.dot(np.linalg.inv(Z), phi_implied).T
-
   assert eta.shape == (S, K)
-  psi = np.zeros((S, K))
-  phi = np.zeros((S, K))
 
-  for s in range(S):
-    # If no negative elements are in eta, we have the analytic solution.
-    # Otherwise, set the negative elements to zero to provide an initial
-    # starting point, then run the optimizer.
-    if np.any(eta[s] < 0):
-      eta_s = np.maximum(1e-10, eta[s])
-      psi_s = np.log(eta_s)
-      psi[s] = grad_desc(var_reads[:,s], ref_reads[:,s], A, Z, psi_s)
-      eta[s] = softmax(psi[s])
-    phi[s] = np.dot(Z, eta[s])
+  modified_samples = []
+  futures = []
+  with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
+    for s in range(S):
+      # If no negative elements are in eta, we have the analytic solution.
+      # Otherwise, set the negative elements to zero to provide an initial
+      # starting point, then run the optimizer.
+      if np.any(eta[s] < 0):
+        modified_samples.append(s)
+        futures.append(ex.submit(fit_phi_S, eta[s], var_reads[:,s], ref_reads[:,s], A, Z))
+    for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Fitting phis', unit=' samples'):
+      pass
+  for s, F in zip(modified_samples, futures):
+    eta[s] = F.result()
 
+  phi = np.dot(Z, eta.T).T
   return (phi, eta)
 
 def calc_grad(var_reads, ref_reads, A, Z, psi):
@@ -115,7 +125,7 @@ def grad_desc(var_reads, ref_reads, A, Z, psi):
     llh = calc_llh(var_reads, ref_reads, A, Z, psi)
 
     if llh > last_llh:
-      print('%s\tkeep\t%.2e\t%.2e' % (I, learn_rate, llh))
+      #print('%s\tkeep\t%.2e\t%.2e' % (I, learn_rate, llh))
       last_llh = llh
       last_psi = psi
       learn_rate *= 1.1
