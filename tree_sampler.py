@@ -52,6 +52,17 @@ def init_cluster_adj_branching(K):
   cluster_adj[1,range(2,K)] = 1
   return cluster_adj
 
+def init_cluster_adj_random(K):
+  # Parents for nodes [1, ..., K-1].
+  parents = []
+  # Note this isn't truly random, since node i can only choose a parent <i.
+  # This prevents cycles.
+  for idx in range(1, K):
+    parents.append(np.random.randint(0, idx))
+  cluster_adj = np.eye(K)
+  cluster_adj[parents, range(1,K)] = 1
+  return cluster_adj
+
 def permute_adj(adj):
   adj = np.copy(adj)
   K = len(adj)
@@ -102,8 +113,7 @@ def run_chain(data_mutrel, clusters, nsamples, progress_queue):
   assert nsamples > 0
   K = len(clusters)
 
-  init_choices = (init_cluster_adj_linear, init_cluster_adj_branching)
-  init_choices = [init_cluster_adj_branching]
+  init_choices = (init_cluster_adj_linear, init_cluster_adj_branching, init_cluster_adj_random)
   init_cluster_adj = init_choices[np.random.choice(len(init_choices))]
   cluster_adj = [init_cluster_adj(K)]
   tree_mutrel = make_mutrel_tensor_from_cluster_adj(cluster_adj[0], clusters)
