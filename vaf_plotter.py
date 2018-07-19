@@ -18,6 +18,8 @@ def find_gene_name(chrom, pos, spreadsheet_rows):
   raise Exception('Could not find gene name for %s_%s' % (chrom, pos))
 
 def load_spreadsheet(spreadsheetfn):
+  if spreadsheetfn is None:
+    return None
   with open(spreadsheetfn) as S:
     reader = csv.DictReader(S)
     return list(reader)
@@ -77,7 +79,7 @@ def print_vaftable_header(sampnames, outf):
   print('</thead><tbody>', file=outf)
 
 def print_vaftable_row(V, bgcolour, outf):
-  td = ['<td>%s</td>' % (V[K] if V[K] is not None else '&mdash;') for K in ('gene', 'id', 'chrom', 'pos', 'cluster')]
+  td = ['<td>%s</td>' % (V[K] if K in V and V[K] is not None else '&mdash;') for K in ('gene', 'id', 'chrom', 'pos', 'cluster')]
   td += ['<td style="background-color: %s"><span>%s</span></td>' % (make_colour(v), make_vaf_label(v)) for v in V['vaf']]
   print('<tr style="background-color: %s">%s</tr>' % (
     bgcolour,
@@ -98,10 +100,14 @@ def print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, outf
   for cidx, cluster in enumerate(clustered_vars):
     if len(cluster) == 0:
       continue
-    supervar = supervars['C%s' % cidx]
+    supervar = supervars['C%s' % (cidx - 1)]
     garbage = parted_garbage_vars[cidx] if cidx in parted_garbage_vars else []
     phi_pseudovar = phi_pseudovars[cidx]
-    for V in [phi_pseudovar, supervar] + cluster + garbage:
+
+    cluster_rows = [phi_pseudovar, supervar]
+    #cluster_rows += cluster
+    #cluster_rows += garbage
+    for V in cluster_rows:
       print_vaftable_row(V, cluster_colours[V['cluster']], outf)
 
   print_vaftable_footer(outf)
@@ -157,10 +163,10 @@ def get_next_colour():
 get_next_colour._last_idx = -1
 
 def augment_variant(V, spreadsheet, correct_vaf):
-  if spreadsheet is None:
-    return
   if correct_vaf:
     V['vaf'] *= V['vaf_correction']
+  if spreadsheet is None:
+    return
   V['gene'] = find_gene_name(V['chrom'], V['pos'], spreadsheet)
 
 def plot_unclustered_vafs(sampid, variants, garbage_variants, sampnames, spreadsheetfn, outf, patient_samples_only=False):

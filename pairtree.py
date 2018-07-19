@@ -8,6 +8,7 @@ import json_writer
 import json
 import tree_sampler
 import phi_fitter
+import vaf_plotter
 
 def create_matrix(model, model_probs, variants):
   N = len(variants)
@@ -61,6 +62,8 @@ def write_trees(sampid, tidx, outf):
     'SJETV010steph': [{'left': 'D', 'right': 'R2'}],
     'SJBALL022610steph': [{'left': 'D', 'right': 'R1'}],
   }
+  if sampid not in colourings:
+    colourings[sampid] = [{'left': 'D', 'right': 'R1'}]
 
   print('''<div id="trees"></div>''', file=outf)
   print('''<script type="text/javascript">$(document).ready(function() {''', file=outf)
@@ -87,6 +90,20 @@ def write_phi_json(phi, sampnames, phifn):
       'phi': phi.tolist()
     }, outf)
 
+def print_error(phi, supervars, llh):
+  svkeys = sorted(supervars.keys(), key = lambda S: int(S[1:]))
+  supervar_vaf = np.array([supervars[S]['vaf'] for S in svkeys])
+  assert np.allclose(phi[0], 1)
+  phi = phi[1:] # Discard phi for normal node, which should always be 1.
+  assert supervar_vaf.shape == phi.shape
+
+  diff = np.abs(2*supervar_vaf - phi)
+  M, S = phi.shape
+  phi_error = np.sum(diff) / (M*S)
+
+  llh_error = -llh / (M*S*np.log(2))
+  print('phi_error = %.3f, llh_error = %.3f' % (phi_error, llh_error))
+
 def main():
   np.set_printoptions(threshold=np.nan, linewidth=120)
   np.seterr(divide='raise', invalid='raise')
@@ -97,7 +114,8 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('--struct-iterations', dest='struct_iterations', type=int, default=1000)
+  parser.add_argument('--tree-samples', dest='tree_samples', type=int, default=1000)
+  parser.add_argument('--tree-chains', dest='tree_chains', type=int, default=1)
   parser.add_argument('--parallel', dest='parallel', type=int, default=1)
   parser.add_argument('sampid')
   parser.add_argument('ssm_fn')
@@ -117,7 +135,7 @@ def main():
   results = pairwise.generate_results(posterior, evidence, supervars)
 
   model_probs_tensor = create_model_prob_tensor(results)
-  sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, superclusters, nsamples=args.struct_iterations, nchains=args.parallel)
+  sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, superclusters, nsamples=args.tree_samples, nchains=args.tree_chains, parallel=args.parallel)
   phi, eta = fit_phis(sampled_adjm, supervars, superclusters, tidxs=(-1,), parallel=args.parallel)
   json_writer.write_json(
     args.sampid,
@@ -136,5 +154,9 @@ def main():
     write_header(args.sampid, outf)
     write_trees(args.sampid, len(sampled_adjm) - 1, outf)
     write_phi_matrix(args.sampid, outf)
+    vaf_plotter.plot_vaf_matrix(args.sampid, clusters, variants, supervars, {}, phi[-1].T, sampnames, None, False, outf)
+
+  print_error(phi[-1].T, supervars, sampled_llh[-1])
+
 
 main()

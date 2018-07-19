@@ -94,7 +94,7 @@ def calc_posterior(variants, use_dummy=False, parallel=1):
       for vidx2 in sorted(variants.keys()):
         pairs.append((vidx1, vidx2))
         futures.append(ex.submit(_calc_prob, variants[vidx1], variants[vidx2]))
-    for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Computing relations', unit=' pairs'):
+    for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Computing relations', unit=' pairs', dynamic_ncols=True):
       pass
   for pair, F in zip(pairs, futures):
     posterior[pair], evidence[pair] = F.result()

@@ -68,7 +68,7 @@ def fit_all_phis(adj, A, ref_reads, var_reads, parallel):
       if np.any(eta[s] < 0):
         modified_samples.append(s)
         futures.append(ex.submit(fit_phi_S, eta[s], var_reads[:,s], ref_reads[:,s], A, Z))
-    for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Fitting phis', unit=' samples'):
+    for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Fitting phis', unit=' samples', dynamic_ncols=True):
       pass
   for s, F in zip(modified_samples, futures):
     eta[s] = F.result()

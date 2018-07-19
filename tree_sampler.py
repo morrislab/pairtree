@@ -103,6 +103,7 @@ def run_chain(data_mutrel, clusters, nsamples, progress_queue):
   K = len(clusters)
 
   init_choices = (init_cluster_adj_linear, init_cluster_adj_branching)
+  init_choices = [init_cluster_adj_branching]
   init_cluster_adj = init_choices[np.random.choice(len(init_choices))]
   cluster_adj = [init_cluster_adj(K)]
   tree_mutrel = make_mutrel_tensor_from_cluster_adj(cluster_adj[0], clusters)
@@ -129,14 +130,14 @@ def run_chain(data_mutrel, clusters, nsamples, progress_queue):
   #print('Last LLH:', llh[-1])
   return (cluster_adj[-1], llh[-1])
 
-def sample_trees(data_mutrel, clusters, nsamples, nchains=1):
+def sample_trees(data_mutrel, clusters, nsamples, nchains, parallel):
   jobs = []
   total = nchains * nsamples
 
   manager = multiprocessing.Manager()
   progress_queue = manager.Queue()
-  with tqdm(total=total, desc='Sampling trees', unit=' trees') as progress_bar:
-    with concurrent.futures.ProcessPoolExecutor(max_workers=nchains) as ex:
+  with tqdm(total=total, desc='Sampling trees', unit=' trees', dynamic_ncols=True) as progress_bar:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
       for C in range(nchains):
         jobs.append(ex.submit(run_chain, data_mutrel, clusters, nsamples, progress_queue))
       for _ in range(total):
@@ -144,6 +145,8 @@ def sample_trees(data_mutrel, clusters, nsamples, nchains=1):
         progress_bar.update()
   results = [J.result() for J in jobs]
 
-  results.sort(key = lambda result: result[1]) # Sort by LLH
+   # Sort by LLH. Highest LLH will be at the end of the list, which is what we
+   # want, as we display the last ("best") tree.
+  results.sort(key = lambda result: result[1])
   adj, llh = zip(*results)
   return (adj, llh)
