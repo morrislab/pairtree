@@ -5,6 +5,7 @@ import numpy as np
 from collections import defaultdict
 import vaf_correcter
 import common
+import itertools
 
 def find_gene_name(chrom, pos, spreadsheet_rows):
   for row in spreadsheet_rows:
@@ -105,7 +106,7 @@ def print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, outf
     phi_pseudovar = phi_pseudovars[cidx]
 
     cluster_rows = [phi_pseudovar, supervar]
-    #cluster_rows += cluster
+    cluster_rows += cluster
     #cluster_rows += garbage
     for V in cluster_rows:
       print_vaftable_row(V, cluster_colours[V['cluster']], outf)
@@ -187,6 +188,28 @@ def plot_unclustered_vafs(sampid, variants, garbage_variants, sampnames, spreads
 
   print_unclustered_vafs(variants, sampnames, outf, patient_samples_only)
 
+def print_distances(sampid, supervars, phi):
+  def _compute_dist(V1, V2):
+    dist = np.sum(np.abs(V1['vaf'] - V2['vaf']))
+    normdist = dist / len(V1['vaf'])
+    return (dist, normdist)
+
+  phi_pseudovars = {P['id']: P for P in make_phi_pseudovars(phi)}
+  sv_ids = sorted(supervars.keys(), key = lambda S: int(S[1:]))
+  phi_ids = sorted(phi_pseudovars.keys(), key = lambda P: int(P[1:]))
+
+  # Add 1 to supervariant IDs to match cluster numbering in the results --
+  # supervariant C_i corresponds to cluter K_(i + 1).  Actually, maybe this is
+  # the wrong thing to do, since I'm already removing empty clusters, meaning
+  # that my numbering doesn't match Steph's. Meh.
+  for V1, V2 in itertools.combinations(sv_ids, 2):
+    dist, normdist = _compute_dist(supervars[V1], supervars[V2])
+    print('cluster_dist', int(V1[1:]) + 1, int(V2[1:]) + 1, dist, normdist, sep=',')
+  for sv in sv_ids:
+    phivid = 'P%s' % (int(sv[1:]) + 1)
+    dist, normdist = _compute_dist(supervars[sv], phi_pseudovars[phivid])
+    print('phi_dist', int(phivid[1:]), int(sv[1:]) + 1, dist, normdist, sep=',')
+
 def plot_vaf_matrix(sampid, clusters, variants, supervars, garbage_variants, phi, sampnames, spreadsheetfn, correct_vafs, outf):
   print('<h2>VAFs (%s)</h2>' % ('corrected' if correct_vafs else 'uncorrected',), file=outf)
   if correct_vafs is True:
@@ -204,3 +227,4 @@ def plot_vaf_matrix(sampid, clusters, variants, supervars, garbage_variants, phi
     for var in cluster:
       var['cluster'] = cidx
   print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, outf)
+  print_distances(sampid, supervars, phi)
