@@ -186,3 +186,8 @@ def load_sampnames(paramsfn):
     params = json.load(P)
   sampnames = params['samples']
   return sampnames
+
+def debug(*args, **kwargs):
+  if debug.DEBUG:
+    print(*args, **kwargs)
+debug.DEBUG = False

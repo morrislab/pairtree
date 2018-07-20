@@ -107,7 +107,6 @@ def print_error(phi, supervars, llh):
 def main():
   np.set_printoptions(threshold=np.nan, linewidth=120)
   np.seterr(divide='raise', invalid='raise')
-
   np.random.seed(1)
 
   parser = argparse.ArgumentParser(
@@ -131,7 +130,7 @@ def main():
   supervars = common.make_cluster_supervars(clusters, variants)
   superclusters = common.make_superclusters(supervars)
 
-  posterior, evidence = pairwise.calc_posterior(supervars, parallel=args.parallel)
+  posterior, evidence = pairwise.calc_posterior(supervars, parallel=args.parallel, include_garbage_in_posterior=True)
   results = pairwise.generate_results(posterior, evidence, supervars)
 
   model_probs_tensor = create_model_prob_tensor(results)
@@ -157,6 +156,5 @@ def main():
     vaf_plotter.plot_vaf_matrix(args.sampid, clusters, variants, supervars, {}, phi[-1].T, sampnames, None, False, outf)
 
   print_error(phi[-1].T, supervars, sampled_llh[-1])
-
 
 main()

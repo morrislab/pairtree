@@ -39,6 +39,15 @@ def generate_logprob_phi(N):
 
   return logprob
 
+def _calc_posterior(evidence, include_garbage=True):
+  evidence = np.copy(evidence)
+  if not include_garbage:
+    evidence[Models.garbage] = -np.inf
+  B = np.max(evidence)
+  evidence -= B
+  posterior = np.exp(evidence) / np.sum(np.exp(evidence))
+  return posterior
+
 #@jit
 def _calc_model_prob(var1, var2):
   grid_step = 0.01
@@ -63,12 +72,8 @@ def _calc_model_prob(var1, var2):
   pv1, pv2 = [scipy.stats.randint.logpmf(V['var_reads'], 0, V['var_reads'] + V['total_reads'] + 1) for V in (var1, var2)]
   logprob_models[:,Models.garbage] = pv1 + pv2
 
-  logpm = np.sum(logprob_models, axis=0)
-  B = np.max(logpm)
-  logpm -= B
-  posterior = np.exp(logpm) / np.sum(np.exp(logpm))
-  evidence = logpm + B
-  return (posterior, evidence)
+  evidence = np.sum(logprob_models, axis=0)
+  return evidence
 
 def _calc_dummy_prob(var1, var2):
   # Just specify uniform posterior over possible relations between `var1` and
@@ -80,7 +85,7 @@ def _calc_dummy_prob(var1, var2):
   return (posterior, evidence)
 
 #@jit
-def calc_posterior(variants, use_dummy=False, parallel=1):
+def calc_posterior(variants, use_dummy=False, parallel=1, include_garbage_in_posterior=True):
   N = len(variants)
   posterior = {}
   evidence = {}
@@ -97,7 +102,8 @@ def calc_posterior(variants, use_dummy=False, parallel=1):
     for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Computing relations', unit=' pairs', dynamic_ncols=True):
       pass
   for pair, F in zip(pairs, futures):
-    posterior[pair], evidence[pair] = F.result()
+    evidence[pair] = F.result()
+    posterior[pair] = _calc_posterior(evidence[pair], include_garbage_in_posterior)
 
   return (posterior, evidence)
 
@@ -133,7 +139,7 @@ def main():
   args = parser.parse_args()
 
   variants = parse_ssms(args.sampid, args.ssm_fn)
-  posterior, evidence = calc_posterior(variants, args.use_dummy)
+  posterior, evidence = calc_posterior(variants, args.use_dummy, include_garbage_in_posterior=False)
   results = generate_results (posterior, evidence, variants)
   write_results(results, args.out_fn)
 
