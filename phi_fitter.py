@@ -30,23 +30,23 @@ def calc_llh(var_reads, ref_reads, A, Z, psi):
   mut_probs = scipy.stats.binom.logpmf(var_reads, total_reads, mut_p)
   return np.sum(mut_probs)
 
-def fit_phis(adj, superclusters, supervars, parallel):
+def fit_phis(adj, superclusters, supervars, iterations, parallel):
   supervar_ids = sorted(supervars.keys(), key = lambda C: int(C[1:]))
   ref_reads = np.array([supervars[cid]['ref_reads'] for cid in supervar_ids])
   var_reads = np.array([supervars[cid]['var_reads'] for cid in supervar_ids])
   assert len(supervars) == len(adj) - 1
   # Supervar `i` is in cluster `i`. Cluster 0 is empty.
   A = np.insert(np.eye(len(supervars)), 0, 0, axis=1)
-  return fit_all_phis(adj, A, ref_reads, var_reads, parallel)
+  return fit_all_phis(adj, A, ref_reads, var_reads, iterations, parallel)
 
-def fit_phi_S(eta_S, var_reads_S, ref_reads_S, A, Z):
+def fit_phi_S(eta_S, var_reads_S, ref_reads_S, A, Z, iterations):
   eta_S = np.maximum(1e-10, eta_S)
   psi_S = np.log(eta_S)
-  psi_S = grad_desc(var_reads_S, ref_reads_S, A, Z, psi_S)
+  psi_S = grad_desc(var_reads_S, ref_reads_S, A, Z, psi_S, iterations)
   eta_S = softmax(psi_S)
   return eta_S
 
-def fit_all_phis(adj, A, ref_reads, var_reads, parallel):
+def fit_all_phis(adj, A, ref_reads, var_reads, iterations, parallel):
   Z = common.make_ancestral_from_adj(adj)
   M, K = A.shape
   _, S = ref_reads.shape
@@ -67,7 +67,7 @@ def fit_all_phis(adj, A, ref_reads, var_reads, parallel):
       # starting point, then run the optimizer.
       if np.any(eta[s] < 0):
         modified_samples.append(s)
-        futures.append(ex.submit(fit_phi_S, eta[s], var_reads[:,s], ref_reads[:,s], A, Z))
+        futures.append(ex.submit(fit_phi_S, eta[s], var_reads[:,s], ref_reads[:,s], A, Z, iterations))
     for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Fitting phis', unit=' samples', dynamic_ncols=True):
       pass
   for s, F in zip(modified_samples, futures):
@@ -106,9 +106,8 @@ def calc_grad_numerical(var_reads, ref_reads, A, Z, psi):
     grad[k] = (calc_llh(var_reads, ref_reads, A, Z, P) - calc_llh(var_reads, ref_reads, A, Z, psi)) / delta
   return grad
 
-def grad_desc(var_reads, ref_reads, A, Z, psi):
+def grad_desc(var_reads, ref_reads, A, Z, psi, iterations):
   learn_rate = 1e-4
-  iterations = 1000
 
   K = len(Z)
   M = len(var_reads)

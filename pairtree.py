@@ -32,17 +32,15 @@ def create_model_prob_tensor(model_probs):
     tensor[:,:,midx] = create_matrix(mdl, model_probs['model_probs'][mdl], model_probs['variants'])
   return tensor
 
-def fit_phis(adjm, variants, clusters, tidxs=None, parallel=1):
+def fit_phis(adjm, variants, clusters, tidxs, iterations, parallel=1):
   ntrees = len(adjm)
   nsamples = len(list(variants.values())[0]['total_reads'])
 
   eta = np.ones((ntrees, nsamples, len(clusters)))
   phi = np.ones((ntrees, nsamples, len(clusters)))
 
-  if tidxs is None:
-    tidxs = range(ntrees)
   for tidx in tidxs:
-    phi[tidx,:,:], eta[tidx,:,:] = phi_fitter.fit_phis(adjm[tidx], clusters, variants, parallel)
+    phi[tidx,:,:], eta[tidx,:,:] = phi_fitter.fit_phis(adjm[tidx], clusters, variants, iterations, parallel)
 
   return (phi, eta)
 
@@ -119,6 +117,7 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('--phi-iterations', dest='phi_iterations', type=int, default=1000)
   parser.add_argument('--tree-samples', dest='tree_samples', type=int, default=1000)
   parser.add_argument('--tree-chains', dest='tree_chains', type=int, default=1)
   parser.add_argument('--parallel', dest='parallel', type=int, default=1)
@@ -141,7 +140,7 @@ def main():
 
   model_probs_tensor = create_model_prob_tensor(results)
   sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, superclusters, nsamples=args.tree_samples, nchains=args.tree_chains, parallel=args.parallel)
-  phi, eta = fit_phis(sampled_adjm, supervars, superclusters, tidxs=(-1,), parallel=args.parallel)
+  phi, eta = fit_phis(sampled_adjm, supervars, superclusters, tidxs=(-1,), iterations=args.phi_iterations, parallel=args.parallel)
   json_writer.write_json(
     args.sampid,
     sampnames,
