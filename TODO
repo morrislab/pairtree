@@ -1,3 +1,10 @@
-Eliminate coclustering relation
 Switch to cross entropy loss
-Fix patient trees
+Eliminate coclustering relation
+
+Add toggles to variant/garbage/etc.
+Select highest LH tree
+Investigate why SJBALL022610 seems weird
+  What are the pairwise probs between clusters?
+
+Make figures
+Make supplementary tables

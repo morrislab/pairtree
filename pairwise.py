@@ -39,17 +39,31 @@ def generate_logprob_phi(N):
 
   return logprob
 
-def _calc_posterior(evidence, include_garbage=True):
+def _calc_posterior(evidence, include_garbage, include_cocluster):
   evidence = np.copy(evidence)
   if not include_garbage:
     evidence[Models.garbage] = -np.inf
+  if not include_cocluster:
+    # We still want the posterior for coclustering of node `i` with `i` to be
+    # certain. To signal that we're computing the (i, i) pairwise posterior,
+    # the evidence for coclustering will be set to 0, and all other entries
+    # will be -inf. In this instance, don't set the coclustering evidence to
+    # -inf -- instead, leave it at 0 so that the posterior will indicate
+    # certainty about coclustering.
+    if evidence[Models.cocluster] < 0:
+      evidence[Models.cocluster] = -np.inf
   B = np.max(evidence)
   evidence -= B
   posterior = np.exp(evidence) / np.sum(np.exp(evidence))
   return posterior
 
-#@jit
 def _calc_model_prob(var1, var2):
+  if var1['id'] == var2['id']:
+    # If they're the same variant, they should cocluster with certainty.
+    evidence = -np.inf * np.ones(len(Models._all))
+    evidence[Models.cocluster] = 0
+    return evidence
+
   grid_step = 0.01
   N = int(1/grid_step + 1) # N: number of grid points
   G = np.linspace(start=0, stop=1, num=N)[:,np.newaxis] # Nx1
@@ -85,7 +99,7 @@ def _calc_dummy_prob(var1, var2):
   return (posterior, evidence)
 
 #@jit
-def calc_posterior(variants, use_dummy=False, parallel=1, include_garbage_in_posterior=True):
+def calc_posterior(variants, use_dummy=False, parallel=1, include_garbage_in_posterior=False, include_cocluster_in_posterior=False):
   N = len(variants)
   posterior = {}
   evidence = {}
@@ -103,7 +117,7 @@ def calc_posterior(variants, use_dummy=False, parallel=1, include_garbage_in_pos
       pass
   for pair, F in zip(pairs, futures):
     evidence[pair] = F.result()
-    posterior[pair] = _calc_posterior(evidence[pair], include_garbage_in_posterior)
+    posterior[pair] = _calc_posterior(evidence[pair], include_garbage_in_posterior, include_cocluster_in_posterior)
 
   return (posterior, evidence)
 
@@ -139,7 +153,7 @@ def main():
   args = parser.parse_args()
 
   variants = parse_ssms(args.sampid, args.ssm_fn)
-  posterior, evidence = calc_posterior(variants, args.use_dummy, include_garbage_in_posterior=False)
+  posterior, evidence = calc_posterior(variants, args.use_dummy, include_garbage_in_posterior=False, include_cocluster_in_posterior=False)
   results = generate_results (posterior, evidence, variants)
   write_results(results, args.out_fn)
 

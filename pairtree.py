@@ -135,7 +135,7 @@ def main():
   supervars = common.make_cluster_supervars(clusters, variants)
   superclusters = common.make_superclusters(supervars)
 
-  posterior, evidence = pairwise.calc_posterior(supervars, parallel=args.parallel, include_garbage_in_posterior=True)
+  posterior, evidence = pairwise.calc_posterior(supervars, parallel=args.parallel, include_garbage_in_posterior=False, include_cocluster_in_posterior=False)
   results = pairwise.generate_results(posterior, evidence, supervars)
 
   model_probs_tensor = create_model_prob_tensor(results)
