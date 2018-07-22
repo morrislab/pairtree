@@ -4,6 +4,7 @@ from tqdm import tqdm
 import concurrent.futures
 import multiprocessing
 Models = common.Models
+debug = common.debug
 
 def make_mutrel_tensor_from_cluster_adj(cluster_adj, clusters):
   cluster_anc = common.make_ancestral_from_adj(cluster_adj)
@@ -34,6 +35,8 @@ def make_mutrel_tensor_from_cluster_adj(cluster_adj, clusters):
   return mutrel
 
 def calc_llh(data_mutrel, tree_mutrel):
+  debug(data_mutrel)
+  debug(tree_mutrel)
   probs = 1 - np.abs(data_mutrel - tree_mutrel)
   # Prevent log of zero.
   probs = np.maximum(1e-20, probs)
@@ -76,9 +79,12 @@ def permute_adj(adj):
 
   anc = common.make_ancestral_from_adj(adj)
   A, B = np.random.choice(K, size=2, replace=False)
+  #debug(adj)
+  debug((A,B))
   if B == 0 and anc[B,A]:
     # Don't permit cluster 0 to become non-root node, since it corresponds to
     # normal cell population.
+    debug('do nothing')
     return adj
   np.fill_diagonal(adj, 0)
 
@@ -97,10 +103,13 @@ def permute_adj(adj):
 
     if adj_BA:
       adj[A,B] = 1
+    debug('swapping', A, B)
   else:
     # Move B so it becomes child of A. I don't need to modify the A column.
     adj[:,B] = 0
-    adj[:,B][A] = 1
+    assert adj[:,B][A] == adj[A,B]
+    adj[A,B] = 1
+    debug('moving', B, 'under', A)
 
   np.fill_diagonal(adj, 1)
   permute_adj.blah.add((A, B, np.array2string(adj)))
@@ -131,12 +140,12 @@ def run_chain(data_mutrel, clusters, nsamples, progress_queue):
       # Accept.
       cluster_adj.append(new_adj)
       llh.append(new_llh)
-      #print(I, llh[-1], 'accept', sep='\t')
+      debug(I, llh[-1], 'accept', sep='\t')
     else:
       # Reject.
       cluster_adj.append(old_adj)
       llh.append(old_llh)
-      #print(I, llh[-1], 'reject', sep='\t')
+      debug(I, llh[-1], 'reject', sep='\t')
 
   return choose_best_tree(cluster_adj, llh)
 
