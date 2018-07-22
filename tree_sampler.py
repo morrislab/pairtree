@@ -114,6 +114,7 @@ def run_chain(data_mutrel, clusters, nsamples, progress_queue):
   K = len(clusters)
 
   init_choices = (init_cluster_adj_linear, init_cluster_adj_branching, init_cluster_adj_random)
+  init_choices = (init_cluster_adj_branching,)
   init_cluster_adj = init_choices[np.random.choice(len(init_choices))]
   cluster_adj = [init_cluster_adj(K)]
   tree_mutrel = make_mutrel_tensor_from_cluster_adj(cluster_adj[0], clusters)
@@ -126,7 +127,7 @@ def run_chain(data_mutrel, clusters, nsamples, progress_queue):
     new_adj = permute_adj(old_adj)
     tree_mutrel = make_mutrel_tensor_from_cluster_adj(new_adj, clusters)
     new_llh = calc_llh(data_mutrel, tree_mutrel)
-    if new_llh - old_llh > np.log(np.random.uniform()):
+    if new_llh - old_llh >= np.log(np.random.uniform()):
       # Accept.
       cluster_adj.append(new_adj)
       llh.append(new_llh)
@@ -137,8 +138,16 @@ def run_chain(data_mutrel, clusters, nsamples, progress_queue):
       llh.append(old_llh)
       #print(I, llh[-1], 'reject', sep='\t')
 
-  #print('Last LLH:', llh[-1])
-  return (cluster_adj[-1], llh[-1])
+  return choose_best_tree(cluster_adj, llh)
+
+def choose_best_tree(adj, llh):
+  best_llh = -float('inf')
+  best_adj = None
+  for A, L in zip(adj, llh):
+    if L > best_llh:
+      best_llh = L
+      best_adj = A
+  return (best_adj, best_llh)
 
 def sample_trees(data_mutrel, clusters, nsamples, nchains, parallel):
   jobs = []
@@ -153,10 +162,7 @@ def sample_trees(data_mutrel, clusters, nsamples, nchains, parallel):
       for _ in range(total):
         progress_queue.get()
         progress_bar.update()
-  results = [J.result() for J in jobs]
 
-   # Sort by LLH. Highest LLH will be at the end of the list, which is what we
-   # want, as we display the last ("best") tree.
-  results.sort(key = lambda result: result[1])
-  adj, llh = zip(*results)
-  return (adj, llh)
+  results = [J.result() for J in jobs]
+  adj, llh = choose_best_tree(*zip(*results))
+  return ([adj], [llh])
