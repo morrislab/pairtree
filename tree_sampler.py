@@ -145,6 +145,11 @@ def run_chain(data_mutrel, supervars, superclusters, nsamples, progress_queue=No
   K = len(superclusters)
 
   init_choices = (init_cluster_adj_linear, init_cluster_adj_branching, init_cluster_adj_random)
+  # Particularly since clusters may not be ordered by mean VAF, a branching
+  # tree in which every node comes off the root is the least biased
+  # initialization, as it doesn't require any steps that "undo" bad choices, as
+  # in the linear or random (which is partly linear, given that later clusters
+  # aren't allowed to be parents of earlier ones) cases.
   init_choices = (init_cluster_adj_branching,)
   init_cluster_adj = init_choices[np.random.choice(len(init_choices))]
   cluster_adj = [init_cluster_adj(K)]
