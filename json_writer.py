@@ -28,7 +28,7 @@ def generate_treesumm(sampnames, clusters, adjmats, llh, phi):
     pops = { str(pidx): {
       'num_ssms': len(ssms),
       'num_cnvs': 0,
-      'cellular_prevalence': list(phi[tidx,:,pidx])
+      'cellular_prevalence': list(phi[tidx,pidx,:])
       } for pidx, ssms in enumerate(clusters)
     }
     result['trees'][str(tidx)] = {

@@ -73,8 +73,8 @@ def fit_all_phis(adj, A, ref_reads, var_reads, iterations, parallel):
   for s, F in zip(modified_samples, futures):
     eta[s] = F.result()
 
-  phi = np.dot(Z, eta.T).T
-  return (phi, eta)
+  phi = np.dot(Z, eta.T)
+  return (phi, eta.T)
 
 def calc_grad(var_reads, ref_reads, A, Z, psi):
   M, K = A.shape

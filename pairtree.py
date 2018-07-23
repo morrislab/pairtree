@@ -36,8 +36,9 @@ def fit_phis(adjm, variants, clusters, tidxs, iterations, parallel=1):
   ntrees = len(adjm)
   nsamples = len(list(variants.values())[0]['total_reads'])
 
-  eta = np.ones((ntrees, nsamples, len(clusters)))
-  phi = np.ones((ntrees, nsamples, len(clusters)))
+  N, K, S = ntrees, len(clusters), nsamples
+  eta = np.ones((N, K, S))
+  phi = np.ones((N, K, S))
 
   for tidx in tidxs:
     phi[tidx,:,:], eta[tidx,:,:] = phi_fitter.fit_phis(adjm[tidx], clusters, variants, iterations, parallel)
@@ -152,14 +153,14 @@ def main():
     '%s.summ.json' % args.sampid,
     '%s.muts.json' % args.sampid,
   )
-  write_phi_json(phi[-1].T, sampnames, '%s.phi.json' % args.sampid)
+  write_phi_json(phi[-1], sampnames, '%s.phi.json' % args.sampid)
 
   with open('%s.results.html' % args.sampid, 'w') as outf:
     write_header(args.sampid, outf)
     write_trees(args.sampid, len(sampled_adjm) - 1, outf)
     write_phi_matrix(args.sampid, outf)
-    vaf_plotter.plot_vaf_matrix(args.sampid, clusters, variants, supervars, {}, phi[-1].T, sampnames, None, False, outf)
+    vaf_plotter.plot_vaf_matrix(args.sampid, clusters, variants, supervars, {}, phi[-1], sampnames, None, False, outf)
 
-  print_error(phi[-1].T, supervars, sampled_llh[-1])
+  print_error(phi[-1], supervars, sampled_llh[-1])
 
 main()
