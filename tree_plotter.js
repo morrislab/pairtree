@@ -111,7 +111,6 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops, left_samp
   var vis = svg.append('svg:g')
       .attr('transform', 'translate(' + m[3] + ',' + m[0] + ')');
 
-
   // Update the nodes.
   var node = vis.selectAll('g.node')
       .data(root.descendants(), function(d) { return d.data.name; });
@@ -248,11 +247,14 @@ TreePlotter.prototype.plot = function(summ_path, tidx, tname, left_sample, right
     var struct = summary.trees[tidx].structure;
     var root = summary.trees[tidx].root;
     if(struct[root].length !== 1) {
-      throw "Unexpected children from root: " + struct[root];
+      // Uncomment this if you want to disallow polyclonal trees.
+      //throw "Unexpected children from root " + summary.trees[tidx].root + ": " + struct[root];
     }
     var clonal = struct[root][0];
 
-    var root = self._generate_tree_struct(summary.params.samples, struct, pops, clonal, left_sample, right_sample);
+    // Note to self: change "root" to "clonal" in the call below to eliminate
+    // the normal node 0 when drawing trees.
+    var root = self._generate_tree_struct(summary.params.samples, struct, pops, root, left_sample, right_sample);
     self._draw_tree(root, container, Object.keys(pops).length, left_sample, right_sample);
   });
 }
@@ -303,7 +305,11 @@ function PhiMatrix() {
 
 PhiMatrix.prototype._calc_ccf = function(phi) {
   var ccf = [];
-  var clonalidx = 1;
+  // Set clonalidx=0 if you want the phi matrix plots to be unnormalized.
+  // Set clonalidx=1 if you want the phi matrix plots to be normalized relative
+  // to population 1's phi. (This is only sensible if you don't have any
+  // polyclonal trees.)
+  var clonalidx = 0;
 
   for(var rowidx = clonalidx; rowidx < phi.length; rowidx++) {
     ccf[rowidx - 1] = [];
