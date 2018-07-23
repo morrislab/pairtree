@@ -1,8 +1,8 @@
 import common
 import numpy as np
+import scipy.stats
 from tqdm import tqdm
-import concurrent.futures
-import multiprocessing
+import phi_fitter
 Models = common.Models
 debug = common.debug
 
@@ -34,13 +34,25 @@ def make_mutrel_tensor_from_cluster_adj(cluster_adj, clusters):
 
   return mutrel
 
-def calc_llh(data_mutrel, tree_mutrel):
-  debug(data_mutrel)
-  debug(tree_mutrel)
-  probs = 1 - np.abs(data_mutrel - tree_mutrel)
+def calc_llh(data_mutrel, supervars, superclusters, cluster_adj, fit_phis=True):
+  tree_mutrel = make_mutrel_tensor_from_cluster_adj(cluster_adj, superclusters)
+  mutrel_fit = 1 - np.abs(data_mutrel - tree_mutrel)
   # Prevent log of zero.
-  probs = np.maximum(1e-20, probs)
-  llh = np.sum(np.log(probs))
+  mutrel_fit = np.maximum(1e-20, mutrel_fit)
+  mutrel_fit = np.sum(np.log(mutrel_fit))
+
+  if fit_phis:
+    phi, eta = phi_fitter.fit_phis(cluster_adj, superclusters, supervars, iterations=100, parallel=1)
+    K, S = phi.shape
+    alpha, beta = calc_beta_params(supervars)
+    assert alpha.shape == beta.shape == (K-1, S)
+    assert np.allclose(1, phi[0])
+    phi_fit = scipy.stats.beta.logpdf(phi[1:,:], alpha, beta)
+    phi_fit = np.sum(phi_fit)
+  else:
+    phi_fit = 0
+
+  llh = mutrel_fit + phi_fit
   return llh
 
 def init_cluster_adj_linear(K):
@@ -116,26 +128,36 @@ def permute_adj(adj):
   return adj
 permute_adj.blah = set()
 
-def run_chain(data_mutrel, clusters, nsamples, progress_queue):
+def calc_beta_params(supervars):
+  svids = sorted(supervars.keys(), key = lambda V: int(V[1:]))
+  V = np.array([supervars[C]['var_reads'] for C in svids])
+  R = np.array([supervars[C]['ref_reads'] for C in svids])
+  # Since these are supervars, we can just take 2*V and disregard mu_v, since
+  # supervariants are never haploid.
+  alpha = 2*V + 1
+  beta = R - V + 1
+  return (alpha, beta)
+
+def run_chain(data_mutrel, supervars, superclusters, nsamples, progress_queue=None):
   # Ensure each chain gets a new random state.
   np.random.seed()
   assert nsamples > 0
-  K = len(clusters)
+  K = len(superclusters)
 
   init_choices = (init_cluster_adj_linear, init_cluster_adj_branching, init_cluster_adj_random)
   init_choices = (init_cluster_adj_branching,)
   init_cluster_adj = init_choices[np.random.choice(len(init_choices))]
   cluster_adj = [init_cluster_adj(K)]
-  tree_mutrel = make_mutrel_tensor_from_cluster_adj(cluster_adj[0], clusters)
-  llh = [calc_llh(data_mutrel, tree_mutrel)]
-  progress_queue.put(0)
+  llh = [calc_llh(data_mutrel, supervars, superclusters, cluster_adj[0])]
+  if progress_queue is not None:
+    progress_queue.put(0)
 
   for I in range(1, nsamples):
-    progress_queue.put(I)
+    if progress_queue is not None:
+      progress_queue.put(I)
     old_llh, old_adj = llh[-1], cluster_adj[-1]
     new_adj = permute_adj(old_adj)
-    tree_mutrel = make_mutrel_tensor_from_cluster_adj(new_adj, clusters)
-    new_llh = calc_llh(data_mutrel, tree_mutrel)
+    new_llh = calc_llh(data_mutrel, supervars, superclusters, new_adj)
     if new_llh - old_llh >= np.log(np.random.uniform()):
       # Accept.
       cluster_adj.append(new_adj)
@@ -158,20 +180,39 @@ def choose_best_tree(adj, llh):
       best_adj = A
   return (best_adj, best_llh)
 
-def sample_trees(data_mutrel, clusters, nsamples, nchains, parallel):
+def sample_trees(data_mutrel, supervars, superclusters, nsamples, nchains, parallel):
   jobs = []
   total = nchains * nsamples
 
-  manager = multiprocessing.Manager()
-  progress_queue = manager.Queue()
-  with tqdm(total=total, desc='Sampling trees', unit=' trees', dynamic_ncols=True) as progress_bar:
-    with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
-      for C in range(nchains):
-        jobs.append(ex.submit(run_chain, data_mutrel, clusters, nsamples, progress_queue))
-      for _ in range(total):
-        progress_queue.get()
-        progress_bar.update()
+  assert parallel > 0
+  # Don't use (hard-to-debug) parallelism machinery unless necessary.
+  if parallel > 1:
+    import concurrent.futures
+    import multiprocessing
+    manager = multiprocessing.Manager()
+    # What is stored in progress_queue doesn't matter. The queue is just used
+    # so that child processes can signal when they've sampled a tree, allowing
+    # the main process to update the progress bar.
+    progress_queue = manager.Queue()
+    with tqdm(total=total, desc='Sampling trees', unit=' trees', dynamic_ncols=True) as progress_bar:
+      with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
+        for C in range(nchains):
+          jobs.append(ex.submit(run_chain, data_mutrel, supervars, superclusters, nsamples, progress_queue))
 
-  results = [J.result() for J in jobs]
+        # Exactly `total` items will be added to the queue. Once we've
+        # retrieved that many items from the queue, we can assume that our
+        # child processes are finished sampling trees.
+        for _ in range(total):
+          # Block until there's something in the queue for us to retrieve,
+          # indicating a child process has sampled a tree.
+          progress_queue.get()
+          progress_bar.update()
+
+    results = [J.result() for J in jobs]
+  else:
+    results = []
+    for C in range(nchains):
+      results.append(run_chain(data_mutrel, supervars, superclusters, nsamples))
+
   adj, llh = choose_best_tree(*zip(*results))
   return ([adj], [llh])

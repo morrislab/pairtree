@@ -1,7 +1,6 @@
 import numpy as np
 import scipy.stats
 import common
-import concurrent.futures
 from tqdm import tqdm
 
 # Matrices: M mutations, K clusters, S samples
@@ -58,20 +57,29 @@ def fit_all_phis(adj, A, ref_reads, var_reads, iterations, parallel):
   eta = np.dot(np.linalg.inv(Z), phi_implied).T
   assert eta.shape == (S, K)
 
-  modified_samples = []
-  futures = []
-  with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
+  assert parallel > 0
+  # Don't bother invoking all the parallelism machinery if we're only fitting a
+  # single sample at a time.
+  if parallel > 1:
+    modified_samples = []
+    futures = []
+    import concurrent.futures
+    with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
+      for s in range(S):
+        # If no negative elements are in eta, we have the analytic solution.
+        # Otherwise, set the negative elements to zero to provide an initial
+        # starting point, then run the optimizer.
+        if np.any(eta[s] < 0):
+          modified_samples.append(s)
+          futures.append(ex.submit(fit_phi_S, eta[s], var_reads[:,s], ref_reads[:,s], A, Z, iterations))
+      for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Fitting phis', unit=' samples', dynamic_ncols=True):
+        pass
+    for s, F in zip(modified_samples, futures):
+      eta[s] = F.result()
+  else:
     for s in range(S):
-      # If no negative elements are in eta, we have the analytic solution.
-      # Otherwise, set the negative elements to zero to provide an initial
-      # starting point, then run the optimizer.
       if np.any(eta[s] < 0):
-        modified_samples.append(s)
-        futures.append(ex.submit(fit_phi_S, eta[s], var_reads[:,s], ref_reads[:,s], A, Z, iterations))
-    for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Fitting phis', unit=' samples', dynamic_ncols=True):
-      pass
-  for s, F in zip(modified_samples, futures):
-    eta[s] = F.result()
+        eta[s] = fit_phi_S(eta[s], var_reads[:,s], ref_reads[:,s], A, Z, iterations)
 
   phi = np.dot(Z, eta.T)
   return (phi, eta.T)

@@ -140,7 +140,7 @@ def main():
   results = pairwise.generate_results(posterior, evidence, supervars)
 
   model_probs_tensor = create_model_prob_tensor(results)
-  sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, superclusters, nsamples=args.tree_samples, nchains=args.tree_chains, parallel=args.parallel)
+  sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, supervars, superclusters, nsamples=args.tree_samples, nchains=args.tree_chains, parallel=args.parallel)
   phi, eta = fit_phis(sampled_adjm, supervars, superclusters, tidxs=(-1,), iterations=args.phi_iterations, parallel=args.parallel)
   json_writer.write_json(
     args.sampid,
