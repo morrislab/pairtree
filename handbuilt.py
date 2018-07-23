@@ -95,7 +95,8 @@ def load_clusters_and_tree(handbuilt_jsonfn, variants, tree_type, sampnames):
   return (clusters, adjm, colourings)
 
 def load_clusters(handbuilt_jsonfn, variants, tree_type, sampnames):
-  clusters, _, _ = load_clusters_and_tree(handbuilt_jsonfn, variants, tree_type, sampnames)
+  hbjson = _load_handbuilt(handbuilt_jsonfn, tree_type)
+  clusters = _load_clusters(hbjson, variants)
   return clusters
 
 def load_samporders(handbuilt_jsonfn, tree_type):
