@@ -53,6 +53,9 @@ def calc_llh(data_mutrel, supervars, superclusters, cluster_adj, fit_phis=True):
     phi_fit = 0
 
   llh = mutrel_fit + phi_fit
+  # I had NaNs creep into my LLH when my alpha and beta params were invalid
+  # (i.e., when I had elements of beta that were <= 0).
+  assert not np.isnan(llh)
   return llh
 
 def init_cluster_adj_linear(K):
@@ -135,7 +138,9 @@ def calc_beta_params(supervars):
   # Since these are supervars, we can just take 2*V and disregard mu_v, since
   # supervariants are never haploid.
   alpha = 2*V + 1
-  beta = R - V + 1
+  # Must ensure beta is > 0.
+  beta = np.maximum(1, R - V + 1)
+  assert np.all(alpha > 0) and np.all(beta > 0)
   return (alpha, beta)
 
 def run_chain(data_mutrel, supervars, superclusters, nsamples, progress_queue=None):
@@ -144,6 +149,8 @@ def run_chain(data_mutrel, supervars, superclusters, nsamples, progress_queue=No
   assert nsamples > 0
   K = len(superclusters)
 
+  if progress_queue is not None:
+    progress_queue.put(0)
   init_choices = (init_cluster_adj_linear, init_cluster_adj_branching, init_cluster_adj_random)
   # Particularly since clusters may not be ordered by mean VAF, a branching
   # tree in which every node comes off the root is the least biased
@@ -154,8 +161,6 @@ def run_chain(data_mutrel, supervars, superclusters, nsamples, progress_queue=No
   init_cluster_adj = init_choices[np.random.choice(len(init_choices))]
   cluster_adj = [init_cluster_adj(K)]
   llh = [calc_llh(data_mutrel, supervars, superclusters, cluster_adj[0])]
-  if progress_queue is not None:
-    progress_queue.put(0)
 
   for I in range(1, nsamples):
     if progress_queue is not None:
