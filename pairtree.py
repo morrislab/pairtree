@@ -72,6 +72,7 @@ def write_trees(sampid, tidx, outf):
 
   print('''<div id="trees"></div>''', file=outf)
   print('''<script type="text/javascript">$(document).ready(function() {''', file=outf)
+  print('new VafMatrix("#vafmatrix_toggles");', file=outf)
   for colouring in colourings[sampid]:
     print('''(new TreePlotter()).plot('%s.summ.json', %s, '%s', '%s', '%s', '#trees');''' % (
       sampid,
@@ -109,6 +110,14 @@ def print_error(phi, supervars, llh):
   llh_error = -llh / (M*S*np.log(2))
   print('phi_error = %.3f, llh_error = %.3f' % (phi_error, llh_error))
 
+def remove_garbage(garbage_ids, variants):
+  garbage_variants = {}
+  for varid in sorted(variants.keys(), key = lambda S: int(S[1:])):
+    if int(varid[1:]) in garbage_ids:
+      garbage_variants[varid] = variants[varid]
+      del variants[varid]
+  return garbage_variants
+
 def main():
   np.set_printoptions(threshold=np.nan, linewidth=120)
   np.seterr(divide='raise', invalid='raise')
@@ -132,6 +141,8 @@ def main():
   variants = common.parse_ssms(args.sampid, args.ssm_fn)
   sampnames = common.load_sampnames(args.params_fn)
   clusters = handbuilt.load_clusters(args.clusters_fn, variants, args.tree_type, sampnames)
+  garbage_vids = handbuilt.load_garbage(args.clusters_fn, args.tree_type)
+  garbage_variants = remove_garbage(garbage_vids, variants)
 
   supervars = common.make_cluster_supervars(clusters, variants)
   superclusters = common.make_superclusters(supervars)
@@ -159,7 +170,7 @@ def main():
     write_header(args.sampid, outf)
     write_trees(args.sampid, len(sampled_adjm) - 1, outf)
     write_phi_matrix(args.sampid, outf)
-    vaf_plotter.plot_vaf_matrix(args.sampid, clusters, variants, supervars, {}, phi[-1], sampnames, None, False, outf)
+    vaf_plotter.plot_vaf_matrix(args.sampid, clusters, variants, supervars, garbage_variants, phi[-1], sampnames, None, False, outf)
 
   print_error(phi[-1], supervars, sampled_llh[-1])
 

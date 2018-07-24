@@ -73,14 +73,21 @@ def make_phi_pseudovars(phi):
 
 def print_vaftable_header(sampnames, outf):
   print('<style>.vafmatrix td, .vafmatrix { padding: 5px; margin: 0; border-collapse: collapse; } .vafmatrix th { transform: rotate(45deg); font-weight: normal !important; } .vafmatrix span { visibility: hidden; } .vafmatrix td:hover > span { visibility: visible; }</style>', file=outf)
-  print('<br><br><br><table class="vafmatrix matrix"><thead>', file=outf)
+  print('<div id="vafmatrix_toggles" class="btn-group" data-toggle="buttons">', file=outf)
+  print('<label class="btn btn-primary active toggle_phi"><input type="checkbox" autocomplete="off" checked> &phi;</label>', file=outf)
+  print('<label class="btn btn-primary active toggle_cluster_means"><input type="checkbox" autocomplete="off" checked> Cluster means</label>', file=outf)
+  print('<label class="btn btn-primary active toggle_cluster_members"><input type="checkbox" autocomplete="off" checked> Cluster members</label>', file=outf)
+  print('<label class="btn btn-primary active toggle_garbage"><input type="checkbox" autocomplete="off" checked> Garbage</label>', file=outf)
+  print('</div>', file=outf)
+  print('<br><br><br>', file=outf)
+  print('<table class="vafmatrix matrix"><thead><tr>', file=outf)
   header = ['Gene', 'ID', 'Chrom', 'Locus', 'Cluster']
   header += munge_samp_names(sampnames)
   print(''.join(['<th>%s</th>' % H for H in header]), file=outf)
-  print('</thead><tbody>', file=outf)
+  print('</tr></thead><tbody>', file=outf)
 
 def print_vaftable_row(V, bgcolour, outf):
-  td = ['<td>%s</td>' % (V[K] if K in V and V[K] is not None else '&mdash;') for K in ('gene', 'id', 'chrom', 'pos', 'cluster')]
+  td = ['<td class="%s">%s</td>' % (K, V[K] if K in V and V[K] is not None else '&mdash;') for K in ('gene', 'id', 'chrom', 'pos', 'cluster')]
   td += ['<td style="background-color: %s"><span>%s</span></td>' % (make_colour(v), make_vaf_label(v)) for v in V['vaf']]
   print('<tr style="background-color: %s">%s</tr>' % (
     bgcolour,
@@ -107,7 +114,7 @@ def print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, outf
 
     cluster_rows = [phi_pseudovar, supervar]
     cluster_rows += cluster
-    #cluster_rows += garbage
+    cluster_rows += garbage
     for V in cluster_rows:
       print_vaftable_row(V, cluster_colours[V['cluster']], outf)
 
