@@ -1,0 +1,22 @@
+{
+  "handbuilt.xeno": {
+    "colourings": [
+      {
+        "left": "D",
+        "right": "R1"
+      }
+    ],
+    "garbage": [
+    ],
+    "samporders": [],
+    "clusters": [
+      [],
+      [
+        0
+      ],
+      [
+        1
+      ]
+    ]
+  }
+}
