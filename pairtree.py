@@ -147,11 +147,17 @@ def main():
   supervars = common.make_cluster_supervars(clusters, variants)
   superclusters = common.make_superclusters(supervars)
 
-  posterior, evidence = pairwise.calc_posterior(supervars, parallel=args.parallel, include_garbage_in_posterior=False, include_cocluster_in_posterior=False)
-  results = pairwise.generate_results(posterior, evidence, supervars)
+  adjm = handbuilt.load_tree(args.clusters_fn, args.tree_type)
+  if adjm is not None:
+    sampled_adjm = [adjm]
+    sampled_llh = [0]
+  else:
+    posterior, evidence = pairwise.calc_posterior(supervars, parallel=args.parallel, include_garbage_in_posterior=False, include_cocluster_in_posterior=False)
+    results = pairwise.generate_results(posterior, evidence, supervars)
 
-  model_probs_tensor = create_model_prob_tensor(results)
-  sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, supervars, superclusters, nsamples=args.tree_samples, nchains=args.tree_chains, parallel=args.parallel)
+    model_probs_tensor = create_model_prob_tensor(results)
+    sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, supervars, superclusters, nsamples=args.tree_samples, nchains=args.tree_chains, parallel=args.parallel)
+
   phi, eta = fit_phis(sampled_adjm, supervars, superclusters, tidxs=(-1,), iterations=args.phi_iterations, parallel=args.parallel)
   json_writer.write_json(
     args.sampid,
