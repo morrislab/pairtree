@@ -24,12 +24,12 @@ def create_matrix(model, model_probs, variants):
 
   return mat
 
-def create_model_prob_tensor(model_probs):
+def create_model_prob_tensor(model_probs, K='model_probs'):
   M = len(model_probs['variants'])
   num_models = len(common.Models._all)
   tensor = np.zeros((M, M, num_models))
   for midx, mdl in enumerate(common.Models._all):
-    tensor[:,:,midx] = create_matrix(mdl, model_probs['model_probs'][mdl], model_probs['variants'])
+    tensor[:,:,midx] = create_matrix(mdl, model_probs[K][mdl], model_probs['variants'])
   return tensor
 
 def fit_phis(adjm, variants, clusters, tidxs, iterations, parallel=1):
