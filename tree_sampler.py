@@ -122,7 +122,6 @@ def permute_adj(adj):
   else:
     # Move B so it becomes child of A. I don't need to modify the A column.
     adj[:,B] = 0
-    assert adj[:,B][A] == adj[A,B]
     adj[A,B] = 1
     debug('moving', B, 'under', A)
 
