@@ -99,6 +99,14 @@ def load_clusters(handbuilt_jsonfn, variants, tree_type, sampnames):
   clusters = _load_clusters(hbjson, variants)
   return clusters
 
+def load_tree(handbuilt_jsonfn, tree_type):
+  hbjson = _load_handbuilt(handbuilt_jsonfn, tree_type)
+  if 'structure' not in hbjson:
+    return None
+  tstruct = _load_tree(hbjson)
+  adjm = _convert_adjlist_to_adjmatrix(tstruct)
+  return adjm
+
 def load_samporders(handbuilt_jsonfn, tree_type):
   hbjson = _load_handbuilt(handbuilt_jsonfn, tree_type)
   samporders = hbjson['samporders']
