@@ -295,8 +295,9 @@ Util.rgba2hex = function(base_colour, alpha, bgcolour) {
   var rgb = {};
   Object.keys(base_colour).forEach(function(channel) {
     rgb[channel] = Math.round(alpha*base_colour[channel] + (1 - alpha)*bgcolour[channel]);
+    rgb[channel] = rgb[channel].toString(16).padStart(2, "0");
   });
-  var hex = '#' + rgb.r.toString(16) + rgb.g.toString(16) + rgb.b.toString(16);
+  var hex = '#' + rgb.r + rgb.g + rgb.b;
   return hex;
 }
 
