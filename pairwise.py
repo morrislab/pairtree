@@ -89,6 +89,55 @@ def _calc_model_prob(var1, var2):
   evidence = np.sum(logprob_models, axis=0)
   return evidence
 
+def _gen_samples(modelidx, S):
+  if modelidx == Models.A_B:
+    phi1 = scipy.stats.uniform.rvs(loc=0, scale=1, size=S)
+    phi2 = scipy.stats.uniform.rvs(loc=0, scale=phi1, size=S)
+    area = 0.5
+  elif modelidx == Models.B_A:
+    phi2 = scipy.stats.uniform.rvs(loc=0, scale=1, size=S)
+    phi1 = scipy.stats.uniform.rvs(loc=0, scale=phi2, size=S)
+    area = 0.5
+  elif modelidx == Models.diff_branches:
+    phi1 = scipy.stats.uniform.rvs(loc=0, scale=1, size=S)
+    phi2 = scipy.stats.uniform.rvs(loc=0, scale=(1 - phi1), size=S)
+    area = 0.5
+  elif modelidx == Models.cocluster:
+    phi1 = scipy.stats.uniform.rvs(loc=0, scale=1, size=S)
+    phi2 = np.copy(phi1)
+    area = 1
+  else:
+    raise Exception('Unknown model: %s' % model)
+  return (phi1, phi2, area)
+
+def _calc_model_prob(var1, var2):
+  if var1['id'] == var2['id']:
+    # If they're the same variant, they should cocluster with certainty.
+    evidence = -np.inf * np.ones(len(Models._all))
+    evidence[Models.cocluster] = 0
+    return evidence
+
+  S = len(var1['total_reads']) # S
+  logprob_models = np.zeros((S, len(Models._all))) # SxM
+  for s in range(S):
+    for modelidx, model in enumerate(Models._all):
+      if modelidx == Models.garbage:
+        continue
+      mcsamps = 100000
+      phi1, phi2, area = _gen_samples(modelidx, S=mcsamps)
+
+      logP = []
+      for V, phi in ((var1, phi1), (var2, phi2)):
+        alpha = 2*V['var_reads'][s] + 1
+        beta = np.maximum(1, V['ref_reads'][s] - V['var_reads'][s] + 1)
+        logP.append(scipy.stats.beta.logpdf(phi, alpha, beta))
+      logprob_models[s,modelidx] = scipy.misc.logsumexp(logP[0] + logP[1] - np.log(area)) - np.log(mcsamps)
+
+  garb1, garb2 = [scipy.stats.randint.logpmf(V['var_reads'], 0, V['var_reads'] + V['total_reads'] + 1) for V in (var1, var2)]
+  logprob_models[:,Models.garbage] = garb1 + garb2
+  evidence = np.sum(logprob_models, axis=0)
+  return evidence
+
 def _calc_dummy_prob(var1, var2):
   # Just specify uniform posterior over possible relations between `var1` and
   # `var2`. This makes model computation tractable in scenarios for which we
