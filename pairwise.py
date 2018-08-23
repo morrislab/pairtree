@@ -105,19 +105,29 @@ def calc_posterior(variants, use_dummy=False, parallel=1, include_garbage_in_pos
   evidence = {}
 
   _calc_prob = _calc_dummy_prob if use_dummy else _calc_model_prob
+  #_calc_prob(variants['C24'], variants['C26'])
 
-  pairs = []
-  futures = []
-  with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
+  # Don't bother invoking all the parallelism machinery if we're only fitting a
+  # single sample at a time.
+  if parallel > 1:
+    pairs = []
+    futures = []
+    with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
+      for vidx1 in sorted(variants.keys()):
+        for vidx2 in sorted(variants.keys()):
+          pairs.append((vidx1, vidx2))
+          futures.append(ex.submit(_calc_prob, variants[vidx1], variants[vidx2]))
+      for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Computing relations', unit=' pairs', dynamic_ncols=True):
+        pass
+    for pair, F in zip(pairs, futures):
+      evidence[pair] = F.result()
+      posterior[pair] = _calc_posterior(evidence[pair], include_garbage_in_posterior, include_cocluster_in_posterior)
+  else:
     for vidx1 in sorted(variants.keys()):
       for vidx2 in sorted(variants.keys()):
-        pairs.append((vidx1, vidx2))
-        futures.append(ex.submit(_calc_prob, variants[vidx1], variants[vidx2]))
-    for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Computing relations', unit=' pairs', dynamic_ncols=True):
-      pass
-  for pair, F in zip(pairs, futures):
-    evidence[pair] = F.result()
-    posterior[pair] = _calc_posterior(evidence[pair], include_garbage_in_posterior, include_cocluster_in_posterior)
+        pair = (vidx1, vidx2)
+        evidence[pair] = _calc_prob(variants[vidx1], variants[vidx2])
+        posterior[pair] = _calc_posterior(evidence[pair], include_garbage_in_posterior, include_cocluster_in_posterior)
 
   return (posterior, evidence)
 
