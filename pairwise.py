@@ -5,6 +5,7 @@ import json
 from common import parse_ssms, Models
 import concurrent.futures
 from tqdm import tqdm
+import itertools
 
 #from numba import jit
 
@@ -123,7 +124,7 @@ def _calc_model_prob(var1, var2):
     for modelidx, model in enumerate(Models._all):
       if modelidx == Models.garbage:
         continue
-      mcsamps = 100000
+      mcsamps = 1000000
       phi1, phi2, area = _gen_samples(modelidx, S=mcsamps)
 
       logP = []
@@ -147,7 +148,20 @@ def _calc_dummy_prob(var1, var2):
   evidence = np.log(posterior)
   return (posterior, evidence)
 
-#@jit
+def swap_evidence(evidence):
+  swapped = np.zeros(len(evidence)) + np.nan
+  for midx, M in enumerate(Models._all):
+    if midx in (Models.garbage, Models.cocluster, Models.diff_branches):
+      swapped[midx] = evidence[midx]
+    elif midx == Models.A_B:
+      swapped[midx] = evidence[Models.B_A]
+    elif midx == Models.B_A:
+      swapped[midx] = evidence[Models.A_B]
+    else:
+      raise Exception('Unknown model')
+  assert not np.any(np.isnan(swapped))
+  return swapped
+
 def calc_posterior(variants, use_dummy=False, parallel=1, include_garbage_in_posterior=False, include_cocluster_in_posterior=False):
   N = len(variants)
   posterior = {}
@@ -156,28 +170,32 @@ def calc_posterior(variants, use_dummy=False, parallel=1, include_garbage_in_pos
   _calc_prob = _calc_dummy_prob if use_dummy else _calc_model_prob
   #_calc_prob(variants['C24'], variants['C26'])
 
+  combos = list(itertools.combinations(variants.keys(), 2)) + [(K,K) for K in variants.keys()]
   # Don't bother invoking all the parallelism machinery if we're only fitting a
   # single sample at a time.
   if parallel > 1:
     pairs = []
     futures = []
     with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
-      for vidx1 in sorted(variants.keys()):
-        for vidx2 in sorted(variants.keys()):
-          pairs.append((vidx1, vidx2))
-          futures.append(ex.submit(_calc_prob, variants[vidx1], variants[vidx2]))
+      for vidx1, vidx2 in combos:
+        pairs.append((vidx1, vidx2))
+        futures.append(ex.submit(_calc_prob, variants[vidx1], variants[vidx2]))
       for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Computing relations', unit=' pairs', dynamic_ncols=True):
         pass
     for pair, F in zip(pairs, futures):
       evidence[pair] = F.result()
-      posterior[pair] = _calc_posterior(evidence[pair], include_garbage_in_posterior, include_cocluster_in_posterior)
   else:
-    for vidx1 in sorted(variants.keys()):
-      for vidx2 in sorted(variants.keys()):
-        pair = (vidx1, vidx2)
-        evidence[pair] = _calc_prob(variants[vidx1], variants[vidx2])
-        posterior[pair] = _calc_posterior(evidence[pair], include_garbage_in_posterior, include_cocluster_in_posterior)
+    for vidx1, vidx2 in combos:
+      pair = (vidx1, vidx2)
+      evidence[pair] = _calc_prob(variants[vidx1], variants[vidx2])
 
+  # Duplicate evidence's keys, since we'll be modifying dictionary.
+  for A, B in list(evidence.keys()):
+    if A == B:
+      continue
+    evidence[(B,A)] = swap_evidence(evidence[(A,B)])
+  for pair in evidence.keys():
+    posterior[pair] = _calc_posterior(evidence[pair], include_garbage_in_posterior, include_cocluster_in_posterior)
   return (posterior, evidence)
 
 def generate_results(posterior, evidence, variants):

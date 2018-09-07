@@ -18,7 +18,7 @@ def create_matrix(model, model_probs, variants):
     assert 0 <= P <= 1
     vidx1, vidx2 = [int(V[1:]) for V in vids.split(',')]
     mat[(vidx1, vidx2)] = P
-  if model in ('cocluster', 'diff_branches'):
+  if model in ('garbage', 'cocluster', 'diff_branches'):
     # These should be symmetric.
     assert np.allclose(mat, mat.T)
 
