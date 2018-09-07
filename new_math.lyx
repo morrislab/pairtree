@@ -1,0 +1,197 @@
+#LyX 2.3 created this file. For more info see http://www.lyx.org/
+\lyxformat 544
+\begin_document
+\begin_header
+\save_transient_properties true
+\origin unavailable
+\textclass article
+\use_default_options true
+\maintain_unincluded_children false
+\language english
+\language_package default
+\inputencoding auto
+\fontencoding global
+\font_roman "default" "default"
+\font_sans "default" "default"
+\font_typewriter "default" "default"
+\font_math "auto" "auto"
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100 100
+\font_tt_scale 100 100
+\use_microtype false
+\use_dash_ligatures true
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize default
+\spacing single
+\use_hyperref false
+\papersize default
+\use_geometry true
+\use_package amsmath 1
+\use_package amssymb 1
+\use_package cancel 1
+\use_package esint 1
+\use_package mathdots 1
+\use_package mathtools 1
+\use_package mhchem 1
+\use_package stackrel 1
+\use_package stmaryrd 1
+\use_package undertilde 1
+\cite_engine basic
+\cite_engine_type default
+\biblio_style plain
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\justification true
+\use_refstyle 1
+\use_minted 0
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\leftmargin 0.8in
+\topmargin 0.8in
+\rightmargin 0.8in
+\bottommargin 0.8in
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation default
+\is_math_indent 0
+\math_numbering_side default
+\quotes_style english
+\dynamic_quotes 0
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Itemize
+Lemma 1:
+\begin_inset Formula 
+\begin{align*}
+Binom(x|n,p) & ={n \choose x}p^{x}(1-p)^{n-x}\\
+Beta(p|x,n-x) & =\frac{p^{x-1}(1-p)^{n-x-1}}{B(x,n-x)}\\
+ & \therefore\\
+Binom(x|n,p) & \propto Beta(p|x+1,n-x+1)\\
+\frac{Binom(x|n,p)}{Beta(p|x+1,n-x+1)} & ={n \choose x}B(x+1,n-x+1)
+\end{align*}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+Lemma 2:
+\begin_inset Formula $\int_{0}^{U}dxBeta(x|\alpha,\beta)=\frac{B(U;\alpha,\beta)}{B(\alpha,\beta)}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+Derivation of joint likelihood:
+\begin_inset Formula 
+\begin{align*}
+ & p(V_{1},R_{1},V_{2,}R_{2}|M_{i})=\int d\phi_{1}d\phi_{2}p(V_{1},R_{1},V_{2,}R_{2},\phi_{1},\phi_{2}|M_{i})\\
+ & =\int d\phi_{1}d\phi_{2}p(V_{1},R_{1}|\phi_{1})p(V_{2},R_{2}|\phi_{2})p(\phi_{1},\phi_{2}|M_{i})\\
+ & =\int d\phi_{1}d\phi_{2}p(V_{1},R_{1}|\phi_{1})p(V_{2},R_{2}|\phi_{2})p(\phi_{2}|\phi_{1},M_{i})p(\phi_{1}|M_{i})\\
+ & =\int d\phi_{1}p(V_{1},R_{1}|\phi_{1})p(\phi_{1}|M_{i})\int d\phi_{2}p(V_{2},R_{2}|\phi_{2})p(\phi_{2}|\phi_{1},M_{i})
+\end{align*}
+
+\end_inset
+
+
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+\begin_inset Formula $\text{If \ensuremath{M_{i}=\text{cocluster}:}}p(\phi_{1}|M_{i})$
+\end_inset
+
+: 
+\begin_inset Formula 
+\begin{align*}
+p(\phi_{2}|\phi_{1},M_{i})= & I(\phi_{1}=\phi_{2})\\
+p(\phi_{1}|M_{i})= & \frac{p(\phi_{1},\phi_{2}|M_{i})}{p(\phi_{2}|\phi_{1},M_{i})}=\\
+= & \frac{I(\phi_{1}=\phi_{2})}{I(\phi_{1}=\phi_{2})}\\
+= & 1\\
+p(V_{1},R_{1},V_{2,}R_{2}|M_{i})= & \int d\phi_{1}p(V_{1},R_{1}|\phi_{1})p(\phi_{1}|M_{i})\int d\phi_{2}p(V_{2},R_{2}|\phi_{2})p(\phi_{2}|\phi_{1},M_{i})\\
+= & \int d\phi_{1}p(V_{1},R_{1}|\phi_{1})p(V_{2},R_{2}|\phi_{1})\\
+= & \int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\phi_{1})Binom(V_{2}|V_{2}+R_{2},\phi_{1})
+\end{align*}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+If 
+\begin_inset Formula $M_{i}\in\{A\rightarrow B,B\rightarrow A,\text{diff\_branches\}:}$
+\end_inset
+
+
+\end_layout
+
+\end_deeper
+\begin_layout Standard
+\begin_inset Formula 
+\begin{align*}
+p(\phi_{2}|\phi_{1},M_{i}) & =\frac{1}{U_{\phi_{2}}(\phi_{1},M_{i})-L_{\phi_{2}}(\phi_{1},M_{i})}I(L_{\phi_{2}}(\phi_{1},M_{i})\leq\phi_{2}\leq U_{\phi_{2}}(\phi_{1},M_{i}))\\
+ & \text{(\ensuremath{U} and \ensuremath{L} define upper and lower bounds on \ensuremath{\phi_{2})}}\\
+p(V_{1},R_{1},V_{2,}R_{2}|M_{i}) & =\int d\phi_{1}p(V_{1},R_{1}|\phi_{1})p(\phi_{1}|M_{i})\frac{1}{U_{\phi_{2}}(\phi_{1},M_{i})-L_{\phi_{2}}(\phi_{1},M_{i})}\int_{L_{\phi_{2}}(\phi_{1},M_{i})}^{U_{\phi_{2}}(\phi_{1},M_{i})}d\phi_{2}p(V_{2},R_{2}|\phi_{2})\\
+\int d\phi_{2}p(V_{2},R_{2}|\phi_{2}) & =\int d\phi_{2}Binom(V_{2}|V_{2}+R_{2},\frac{1}{2}\phi_{2})\\
+ & =\int d\phi_{2}Beta(\frac{1}{2}\phi_{2}|V_{2}+1,R_{2}+1){V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)\\
+ & ={V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)\int d\phi_{2}Beta(\frac{1}{2}\phi_{2}|V_{2}+1,R_{2}+1)\\
+ & \text{Let \ensuremath{P_{2}=\frac{1}{2}\phi_{2}.}Then \ensuremath{\frac{dP_{2}}{d\phi_{2}}=\frac{1}{2},}and:}\\
+\int d\phi_{2}Beta(\frac{1}{2}\phi_{2}|V_{2}+1,R_{2}+1)= & 2\int\Bigg(d\phi_{2}\frac{1}{2}\Bigg)Beta(\frac{1}{2}\phi_{2}|V_{2}+1,R_{2}+1)\\
+= & 2\int dP_{2}Beta(P_{2}|V_{2}+1,R_{2}+1)\\
+\int_{L_{\phi_{2}}(\phi_{1},M_{i})}^{U_{\phi_{2}}(\phi_{1},M_{i})}d\phi_{2}p(V_{2},R_{2}|\phi_{2})= & \int_{0}^{U_{\phi_{2}}(\phi_{1},M_{i})}d\phi_{2}p(V_{2},R_{2}|\phi_{2})-\int_{0}^{L_{\phi_{2}}(\phi_{1},M_{i})}d\phi_{2}p(V_{2},R_{2}|\phi_{2})\\
+= & {V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)\\
+ & \Bigg(\int_{0}^{U_{\phi_{2}}(\phi_{1},M_{i})}d\phi_{2}Beta(\frac{1}{2}\phi_{2}|V_{2}+1,R_{2}+1)-\int_{0}^{L_{\phi_{2}}(\phi_{1},M_{i})}d\phi_{2}Beta(\frac{1}{2}\phi_{2}|V_{2}+1,R_{2}+1)\Bigg)\\
+= & {V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)\\
+ & \Bigg(2\int_{0}^{\frac{1}{2}U_{\phi_{2}}(\phi_{1},M_{i})}dP_{2}Beta(P_{2}|V_{2}+1,R_{2}+1)-2\int_{0}^{\frac{1}{2}L_{\phi_{2}}(\phi_{1},M_{i})}dP_{2}Beta(P_{2}|V_{2}+1,R_{2}+1)\Bigg)\\
+= & {V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)\frac{2}{B(V_{2}+1,R_{2}+1)}\\
+ & \Bigg(B(\frac{1}{2}U_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)-B(\frac{1}{2}L_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)\Bigg)\\
+=2 & {V_{2}+R_{2} \choose V_{2}}\Bigg(B(\frac{1}{2}U_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)-B(\frac{1}{2}L_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)\Bigg)\\
+p(\phi_{1}|M_{i}) & =\int d\phi_{2}p(\phi_{1}\phi_{2}|M_{i})\\
+ & =\int_{L_{\phi_{2}(\phi_{1},M_{i})}}^{U_{\phi_{2}(\phi_{1},M_{i})}}d\phi_{2}2\\
+ & =2\phi_{2}\Big|_{L_{\phi_{2}(\phi_{1},M_{i})}}^{U_{\phi_{2}(\phi_{1},M_{i})}}\\
+ & =2(U_{\phi_{2}}(\phi_{1},M_{i})-L_{\phi_{2}}(\phi_{1},M_{i}))\\
+\text{Alternative derivation:}\\
+p(\phi_{1},\phi_{2}|M_{i}) & =2I(0\leq\phi_{2}\leq\phi_{1}\leq1)\\
+ & =p(\phi_{2}|\phi_{1},M_{i})p(\phi_{1}|M_{i})\\
+\text{}p(\phi_{1}|M_{i}) & =\frac{p(\phi_{1},\phi_{2}|M_{i})}{p(\phi_{2}|\phi_{1},M_{i})}\\
+ & =\frac{2I(0\leq\phi_{2}\leq\phi_{1}\leq1)}{\frac{1}{U_{\phi_{2}}(\phi_{1},M_{i})-L_{\phi_{2}}(\phi_{1},M_{i})}I(0\leq\phi_{2}\leq\phi_{1}\leq1)}\\
+ & =2(U_{\phi_{2}}(\phi_{1},M_{i})-L_{\phi_{2}}(\phi_{1},M_{i}))\\
+p(V_{1},R_{1},V_{2,}R_{2}|M_{i})= & \int d\phi_{1}p(V_{1},R_{1}|\phi_{1})p(\phi_{1}|M_{i})\frac{1}{U_{\phi_{2}}(\phi_{1},M_{i})-L_{\phi_{2}}(\phi_{1},M_{i})}\int_{L_{\phi_{2}}(\phi_{1},M_{i})}^{U_{\phi_{2}}(\phi_{1},M_{i})}d\phi_{2}p(V_{2},R_{2}|\phi_{2})\\
+= & \int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\phi_{1})p(\phi_{1}|M_{i})\frac{2{V_{2}+R_{2} \choose V_{2}}}{U_{\phi_{2}}(\phi_{1},M_{i})-L_{\phi_{2}}(\phi_{1},M_{i})}\\
+ & \Bigg(B(\frac{1}{2}U_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)-B(\frac{1}{2}L_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)\Bigg)\\
+= & \int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\phi_{1})2{V_{2}+R_{2} \choose V_{2}}\\
+ & \Bigg(B(\frac{1}{2}U_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)-B(\frac{1}{2}L_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)\Bigg)
+\end{align*}
+
+\end_inset
+
+
+\end_layout
+
+\end_body
+\end_document
