@@ -1,6 +1,8 @@
 import argparse
 import os
 import numpy as np
+import scipy.integrate
+import warnings
 
 import common
 import handbuilt
@@ -66,6 +68,7 @@ def write_trees(sampid, tidx, outf):
     'SJBALL022609': [{'left': 'D', 'right': 'R1'}],
     'SJETV010steph': [{'left': 'D', 'right': 'R2'}],
     'SJBALL022610steph': [{'left': 'D', 'right': 'R1'}],
+    'SJETV010stephR1R2': [{'left': 'D', 'right': 'R1'}, {'left': 'D', 'right': 'R2'}, {'left': 'R1', 'right': 'R2'}],
   }
   if sampid not in colourings:
     colourings[sampid] = [{'left': 'D', 'right': 'R1'}]
@@ -118,15 +121,31 @@ def remove_garbage(garbage_ids, variants):
       del variants[varid]
   return garbage_variants
 
+def _munge(variants):
+  V1, V2 = variants['C0'], variants['C1']
+  for V, var, total in ((V1, 400, 1000), (V2, 100, 1000)):
+    V['var_reads'][:] = var
+    V['total_reads'][:] = total
+    V['ref_reads'] = V['total_reads'] - V['var_reads']
+    V['vaf'] = V['var_reads'] / V['total_reads']
+  return
+
+  for K in ('var_reads', 'total_reads', 'ref_reads'):
+    V2[K] *= 100.
+  V2['var_reads'] += 1
+  V2['total_reads'] += 1
+  V2['vaf'] = V2['var_reads'] / V2['total_reads']
+
 def main():
-  np.set_printoptions(threshold=np.nan, linewidth=120)
+  np.set_printoptions(linewidth=400, precision=3, threshold=np.nan, suppress=True)
   np.seterr(divide='raise', invalid='raise')
-  np.random.seed(1)
+  warnings.simplefilter('ignore', category=scipy.integrate.IntegrationWarning)
 
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('--seed', dest='seed', type=int)
   parser.add_argument('--phi-iterations', dest='phi_iterations', type=int, default=1000)
   parser.add_argument('--tree-samples', dest='tree_samples', type=int, default=1000)
   parser.add_argument('--tree-chains', dest='tree_chains', type=int, default=1)
@@ -138,6 +157,9 @@ def main():
   parser.add_argument('tree_type')
   args = parser.parse_args()
 
+  if args.seed is not None:
+    np.random.seed(args.seed)
+
   variants = common.parse_ssms(args.sampid, args.ssm_fn)
   sampnames = common.load_sampnames(args.params_fn)
   clusters = handbuilt.load_clusters(args.clusters_fn, variants, args.tree_type, sampnames)
@@ -147,14 +169,24 @@ def main():
   supervars = common.make_cluster_supervars(clusters, variants)
   superclusters = common.make_superclusters(supervars)
 
+  #svkeys = sorted(supervars.keys(), key = lambda S: int(S[1:]))
+  #supervar_vaf = np.array([supervars[S]['vaf'] for S in svkeys])
+  #supervar_vaf = np.vstack((np.ones(len(supervar_vaf[0])), supervar_vaf))
+  #S = supervar_vaf
+  #from IPython import embed
+  #embed()
+  #import sys
+  #sys.exit()
+
   adjm = handbuilt.load_tree(args.clusters_fn, args.tree_type)
+  adjm = None
   if adjm is not None:
     sampled_adjm = [adjm]
     sampled_llh = [0]
   else:
+    #_munge(supervars)
     posterior, evidence = pairwise.calc_posterior(supervars, parallel=args.parallel, include_garbage_in_posterior=False, include_cocluster_in_posterior=False)
     results = pairwise.generate_results(posterior, evidence, supervars)
-
     model_probs_tensor = create_model_prob_tensor(results)
     sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, supervars, superclusters, nsamples=args.tree_samples, nchains=args.tree_chains, parallel=args.parallel)
 
