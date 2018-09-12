@@ -4,6 +4,7 @@ import scipy.special
 import scipy.integrate
 import numpy as np
 import util
+import time
 
 def generate_logprob_phi(N):
   prob = {}
@@ -78,7 +79,7 @@ def _gen_samples(modelidx, S):
     raise Exception('Unknown model: %s' % model)
   return (phi1, phi2, area)
 
-def _calc_model_prob_binom_mcmc(var1, var2):
+def _calc_model_prob_binom_mc_2D(var1, var2):
   S = len(var1['total_reads']) # S
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
   for s in range(S):
@@ -92,6 +93,33 @@ def _calc_model_prob_binom_mcmc(var1, var2):
       for V, phi in ((var1, phi1), (var2, phi2)):
         logP.append(scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], (1 - V['mu_v'])*phi))
       logprob_models[s,modelidx] = scipy.misc.logsumexp(logP[0] + logP[1]) - np.log(mcsamps)
+
+  return logprob_models
+
+def _calc_model_prob_binom_mc_1D(V1, V2):
+  S = len(V1['total_reads']) # S
+  logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
+  for sidx in range(S):
+    for modelidx, model in enumerate(Models._all):
+      if modelidx == Models.garbage or modelidx == Models.cocluster:
+        continue
+      mcsamps = 1000000
+      phi1 = scipy.stats.uniform.rvs(loc=0, scale=1, size=mcsamps)
+
+      logP = scipy.stats.binom.logpmf(V1['var_reads'][sidx], V1['total_reads'][sidx], (1 - V1['mu_v'])*phi1)
+      logP += np.log(2)
+      logP += util.log_N_choose_K(V2['total_reads'][sidx], V2['var_reads'][sidx])
+
+      lower = _make_lower(phi1, modelidx)
+      upper = _make_upper(phi1, modelidx)
+      A = V2['var_reads'][sidx] + 1
+      B = V2['ref_reads'][sidx] + 1
+      betainc = [scipy.special.betainc(A, B, 0.5*limit) for limit in (upper, lower)]
+      logdenorm = scipy.special.betaln(V2['var_reads'][sidx] + 1, V2['ref_reads'][sidx] + 1)
+      # Add delta to ensure we don't take log of zero.
+      logP += np.log(betainc[0] - betainc[1] + 1e-300) + logdenorm
+
+      logprob_models[sidx,modelidx] = scipy.misc.logsumexp(logP) - np.log(mcsamps)
 
   return logprob_models
 
@@ -109,13 +137,8 @@ def _make_upper(phi1, midx):
     Models.diff_branches: 1 - phi1,
   }[midx]
 
-# TODO:
-# 1. Compute largest value, with phi1=VAF of V1
-# 2. Change _integral to compute via log, then add the log of the max
-# 3. Divide the integral by the max
-
-def _integral(phi1, V1, V2, sidx, midx):
-  P = scipy.stats.binom.pmf(
+def _integral(phi1, V1, V2, sidx, midx, logsub=None):
+  logP = scipy.stats.binom.logpmf(
     V1['var_reads'][sidx],
     V1['total_reads'][sidx],
     (1 - V1['mu_v'])*phi1
@@ -126,12 +149,12 @@ def _integral(phi1, V1, V2, sidx, midx):
   A = V2['var_reads'][sidx] + 1
   B = V2['ref_reads'][sidx] + 1
   betainc = [scipy.special.betainc(A, B, 0.5*limit) for limit in (upper, lower)]
-  P *= betainc[0] - betainc[1]
-  #print(Models._all[midx], phi1, lower, upper, P, sep='\t')
+  # Add delta to ensure we don't take log of zero.
+  logP += np.log(betainc[0] - betainc[1] + 1e-300)
+  if logsub is not None:
+    logP -= logsub
 
-  _integral.cnt += 1
-  return P
-_integral.cnt = 0
+  return np.exp(logP)
 
 def _calc_model_prob_binom_quad(V1, V2):
   S = len(V1['total_reads']) # S
@@ -148,16 +171,25 @@ def _calc_model_prob_binom_quad(V1, V2):
         P = np.maximum(1e-100, P)
         logprob_models[sidx,modelidx] = np.log(P)
       else:
-        P, P_error, info = scipy.integrate.quad(_integral, 0, 1, args=(V1, V2, sidx, modelidx), full_output=1)
-        #from IPython import embed
-        #embed()
-        logdenorm = scipy.special.betaln(V1['var_reads'][sidx] + 1, V2['ref_reads'][sidx] + 1)
-        P = np.maximum(np.e**-300, P)
-        #print('pants', Models._all[modelidx], P, logdenorm, util.log_N_choose_K(V2['total_reads'][sidx], V2['var_reads'][sidx]))
+        logmaxP = np.log(_integral(V1['vaf'][sidx], V1, V2, sidx, modelidx) + 1e-300)
+        P, P_error = scipy.integrate.quad(_integral, 0, 1, args=(V1, V2, sidx, modelidx, logmaxP))
+        logdenorm = scipy.special.betaln(V2['var_reads'][sidx] + 1, V2['ref_reads'][sidx] + 1)
+        P = np.maximum(np.exp(-300), P)
         # TODO: this factor of 2 is presumably wrong when mu_v != 1/2
-        logP = np.log(P) + logdenorm + np.log(2) + util.log_N_choose_K(V2['total_reads'][sidx], V2['var_reads'][sidx])
+        logP = np.log(P) + logmaxP + logdenorm + np.log(2) + util.log_N_choose_K(V2['total_reads'][sidx], V2['var_reads'][sidx])
         logprob_models[sidx,modelidx] = logP
   return logprob_models
+
+def time_exec(f):
+  def wrap(*args):
+    time1 = time.time()
+    ret = f(*args)
+    time2 = time.time()
+    ms = (time2-time1)*1000.0
+    time_exec._ms = ms
+    return ret
+  return wrap
+time_exec._ms = None
 
 def main():
   np.set_printoptions(linewidth=400, precision=3, threshold=np.nan, suppress=True)
@@ -166,15 +198,22 @@ def main():
   V1 = {'var_reads': np.array([1702]), 'total_reads': np.array([4069])}
   V2 = {'var_reads': np.array([2500]), 'total_reads': np.array([19100])}
   for V in (V1, V2):
-    V['var_reads'] = (V['var_reads'] / 100).astype(np.int)
-    V['total_reads'] = (V['total_reads'] / 100).astype(np.int)
+    V['var_reads'] = (V['var_reads'] / 10).astype(np.int)
+    V['total_reads'] = (V['total_reads'] / 10).astype(np.int)
     V['mu_v'] = 0.5
     V['ref_reads'] = V['total_reads'] - V['var_reads']
     V['vaf'] = V['var_reads'].astype(np.float) / V['total_reads']
     print(V['vaf'])
 
-  for M in (_calc_model_prob_binom_quad, _calc_model_prob_binom_mcmc, _calc_model_prob_binom_grid):
+  for M in (
+    _calc_model_prob_binom_quad,
+    _calc_model_prob_binom_mc_1D,
+    _calc_model_prob_binom_mc_2D,
+    _calc_model_prob_binom_grid,
+  ):
+    M_name = M.__name__
+    M = time_exec(M)
     model_prob = M(V1, V2)
-    print(M.__name__, model_prob)
+    print(M_name, '%.3f ms' % time_exec._ms, model_prob, sep='\t')
 
 main()
