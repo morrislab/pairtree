@@ -25,7 +25,13 @@ def main():
     V['mu_v'] = 0.5
     V['ref_reads'] = V['total_reads'] - V['var_reads']
     V['vaf'] = V['var_reads'].astype(np.float) / V['total_reads']
-    print(V['vaf'])
+
+  S = 1
+  for V, var, total in ((V1, [40], [100]), (V2, [10], [100])):
+    V['var_reads'] = np.array(S * var) / 10
+    V['total_reads'] = np.array(S * total) / 10
+    V['ref_reads'] = V['total_reads'] - V['var_reads']
+    V['vaf'] = V['var_reads'] / V['total_reads']
 
   for M in (
     lh.calc_lh_binom_quad,
@@ -36,6 +42,6 @@ def main():
     M_name = M.__name__
     M = time_exec(M)
     model_prob = M(V1, V2)
-    print(M_name, '%.3f ms' % time_exec._ms, model_prob, sep='\t')
+    print(M_name, '%.3f ms' % time_exec._ms, np.sum(model_prob, axis=0), sep='\t')
 
 main()
