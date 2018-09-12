@@ -6,6 +6,7 @@ import itertools
 
 from common import Models
 import lh
+import util
 
 def swap_evidence(evidence):
   swapped = np.zeros(len(evidence)) + np.nan
@@ -40,7 +41,6 @@ def _calc_posterior(evidence, include_garbage, include_cocluster):
   return posterior
 
 def calc_posterior(variants, parallel=1, include_garbage_in_posterior=False, include_cocluster_in_posterior=False):
-  #return test_calc_lh(variants['C0'], variants['C1'])
   N = len(variants)
   posterior = {}
   evidence = {}
@@ -81,7 +81,7 @@ def calc_lh(V1, V2, _calc_lh=lh.calc_lh_binom_quad):
     # If they're the same variant, they should cocluster with certainty.
     evidence = -np.inf * np.ones(len(Models._all))
     evidence[Models.cocluster] = 0
-    return evidence
+    return (evidence, evidence)
 
   evidence_per_sample = _calc_lh(V1, V2)
   garb1, garb2 = [scipy.stats.randint.logpmf(V['var_reads'], 0, V['var_reads'] + V['total_reads'] + 1) for V in (V1, V2)]
@@ -103,10 +103,12 @@ def test_calc_lh(V1, V2):
     lh.calc_lh_binom_mc_2D,
     lh.calc_lh_binom_grid,
   ):
+    M_name = M.__name__
+    M = util.time_exec(M)
     evidence, evidence_per_sample = calc_lh(V1, V2, _calc_lh=M)
-    records['evidence'][M.__name__] = evidence
-    records['norm_evidence'][M.__name__] = evidence - np.max(evidence)
-    records['posterior'][M.__name__] = _calc_posterior(evidence, include_garbage=True, include_cocluster=False)
+    records['evidence'][M_name] = evidence
+    records['norm_evidence'][M_name] = evidence - np.max(evidence)
+    records['posterior'][M_name] = _calc_posterior(evidence, include_garbage=True, include_cocluster=False)
 
     sep = np.zeros(len(evidence_per_sample))[:,None] + np.nan
     combined = np.hstack((
@@ -120,10 +122,10 @@ def test_calc_lh(V1, V2):
       sep,
       evidence_per_sample - np.max(evidence_per_sample, axis=1)[:,None],
     ))
-    print(M.__name__)
+    print(M_name, '(%.3f ms)' % util.time_exec._ms)
     print(combined)
     for J in sorted(records.keys()):
-      print(J, records[J][M.__name__], sep='\t')
+      print(J, records[J][M_name], sep='\t')
     print()
 
   for K in inputs.keys():

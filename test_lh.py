@@ -1,17 +1,6 @@
-import time
 import numpy as np
 import lh
-
-def time_exec(f):
-  def wrap(*args):
-    time1 = time.time()
-    ret = f(*args)
-    time2 = time.time()
-    ms = (time2-time1)*1000.0
-    time_exec._ms = ms
-    return ret
-  return wrap
-time_exec._ms = None
+import util
 
 def main():
   np.set_printoptions(linewidth=400, precision=3, threshold=np.nan, suppress=True)
@@ -40,8 +29,8 @@ def main():
     lh.calc_lh_binom_grid,
   ):
     M_name = M.__name__
-    M = time_exec(M)
+    M = util.time_exec(M)
     model_prob = M(V1, V2)
-    print(M_name, '%.3f ms' % time_exec._ms, np.sum(model_prob, axis=0), sep='\t')
+    print(M_name, '%.3f ms' % util.time_exec._ms, np.sum(model_prob, axis=0), sep='\t')
 
 main()

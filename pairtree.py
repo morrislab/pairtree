@@ -150,6 +150,7 @@ def main():
   parser.add_argument('--tree-samples', dest='tree_samples', type=int, default=1000)
   parser.add_argument('--tree-chains', dest='tree_chains', type=int, default=1)
   parser.add_argument('--parallel', dest='parallel', type=int, default=1)
+  parser.add_argument('--run-tests', dest='run_tests', action='store_true')
   parser.add_argument('sampid')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
@@ -178,13 +179,17 @@ def main():
   #import sys
   #sys.exit()
 
+  if args.run_tests:
+    #_munge(supervars)
+    pairwise.test_calc_lh(supervars['C0'], supervars['C1'])
+    return
+
   adjm = handbuilt.load_tree(args.clusters_fn, args.tree_type)
   adjm = None
   if adjm is not None:
     sampled_adjm = [adjm]
     sampled_llh = [0]
   else:
-    #_munge(supervars)
     posterior, evidence = pairwise.calc_posterior(supervars, parallel=args.parallel, include_garbage_in_posterior=False, include_cocluster_in_posterior=False)
     results = pairwise.generate_results(posterior, evidence, supervars)
     model_probs_tensor = create_model_prob_tensor(results)
