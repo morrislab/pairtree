@@ -4,7 +4,6 @@ import scipy.special
 import scipy.integrate
 import numpy as np
 import util
-import time
 
 def generate_logprob_phi(N):
   prob = {}
@@ -37,7 +36,7 @@ def generate_logprob_phi(N):
 
   return logprob
 
-def _calc_model_prob_binom_grid(var1, var2):
+def calc_lh_binom_grid(var1, var2):
   grid_step = 0.001
   N = 3*int(1/grid_step + 1) # N: number of grid points
   G = np.linspace(start=0, stop=1, num=N)[:,np.newaxis] # Nx1
@@ -79,7 +78,7 @@ def _gen_samples(modelidx, S):
     raise Exception('Unknown model: %s' % model)
   return (phi1, phi2, area)
 
-def _calc_model_prob_binom_mc_2D(var1, var2):
+def calc_lh_binom_mc_2D(var1, var2):
   S = len(var1['total_reads']) # S
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
   for s in range(S):
@@ -96,7 +95,7 @@ def _calc_model_prob_binom_mc_2D(var1, var2):
 
   return logprob_models
 
-def _calc_model_prob_binom_mc_1D(V1, V2):
+def calc_lh_binom_mc_1D(V1, V2):
   S = len(V1['total_reads']) # S
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
   for sidx in range(S):
@@ -156,7 +155,7 @@ def _integral(phi1, V1, V2, sidx, midx, logsub=None):
 
   return np.exp(logP)
 
-def _calc_model_prob_binom_quad(V1, V2):
+def calc_lh_binom_quad(V1, V2):
   S = len(V1['total_reads']) # S
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
   for sidx in range(S):
@@ -179,41 +178,3 @@ def _calc_model_prob_binom_quad(V1, V2):
         logP = np.log(P) + logmaxP + logdenorm + np.log(2) + util.log_N_choose_K(V2['total_reads'][sidx], V2['var_reads'][sidx])
         logprob_models[sidx,modelidx] = logP
   return logprob_models
-
-def time_exec(f):
-  def wrap(*args):
-    time1 = time.time()
-    ret = f(*args)
-    time2 = time.time()
-    ms = (time2-time1)*1000.0
-    time_exec._ms = ms
-    return ret
-  return wrap
-time_exec._ms = None
-
-def main():
-  np.set_printoptions(linewidth=400, precision=3, threshold=np.nan, suppress=True)
-  np.seterr(divide='raise', invalid='raise')
-
-  V1 = {'var_reads': np.array([1702]), 'total_reads': np.array([4069])}
-  V2 = {'var_reads': np.array([2500]), 'total_reads': np.array([19100])}
-  for V in (V1, V2):
-    V['var_reads'] = (V['var_reads'] / 10).astype(np.int)
-    V['total_reads'] = (V['total_reads'] / 10).astype(np.int)
-    V['mu_v'] = 0.5
-    V['ref_reads'] = V['total_reads'] - V['var_reads']
-    V['vaf'] = V['var_reads'].astype(np.float) / V['total_reads']
-    print(V['vaf'])
-
-  for M in (
-    _calc_model_prob_binom_quad,
-    _calc_model_prob_binom_mc_1D,
-    _calc_model_prob_binom_mc_2D,
-    _calc_model_prob_binom_grid,
-  ):
-    M_name = M.__name__
-    M = time_exec(M)
-    model_prob = M(V1, V2)
-    print(M_name, '%.3f ms' % time_exec._ms, model_prob, sep='\t')
-
-main()
