@@ -1,6 +1,10 @@
 import numpy as np
 import lh
 import util
+import common
+
+def softmax(V):
+  return np.exp(V) / np.sum(np.exp(V))
 
 def main():
   np.set_printoptions(linewidth=400, precision=3, threshold=np.nan, suppress=True)
@@ -16,9 +20,9 @@ def main():
     V['vaf'] = V['var_reads'].astype(np.float) / V['total_reads']
 
   S = 1
-  for V, var, total in ((V1, [40], [100]), (V2, [10], [100])):
-    V['var_reads'] = np.array(S * var) / 10
-    V['total_reads'] = np.array(S * total) / 10
+  for V, var, total in ((V1, [500], [1000]), (V2, [100], [1000])):
+    V['var_reads'] = np.array(S * var)
+    V['total_reads'] = np.array(S * total)
     V['ref_reads'] = V['total_reads'] - V['var_reads']
     V['vaf'] = V['var_reads'] / V['total_reads']
 
@@ -30,7 +34,15 @@ def main():
   ):
     M_name = M.__name__
     M = util.time_exec(M)
-    model_prob = M(V1, V2)
-    print(M_name, '%.3f ms' % util.time_exec._ms, np.sum(model_prob, axis=0), sep='\t')
+    evidence_per_sample = M(V1, V2)
+    evidence_per_sample[:,common.Models.garbage] = -np.inf
+    evidence = np.sum(evidence_per_sample, axis=0)
+    print(
+      M_name,
+      '%.3f ms' % util.time_exec._ms,
+      evidence,
+      softmax(evidence),
+      sep='\t',
+    )
 
 main()
