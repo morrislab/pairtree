@@ -1,7 +1,10 @@
 RESULTSDIR=~/tmp/pairtree
 PROTDIR=~/work/pairtree
 DATADIR=~/work/steph/data
+
 PARALLEL=15
+TREE_SAMPLES=1000
+PHI_ITERATIONS=10000
 
 function make_trees {
   for treetype in patient xeno; do
@@ -19,14 +22,15 @@ function make_trees {
       runid=$(basename $ssmfn | cut -d. -f1)
       echo "cd $OUTDIR && " \
         "python3 $PROTDIR/pairtree.py" \
-        "--tree-samples 1000" \
-        "--phi-iterations 10000" \
+        "--tree-samples $TREE_SAMPLES" \
+        "--phi-iterations $PHI_ITERATIONS" \
         "--tree-chains $PARALLEL" \
         "--parallel $PARALLEL" \
           "$runid" \
           "$INPUTSDIR/$runid.{sampled.ssm,params.json}" \
           "$DATADIR/handbuilt_trees/$runid.json handbuilt.$treetype" \
-          ">$runid.stdout"
+          ">$runid.stdout" \
+          "2>$runid.stderr"
     done
   done | parallel -j3 --halt 1
 }

@@ -12,6 +12,7 @@ import json
 import tree_sampler
 import phi_fitter
 import vaf_plotter
+import relation_plotter
 
 def create_matrix(model, model_probs, variants):
   N = len(variants)
@@ -61,6 +62,7 @@ def write_header(sampid, outf):
   print('<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">', file=outf)
   print('<h1>%s</h1>' % sampid, file=outf)
   print('<style type="text/css">%s</style>' % read_file('tree.css'), file=outf)
+  print('<style type="text/css">%s</style>' % read_file('matrix.css'), file=outf)
   print('<style type="text/css">td, th, table { padding: 5px; margin: 0; border-collapse: collapse; font-weight: normal; } span { visibility: hidden; } td:hover > span { visibility: visible; } .highlighted { background-color: black !important; color: white; }</style>', file=outf)
 
 def write_trees(sampid, tidx, outf):
@@ -213,6 +215,7 @@ def main():
     write_header(args.sampid, outf)
     write_trees(args.sampid, len(sampled_adjm) - 1, outf)
     write_phi_matrix(args.sampid, outf)
+    relation_plotter.plot_ml_relations(model_probs_tensor, outf)
     vaf_plotter.plot_vaf_matrix(args.sampid, clusters, variants, supervars, garbage_variants, phi[-1], sampnames, None, False, outf)
 
   print_error(phi[-1], supervars, sampled_llh[-1])
