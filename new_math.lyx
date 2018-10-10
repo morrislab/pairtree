@@ -134,7 +134,7 @@ p(\phi_{1}|M_{i})= & \frac{p(\phi_{1},\phi_{2}|M_{i})}{p(\phi_{2}|\phi_{1},M_{i}
 = & 1\\
 p(V_{1},R_{1},V_{2,}R_{2}|M_{i})= & \int d\phi_{1}p(V_{1},R_{1}|\phi_{1})p(\phi_{1}|M_{i})\int d\phi_{2}p(V_{2},R_{2}|\phi_{2})p(\phi_{2}|\phi_{1},M_{i})\\
 = & \int d\phi_{1}p(V_{1},R_{1}|\phi_{1})p(V_{2},R_{2}|\phi_{1})\\
-= & \int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\phi_{1})Binom(V_{2}|V_{2}+R_{2},\phi_{1})
+= & \int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\frac{\phi_{1}}{2})Binom(V_{2}|V_{2}+R_{2},\frac{\phi_{1}}{2})
 \end{align*}
 
 \end_inset
@@ -178,13 +178,15 @@ p(\phi_{1}|M_{i}) & =\int d\phi_{2}p(\phi_{1}\phi_{2}|M_{i})\\
 \text{Alternative derivation:}\\
 p(\phi_{1},\phi_{2}|M_{i}) & =2I(0\leq\phi_{2}\leq\phi_{1}\leq1)\\
  & =p(\phi_{2}|\phi_{1},M_{i})p(\phi_{1}|M_{i})\\
-\text{}p(\phi_{1}|M_{i}) & =\frac{p(\phi_{1},\phi_{2}|M_{i})}{p(\phi_{2}|\phi_{1},M_{i})}\\
+p(\phi_{1}|M_{i}) & =\frac{p(\phi_{1},\phi_{2}|M_{i})}{p(\phi_{2}|\phi_{1},M_{i})}\\
  & =\frac{2I(0\leq\phi_{2}\leq\phi_{1}\leq1)}{\frac{1}{U_{\phi_{2}}(\phi_{1},M_{i})-L_{\phi_{2}}(\phi_{1},M_{i})}I(0\leq\phi_{2}\leq\phi_{1}\leq1)}\\
  & =2(U_{\phi_{2}}(\phi_{1},M_{i})-L_{\phi_{2}}(\phi_{1},M_{i}))\\
 p(V_{1},R_{1},V_{2,}R_{2}|M_{i})= & \int d\phi_{1}p(V_{1},R_{1}|\phi_{1})p(\phi_{1}|M_{i})\frac{1}{U_{\phi_{2}}(\phi_{1},M_{i})-L_{\phi_{2}}(\phi_{1},M_{i})}\int_{L_{\phi_{2}}(\phi_{1},M_{i})}^{U_{\phi_{2}}(\phi_{1},M_{i})}d\phi_{2}p(V_{2},R_{2}|\phi_{2})\\
-= & \int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\phi_{1})p(\phi_{1}|M_{i})\frac{2{V_{2}+R_{2} \choose V_{2}}}{U_{\phi_{2}}(\phi_{1},M_{i})-L_{\phi_{2}}(\phi_{1},M_{i})}\\
+= & \int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\frac{\phi_{1}}{2})p(\phi_{1}|M_{i})\frac{2{V_{2}+R_{2} \choose V_{2}}}{U_{\phi_{2}}(\phi_{1},M_{i})-L_{\phi_{2}}(\phi_{1},M_{i})}\\
  & \Bigg(B(\frac{1}{2}U_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)-B(\frac{1}{2}L_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)\Bigg)\\
-= & \int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\phi_{1})2{V_{2}+R_{2} \choose V_{2}}\\
+= & \int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\frac{\phi_{1}}{2})2{V_{2}+R_{2} \choose V_{2}}\\
+ & \Bigg(B(\frac{1}{2}U_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)-B(\frac{1}{2}L_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)\Bigg)\\
+= & 2{V_{2}+R_{2} \choose V_{2}}\int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\frac{\phi_{1}}{2})\\
  & \Bigg(B(\frac{1}{2}U_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)-B(\frac{1}{2}L_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)\Bigg)
 \end{align*}
 
