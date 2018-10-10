@@ -1,6 +1,8 @@
 import argparse
 import os
 import numpy as np
+import scipy.integrate
+import warnings
 
 import common
 import handbuilt
@@ -10,6 +12,7 @@ import json
 import tree_sampler
 import phi_fitter
 import vaf_plotter
+import relation_plotter
 
 def create_matrix(model, model_probs, variants):
   N = len(variants)
@@ -18,7 +21,7 @@ def create_matrix(model, model_probs, variants):
     assert 0 <= P <= 1
     vidx1, vidx2 = [int(V[1:]) for V in vids.split(',')]
     mat[(vidx1, vidx2)] = P
-  if model in ('cocluster', 'diff_branches'):
+  if model in ('garbage', 'cocluster', 'diff_branches'):
     # These should be symmetric.
     assert np.allclose(mat, mat.T)
 
@@ -59,6 +62,7 @@ def write_header(sampid, outf):
   print('<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">', file=outf)
   print('<h1>%s</h1>' % sampid, file=outf)
   print('<style type="text/css">%s</style>' % read_file('tree.css'), file=outf)
+  print('<style type="text/css">%s</style>' % read_file('matrix.css'), file=outf)
   print('<style type="text/css">td, th, table { padding: 5px; margin: 0; border-collapse: collapse; font-weight: normal; } span { visibility: hidden; } td:hover > span { visibility: visible; } .highlighted { background-color: black !important; color: white; }</style>', file=outf)
 
 def write_trees(sampid, tidx, outf):
@@ -66,6 +70,7 @@ def write_trees(sampid, tidx, outf):
     'SJBALL022609': [{'left': 'D', 'right': 'R1'}],
     'SJETV010steph': [{'left': 'D', 'right': 'R2'}],
     'SJBALL022610steph': [{'left': 'D', 'right': 'R1'}],
+    'SJETV010stephR1R2': [{'left': 'D', 'right': 'R1'}, {'left': 'D', 'right': 'R2'}, {'left': 'R1', 'right': 'R2'}],
   }
   if sampid not in colourings:
     colourings[sampid] = [{'left': 'D', 'right': 'R1'}]
@@ -118,25 +123,45 @@ def remove_garbage(garbage_ids, variants):
       del variants[varid]
   return garbage_variants
 
+def _munge(variants):
+  V1, V2 = variants['C0'], variants['C1']
+  for V, var, total in ((V1, 400, 1000), (V2, 100, 1000)):
+    V['var_reads'][:] = var
+    V['total_reads'][:] = total
+    V['ref_reads'] = V['total_reads'] - V['var_reads']
+    V['vaf'] = V['var_reads'] / V['total_reads']
+  return
+
+  for K in ('var_reads', 'total_reads', 'ref_reads'):
+    V2[K] *= 100.
+  V2['var_reads'] += 1
+  V2['total_reads'] += 1
+  V2['vaf'] = V2['var_reads'] / V2['total_reads']
+
 def main():
-  np.set_printoptions(threshold=np.nan, linewidth=120)
+  np.set_printoptions(linewidth=400, precision=3, threshold=np.nan, suppress=True)
   np.seterr(divide='raise', invalid='raise')
-  np.random.seed(1)
+  warnings.simplefilter('ignore', category=scipy.integrate.IntegrationWarning)
 
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('--seed', dest='seed', type=int)
   parser.add_argument('--phi-iterations', dest='phi_iterations', type=int, default=1000)
   parser.add_argument('--tree-samples', dest='tree_samples', type=int, default=1000)
   parser.add_argument('--tree-chains', dest='tree_chains', type=int, default=1)
   parser.add_argument('--parallel', dest='parallel', type=int, default=1)
+  parser.add_argument('--run-tests', dest='run_tests', action='store_true')
   parser.add_argument('sampid')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
   parser.add_argument('clusters_fn')
   parser.add_argument('tree_type')
   args = parser.parse_args()
+
+  if args.seed is not None:
+    np.random.seed(args.seed)
 
   variants = common.parse_ssms(args.sampid, args.ssm_fn)
   sampnames = common.load_sampnames(args.params_fn)
@@ -147,14 +172,28 @@ def main():
   supervars = common.make_cluster_supervars(clusters, variants)
   superclusters = common.make_superclusters(supervars)
 
+  #svkeys = sorted(supervars.keys(), key = lambda S: int(S[1:]))
+  #supervar_vaf = np.array([supervars[S]['vaf'] for S in svkeys])
+  #supervar_vaf = np.vstack((np.ones(len(supervar_vaf[0])), supervar_vaf))
+  #S = supervar_vaf
+  #from IPython import embed
+  #embed()
+  #import sys
+  #sys.exit()
+
+  if args.run_tests:
+    #_munge(supervars)
+    pairwise.test_calc_lh(supervars['C0'], supervars['C1'])
+    return
+
   adjm = handbuilt.load_tree(args.clusters_fn, args.tree_type)
+  adjm = None
   if adjm is not None:
     sampled_adjm = [adjm]
     sampled_llh = [0]
   else:
     posterior, evidence = pairwise.calc_posterior(supervars, parallel=args.parallel, include_garbage_in_posterior=False, include_cocluster_in_posterior=False)
     results = pairwise.generate_results(posterior, evidence, supervars)
-
     model_probs_tensor = create_model_prob_tensor(results)
     sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, supervars, superclusters, nsamples=args.tree_samples, nchains=args.tree_chains, parallel=args.parallel)
 
@@ -176,6 +215,7 @@ def main():
     write_header(args.sampid, outf)
     write_trees(args.sampid, len(sampled_adjm) - 1, outf)
     write_phi_matrix(args.sampid, outf)
+    relation_plotter.plot_ml_relations(model_probs_tensor, outf)
     vaf_plotter.plot_vaf_matrix(args.sampid, clusters, variants, supervars, garbage_variants, phi[-1], sampnames, None, False, outf)
 
   print_error(phi[-1], supervars, sampled_llh[-1])

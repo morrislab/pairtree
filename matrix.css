@@ -1,0 +1,16 @@
+.matrix, .matrix td {
+  padding: 5px; margin: 0;
+  border-collapse: collapse;
+}
+
+.matrix span {
+  visibility: hidden;
+}
+
+.matrix td:hover > span {
+  visibility: visible;
+}
+
+.matrix th {
+  font-weight: bold;
+}

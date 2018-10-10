@@ -2,13 +2,15 @@ RESULTSDIR=~/tmp/pairtree
 PROTDIR=~/work/pairtree
 DATADIR=~/work/steph/data
 
+PARALLEL=15
+TREE_SAMPLES=1000
+PHI_ITERATIONS=10000
+
 function make_trees {
-  #for treetype in patient xeno; do
-  for treetype in xeno; do
+  for treetype in patient xeno; do
     OUTDIR=$RESULTSDIR/$treetype
     rm -f $OUTDIR/SJ*.{html,json,csv,stdout}
     mkdir -p $OUTDIR
-    cd $OUTDIR
 
     if [[ $treetype == "xeno" ]]; then
       INPUTSDIR=$DATADIR/inputs/steph.xenos.nocns
@@ -18,16 +20,25 @@ function make_trees {
 
     for ssmfn in $INPUTSDIR/SJ*.sampled.ssm; do
       runid=$(basename $ssmfn | cut -d. -f1)
-      echo "python3 $PROTDIR/pairtree.py" \
-        "--tree-samples 1000" \
-        "--phi-iterations 10000" \
-        "--tree-chains 20" \
-        "--parallel 20" \
+      echo "cd $OUTDIR && " \
+        "python3 $PROTDIR/pairtree.py" \
+        "--tree-samples $TREE_SAMPLES" \
+        "--phi-iterations $PHI_ITERATIONS" \
+        "--tree-chains $PARALLEL" \
+        "--parallel $PARALLEL" \
           "$runid" \
           "$INPUTSDIR/$runid.{sampled.ssm,params.json}" \
           "$DATADIR/handbuilt_trees/$runid.json handbuilt.$treetype" \
-          ">$runid.stdout"
-    done | grep -e SJETV010steph -e SJBALL022610steph | parallel -j6 --halt 1
+          ">$runid.stdout" \
+          "2>$runid.stderr"
+    done
+  done | parallel -j3 --halt 1
+}
+
+function write_indices {
+  for treetype in patient xeno; do
+    OUTDIR=$RESULTSDIR/$treetype
+    cd $OUTDIR
 
     for stdoutfn in *.stdout; do
       runid=$(basename $stdoutfn | cut -d. -f1)
@@ -53,8 +64,29 @@ function make_trees {
   done
 }
 
+function tweak_clusters {
+  for treetype in xeno patient; do
+    if [[ $treetype == "xeno" ]]; then
+      INPUTSDIR=$DATADIR/inputs/steph.xenos.nocns
+    else
+      INPUTSDIR=$DATADIR/inputs/steph.vanilla
+    fi
+    for sampid in SJBALL022610steph SJETV010stephR1R2; do
+      hb=$DATADIR/handbuilt_trees/$sampid.json
+      echo python3 $PROTDIR/tweak_clusters.py \
+        $sampid \
+        $INPUTSDIR/$sampid.sampled.ssm \
+        $hb \
+        $treetype \
+        $hb
+    done
+  done #| bash
+}
+
 function main {
+  #tweak_clusters
   make_trees
+  write_indices
 }
 
 main
