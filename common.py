@@ -1,9 +1,13 @@
 import csv
 import numpy as np
-import sklearn.cluster
 from collections import namedtuple
 import vaf_correcter
 import json
+
+import warnings
+with warnings.catch_warnings():
+  warnings.simplefilter('ignore', category=DeprecationWarning)
+  import sklearn.cluster
 
 class Models:
   _all = ('garbage', 'cocluster', 'A_B', 'B_A', 'diff_branches')
