@@ -50,8 +50,8 @@ def generate_mutlist(variants):
       'name': var['name'],
       'ref_reads': list(var['ref_reads']),
       'total_reads': list(var['total_reads']),
-      'expected_ref_in_ref': 0.999,     # Dummy value
-      'expected_ref_in_variant': 0.499, # Dummy value
+      'expected_ref_in_ref': var['mu_r'],
+      'expected_ref_in_variant': var['mu_v'],
     }
 
   return mutlist
