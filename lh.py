@@ -5,7 +5,7 @@ import scipy.integrate
 import numpy as np
 import util
 
-_LOGEPSILON = -300
+_LOGEPSILON = -400
 _EPSILON    = np.exp(_LOGEPSILON)
 
 def generate_logprob_phi(N):
@@ -48,25 +48,26 @@ def calc_lh_binom_grid(var1, var2):
 
   for s in range(S):
     for modelidx in logprob_phi.keys():
-      pv1, pv2 = [scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], np.minimum(1., (1 - V['mu_v'])*G)) for V in (var1, var2)] # Nx1
+      pv1, pv2 = [scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], (1 - V['mu_v'])*G) for V in (var1, var2)] # Nx1
       p1 = np.tile(pv1, N)   # pv1 vector tiled as columns
-      p2 = np.tile(pv2, N).T # pv1 vector tiled as rows
+      p2 = np.tile(pv2, N).T # pv2 vector tiled as rows
       P = p1 + p2 + logprob_phi[modelidx]
-      logprob_models[s,modelidx] = scipy.misc.logsumexp(P)
+      logprob_models[s,modelidx] = scipy.special.logsumexp(P)
 
   return logprob_models
 
 def _gen_samples(modelidx, S):
+  U = scipy.stats.uniform.rvs(loc=0, scale=1, size=S)
   if modelidx == Models.A_B:
-    phi1 = scipy.stats.uniform.rvs(loc=0, scale=1, size=S)
-    phi2 = scipy.stats.uniform.rvs(loc=0, scale=phi1, size=S)
-    area = 0.5
-  elif modelidx == Models.B_A:
-    phi2 = scipy.stats.uniform.rvs(loc=0, scale=1, size=S)
+    phi2 = np.sqrt(U)
     phi1 = scipy.stats.uniform.rvs(loc=0, scale=phi2, size=S)
     area = 0.5
+  elif modelidx == Models.B_A:
+    phi1 = np.sqrt(U)
+    phi2 = scipy.stats.uniform.rvs(loc=0, scale=phi1, size=S)
+    area = 0.5
   elif modelidx == Models.diff_branches:
-    phi1 = scipy.stats.uniform.rvs(loc=0, scale=1, size=S)
+    phi1 = 1 - np.sqrt(1 - U)
     phi2 = scipy.stats.uniform.rvs(loc=0, scale=(1 - phi1), size=S)
     area = 0.5
   elif modelidx == Models.cocluster:
@@ -88,7 +89,7 @@ def calc_lh_binom_mc_2D(var1, var2):
       logP = []
       for V, phi in ((var1, phi1), (var2, phi2)):
         logP.append(scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], (1 - V['mu_v'])*phi))
-      logprob_models[s,modelidx] = scipy.misc.logsumexp(logP[0] + logP[1]) - np.log(mcsamps)
+      logprob_models[s,modelidx] = scipy.special.logsumexp(logP[0] + logP[1]) - np.log(mcsamps)
 
   return logprob_models
 
@@ -104,7 +105,7 @@ def calc_lh_binom_mc_1D(V1, V2):
         logP = []
         for V in (V1, V2):
           logP.append(scipy.stats.binom.logpmf(V['var_reads'][sidx], V['total_reads'][sidx], (1 - V['mu_v'])*phi1))
-        logprob_models[sidx,modelidx] = scipy.misc.logsumexp(logP[0] + logP[1]) - np.log(mcsamps)
+        logprob_models[sidx,modelidx] = scipy.special.logsumexp(logP[0] + logP[1]) - np.log(mcsamps)
       else:
         logP = scipy.stats.binom.logpmf(V1['var_reads'][sidx], V1['total_reads'][sidx], (1 - V1['mu_v'])*phi1)
         logP += np.log(2)
@@ -114,28 +115,38 @@ def calc_lh_binom_mc_1D(V1, V2):
         upper = _make_upper(phi1, modelidx)
         A = V2['var_reads'][sidx] + 1
         B = V2['ref_reads'][sidx] + 1
+
         betainc = [scipy.special.betainc(A, B, 0.5*limit) for limit in (upper, lower)]
         logdenorm = scipy.special.betaln(V2['var_reads'][sidx] + 1, V2['ref_reads'][sidx] + 1)
         # Add delta to ensure we don't take log of zero.
         logP += np.log(betainc[0] - betainc[1] + _EPSILON) + logdenorm
 
-        logprob_models[sidx,modelidx] = scipy.misc.logsumexp(logP) - np.log(mcsamps)
+        logprob_models[sidx,modelidx] = scipy.special.logsumexp(logP) - np.log(mcsamps)
 
   return logprob_models
 
+def R(X, A, B, Z):
+  K = int(0.5 * X)
+  if X % 2 == 0:
+    return np.log(K) + np.log(B - K) + np.log(Z) - np.log(A + 2*K - 1) - np.log(A + 2*K)
+  else:
+    return np.log(A + K) + np.log(A + B + K) + np.log(Z) - np.log(A + 2*K) - np.log(A + 2*K + 1)
+
 def _make_lower(phi1, midx):
-  return {
+  ret = {
     Models.A_B: 0,
     Models.B_A: phi1,
     Models.diff_branches: 0,
   }[midx]
+  return np.broadcast_to(ret, np.array(phi1).shape)
 
 def _make_upper(phi1, midx):
-  return {
+  ret = {
     Models.A_B: phi1,
     Models.B_A: 1,
     Models.diff_branches: 1 - phi1,
   }[midx]
+  return np.broadcast_to(ret, np.array(phi1).shape)
 
 def _integral_separate_clusters(phi1, V1, V2, sidx, midx, logsub=None):
   logP = scipy.stats.binom.logpmf(
