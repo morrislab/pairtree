@@ -37,7 +37,7 @@ def generate_logprob_phi(N):
 
   return logprob
 
-def calc_lh_binom_grid(var1, var2):
+def calc_lh_grid(var1, var2):
   grid_step = 0.001
   N = 3*int(1/grid_step + 1) # N: number of grid points
   G = np.linspace(start=0, stop=1, num=N)[:,np.newaxis] # Nx1
@@ -78,7 +78,7 @@ def _gen_samples(modelidx, S):
     raise Exception('Unknown model: %s' % model)
   return (phi1, phi2, area)
 
-def calc_lh_binom_mc_2D(var1, var2):
+def calc_lh_mc_2D(var1, var2):
   S = len(var1['total_reads']) # S
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
   for s in range(S):
@@ -93,7 +93,7 @@ def calc_lh_binom_mc_2D(var1, var2):
 
   return logprob_models
 
-def calc_lh_binom_mc_1D(V1, V2):
+def calc_lh_mc_1D(V1, V2):
   S = len(V1['total_reads']) # S
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
   for sidx in range(S):
@@ -174,7 +174,7 @@ def _integral_same_cluster(phi1, V1, V2, sidx, midx, logsub=None):
     logP -= logsub
   return np.exp(logP)
 
-def calc_lh_binom_quad(V1, V2):
+def calc_lh_quad(V1, V2):
   max_splits = 50
   S = len(V1['total_reads']) # S
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM

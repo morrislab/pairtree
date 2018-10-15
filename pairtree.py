@@ -125,6 +125,10 @@ def remove_garbage(garbage_ids, variants):
 
 def _munge(variants):
   V1, V2 = variants['C0'], variants['C1']
+  V2['var_reads'] *= 100
+  V2['ref_reads'] *= 100
+  V2['total_reads'] *= 100
+  return
   for V, var, total in ((V1, 400, 1000), (V2, 100, 1000)):
     V['var_reads'][:] = var
     V['total_reads'][:] = total

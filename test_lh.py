@@ -35,10 +35,10 @@ def main():
   V1, V2 = create_vars()
 
   for M in (
-    lh.calc_lh_binom_quad,
-    lh.calc_lh_binom_mc_1D,
-    lh.calc_lh_binom_mc_2D,
-    lh.calc_lh_binom_grid,
+    lh.calc_lh_quad,
+    lh.calc_lh_mc_1D,
+    lh.calc_lh_mc_2D,
+    lh.calc_lh_grid,
   ):
     M_name = M.__name__
     M = util.time_exec(M)
