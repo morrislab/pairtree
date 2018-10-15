@@ -52,7 +52,7 @@ function write_indices {
       ) > $runid.phi_distances.csv
     done
 
-    for resultsfn in *steph*.results.html; do
+    for resultsfn in *.results.html; do
       runid=$(echo $resultsfn | cut -d. -f1)
       echo "<h3>$runid</h3>"
       echo "<ul>"

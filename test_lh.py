@@ -6,25 +6,33 @@ import common
 def softmax(V):
   return np.exp(V) / np.sum(np.exp(V))
 
+def create_vars():
+  variants = {
+    'V1': {'var_reads': [10], 'total_reads': [100]},
+    'V2': {'var_reads': [10], 'total_reads': [100]},
+
+    #'V1': {'var_reads': [500], 'total_reads': [1000]},
+    #'V2': {'var_reads': [100], 'total_reads': [1000]},
+
+    #'V1': {'var_reads': [1702], 'total_reads': [4069]},
+    #'V2': {'var_reads': [2500], 'total_reads': [19100]},
+  }
+  print(sorted(variants.items()))
+
+  S = 1
+  for vid, V in variants.items():
+    for K in ('var_reads', 'total_reads'):
+      V[K] = np.array(S*V[K]).astype(np.int)
+    V['ref_reads'] = V['total_reads'] - V['var_reads']
+    V['vaf'] = V['var_reads'].astype(np.float) / V['total_reads']
+    V['mu_v'] = 0.5
+
+  return (variants['V1'], variants['V2'])
+
 def main():
   np.set_printoptions(linewidth=400, precision=3, threshold=np.nan, suppress=True)
   np.seterr(divide='raise', invalid='raise')
-
-  V1 = {'var_reads': np.array([1702]), 'total_reads': np.array([4069])}
-  V2 = {'var_reads': np.array([2500]), 'total_reads': np.array([19100])}
-  for V in (V1, V2):
-    V['var_reads'] = (V['var_reads'] / 10).astype(np.int)
-    V['total_reads'] = (V['total_reads'] / 10).astype(np.int)
-    V['mu_v'] = 0.5
-    V['ref_reads'] = V['total_reads'] - V['var_reads']
-    V['vaf'] = V['var_reads'].astype(np.float) / V['total_reads']
-
-  S = 1
-  for V, var, total in ((V1, [500], [1000]), (V2, [100], [1000])):
-    V['var_reads'] = np.array(S * var)
-    V['total_reads'] = np.array(S * total)
-    V['ref_reads'] = V['total_reads'] - V['var_reads']
-    V['vaf'] = V['var_reads'] / V['total_reads']
+  V1, V2 = create_vars()
 
   for M in (
     lh.calc_lh_binom_quad,
