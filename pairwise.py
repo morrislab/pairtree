@@ -76,16 +76,15 @@ def calc_posterior(variants, parallel=1, include_garbage_in_posterior=False, inc
     posterior[pair] = _calc_posterior(evidence[pair], include_garbage_in_posterior, include_cocluster_in_posterior)
   return (posterior, evidence)
 
-def calc_lh(V1, V2, _calc_lh=lh.calc_lh_binom_quad):
+def calc_lh(V1, V2, _calc_lh=lh.calc_lh_quad):
   if V1['id'] == V2['id']:
     # If they're the same variant, they should cocluster with certainty.
     evidence = -np.inf * np.ones(len(Models._all))
     evidence[Models.cocluster] = 0
     return (evidence, evidence)
 
-  evidence_per_sample = _calc_lh(V1, V2)
-  garb1, garb2 = [scipy.stats.randint.logpmf(V['var_reads'], 0, V['var_reads'] + V['total_reads'] + 1) for V in (V1, V2)]
-  evidence_per_sample[:,Models.garbage] = garb1 + garb2
+  evidence_per_sample = _calc_lh(V1, V2) # SxM
+  evidence_per_sample[:,Models.garbage] = lh.calc_garbage(V1, V2)
   evidence = np.sum(evidence_per_sample, axis=0)
   return (evidence, evidence_per_sample)
 
@@ -98,10 +97,10 @@ def test_calc_lh(V1, V2):
   records = {'evidence': {}, 'norm_evidence': {}, 'posterior': {}}
 
   for M in (
-    lh.calc_lh_binom_quad,
-    lh.calc_lh_binom_mc_1D,
-    lh.calc_lh_binom_mc_2D,
-    lh.calc_lh_binom_grid,
+    lh.calc_lh_quad,
+    lh.calc_lh_mc_1D,
+    lh.calc_lh_mc_2D,
+    lh.calc_lh_grid,
   ):
     M_name = M.__name__
     M = util.time_exec(M)

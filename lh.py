@@ -37,7 +37,7 @@ def generate_logprob_phi(N):
 
   return logprob
 
-def calc_lh_binom_grid(var1, var2):
+def calc_lh_grid(var1, var2):
   grid_step = 0.001
   N = 3*int(1/grid_step + 1) # N: number of grid points
   G = np.linspace(start=0, stop=1, num=N)[:,np.newaxis] # Nx1
@@ -59,12 +59,12 @@ def calc_lh_binom_grid(var1, var2):
 def _gen_samples(modelidx, S):
   U = scipy.stats.uniform.rvs(loc=0, scale=1, size=S)
   if modelidx == Models.A_B:
-    phi2 = np.sqrt(U)
-    phi1 = scipy.stats.uniform.rvs(loc=0, scale=phi2, size=S)
-    area = 0.5
-  elif modelidx == Models.B_A:
     phi1 = np.sqrt(U)
     phi2 = scipy.stats.uniform.rvs(loc=0, scale=phi1, size=S)
+    area = 0.5
+  elif modelidx == Models.B_A:
+    phi2 = np.sqrt(U)
+    phi1 = scipy.stats.uniform.rvs(loc=0, scale=phi2, size=S)
     area = 0.5
   elif modelidx == Models.diff_branches:
     phi1 = 1 - np.sqrt(1 - U)
@@ -78,7 +78,7 @@ def _gen_samples(modelidx, S):
     raise Exception('Unknown model: %s' % model)
   return (phi1, phi2, area)
 
-def calc_lh_binom_mc_2D(var1, var2):
+def calc_lh_mc_2D(var1, var2):
   S = len(var1['total_reads']) # S
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
   for s in range(S):
@@ -93,7 +93,72 @@ def calc_lh_binom_mc_2D(var1, var2):
 
   return logprob_models
 
-def calc_lh_binom_mc_1D(V1, V2):
+def calc_lh_mc_2D_dumb(var1, var2):
+  S = len(var1['total_reads']) # S
+  logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
+  for s in range(S):
+    for modelidx in (Models.cocluster, Models.A_B, Models.B_A, Models.diff_branches):
+      mcsamps = int(1e6)
+      phi1 = scipy.stats.uniform.rvs(loc=0, scale=1, size=mcsamps)
+      phi2 = scipy.stats.uniform.rvs(loc=0, scale=1, size=mcsamps)
+
+      if modelidx == Models.A_B:
+        prior = phi1 >= phi2
+        area = 0.5
+      elif modelidx == Models.B_A:
+        prior = phi2 >= phi1
+        area = 0.5
+      elif modelidx == Models.diff_branches:
+        prior = phi1 + phi2 <= 1
+        area = 0.5
+      elif modelidx == Models.cocluster:
+        phi2 = phi1
+        prior = np.array(mcsamps * [True])
+        area = 1
+      else:
+        raise Exception('Unknown model: %s' % model)
+
+      logP = []
+      for V, phi in ((var1, phi1), (var2, phi2)):
+        logP.append(scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], (1 - V['mu_v'])*phi))
+      logprob_models[s,modelidx] = scipy.special.logsumexp((logP[0] + logP[1] - np.log(area))[prior]) - np.log(mcsamps)
+
+  return logprob_models
+
+def _calc_garbage_smart(V1, V2):
+  S = len(V1['total_reads']) # S
+  evidence = np.nan * np.ones(S)
+
+  for sidx in range(S):
+    logP = [np.log(4)]
+    for V in (V1, V2):
+      A, B = V['var_reads'][sidx] + 1, V['ref_reads'][sidx] + 1
+      logP.append(util.log_N_choose_K(V['total_reads'][sidx], V['var_reads'][sidx]))
+      logP.append(np.log(scipy.special.betainc(A, B, 0.5)))
+      logP.append(scipy.special.betaln(A, B)) # Denormalization factor for beta
+    evidence[sidx] = np.sum(logP)
+
+  return evidence
+
+def _calc_garbage_dumb(V1, V2):
+  S = len(V1['total_reads']) # S
+  evidence = np.nan * np.ones(S)
+  mcsamps = int(1e5)
+
+  for sidx in range(S):
+    logP = []
+    for V in (V1, V2):
+      phi = scipy.stats.uniform.rvs(loc=0, scale=1, size=mcsamps)
+      binom = scipy.stats.binom.logpmf(V['var_reads'][sidx], V['total_reads'][sidx], (1 - V['mu_v'])*phi)
+      logP.append(scipy.special.logsumexp(binom) - np.log(mcsamps))
+    evidence[sidx] = np.sum(logP)
+
+  return evidence
+
+calc_garbage = _calc_garbage_smart
+#calc_garbage = _calc_garbage_dumb
+
+def calc_lh_mc_1D(V1, V2):
   S = len(V1['total_reads']) # S
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
   for sidx in range(S):
@@ -108,7 +173,7 @@ def calc_lh_binom_mc_1D(V1, V2):
         logprob_models[sidx,modelidx] = scipy.special.logsumexp(logP[0] + logP[1]) - np.log(mcsamps)
       else:
         logP = scipy.stats.binom.logpmf(V1['var_reads'][sidx], V1['total_reads'][sidx], (1 - V1['mu_v'])*phi1)
-        logP += np.log(2)
+        logP += np.log(4)
         logP += util.log_N_choose_K(V2['total_reads'][sidx], V2['var_reads'][sidx])
 
         lower = _make_lower(phi1, modelidx)
@@ -174,7 +239,7 @@ def _integral_same_cluster(phi1, V1, V2, sidx, midx, logsub=None):
     logP -= logsub
   return np.exp(logP)
 
-def calc_lh_binom_quad(V1, V2):
+def calc_lh_quad(V1, V2):
   max_splits = 50
   S = len(V1['total_reads']) # S
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
@@ -192,6 +257,6 @@ def calc_lh_binom_quad(V1, V2):
         logdenorm = scipy.special.betaln(V2['var_reads'][sidx] + 1, V2['ref_reads'][sidx] + 1)
         P = np.maximum(_EPSILON, P)
         # TODO: this factor of 2 is presumably wrong when mu_v != 1/2
-        logP = np.log(P) + logmaxP + logdenorm + np.log(2) + util.log_N_choose_K(V2['total_reads'][sidx], V2['var_reads'][sidx])
+        logP = np.log(P) + logmaxP + logdenorm + np.log(4) + util.log_N_choose_K(V2['total_reads'][sidx], V2['var_reads'][sidx])
       logprob_models[sidx,modelidx] = logP
   return logprob_models
