@@ -122,10 +122,10 @@ Derivation of joint likelihood:
 
 \begin_deeper
 \begin_layout Itemize
-\begin_inset Formula $\text{If \ensuremath{M_{i}=\text{cocluster}:}}p(\phi_{1}|M_{i})$
+\begin_inset Formula $\text{If \ensuremath{M_{i}=\text{cocluster}:}}$
 \end_inset
 
-: 
+
 \begin_inset Formula 
 \begin{align*}
 p(\phi_{2}|\phi_{1},M_{i})= & I(\phi_{1}=\phi_{2})\\
@@ -135,6 +135,30 @@ p(\phi_{1}|M_{i})= & \frac{p(\phi_{1},\phi_{2}|M_{i})}{p(\phi_{2}|\phi_{1},M_{i}
 p(V_{1},R_{1},V_{2,}R_{2}|M_{i})= & \int d\phi_{1}p(V_{1},R_{1}|\phi_{1})p(\phi_{1}|M_{i})\int d\phi_{2}p(V_{2},R_{2}|\phi_{2})p(\phi_{2}|\phi_{1},M_{i})\\
 = & \int d\phi_{1}p(V_{1},R_{1}|\phi_{1})p(V_{2},R_{2}|\phi_{1})\\
 = & \int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\frac{\phi_{1}}{2})Binom(V_{2}|V_{2}+R_{2},\frac{\phi_{1}}{2})
+\end{align*}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $\text{If \ensuremath{M_{i}=\text{garbage}:}}$
+\end_inset
+
+ 
+\begin_inset Formula 
+\begin{align*}
+p(\phi_{1},\phi_{2}|M_{i}) & =p(\phi_{1}|M_{i})p(\phi_{2}|M_{i})\\
+ & =1\cdot1\\
+p(V_{1},R_{1},V_{2},R_{2}|M_{i}) & =\int d\phi_{1}d\phi_{2}p(V_{1},R_{1}|\phi_{1})p(V_{2},R_{2}|\phi_{2})p(\phi_{1},\phi_{2}|M_{i})\\
+ & =\int d\phi_{1}p(V_{1},R_{1}|\phi_{1})\int d\phi_{2}p(V_{2},R_{2}|\phi_{2})\\
+ & =\int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\frac{\phi_{1}}{2})\int d\phi_{2}Binom(V_{2}|V_{2}+R_{2},\frac{\phi_{2}}{2})\\
+ & ={V_{1}+R_{1} \choose V_{1}}B(V_{1}+1,R_{1}+1){V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)\int_{0}^{1}d\phi_{1}Beta(\frac{1}{2}\phi_{1}|V_{1}+1,R_{1}+1)\int_{0}^{1}d\phi_{2}Beta(\frac{1}{2}\phi_{2}|V_{2}+1,R_{2}+1)\\
+ & ={V_{1}+R_{1} \choose V_{1}}B(V_{1}+1,R_{1}+1){V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)(2\cdot2)\int_{0}^{\frac{1}{2}}dP_{1}Beta(P_{1}|V_{1}+1,R_{1}+1)\int_{0}^{\frac{1}{2}}dP_{2}Beta(P_{2}|V_{2}+1,R_{2}+1)\\
+ & ={V_{1}+R_{1} \choose V_{1}}B(V_{1}+1,R_{1}+1){V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)(2\cdot2)\int_{0}^{\frac{1}{2}}dP_{1}Beta(P_{1}|V_{1}+1,R_{1}+1)\int_{0}^{\frac{1}{2}}dP_{2}Beta(P_{2}|V_{2}+1,R_{2}+1)\\
+ & ={V_{1}+R_{1} \choose V_{1}}B(V_{1}+1,R_{1}+1){V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)(2\cdot2)\frac{B(\frac{1}{2};V_{1}+1,R_{1}+1)}{B(V_{1}+1,R_{1}+1)}\frac{B(\frac{1}{2};V_{2}+1,R_{2}+1)}{B(V_{2}+1,R_{2}+1)}\\
+ & =4{V_{1}+R_{1} \choose V_{1}}{V_{2}+R_{2} \choose V_{2}}B(\frac{1}{2};V_{1}+1,R_{1}+1)B(\frac{1}{2};V_{2}+1,R_{2}+1)
 \end{align*}
 
 \end_inset
