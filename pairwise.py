@@ -84,8 +84,7 @@ def calc_lh(V1, V2, _calc_lh=lh.calc_lh_quad):
     return (evidence, evidence)
 
   evidence_per_sample = _calc_lh(V1, V2)
-  # TODO: This is wrong
-  garb1, garb2 = [scipy.stats.randint.logpmf(V['var_reads'], 0, V['var_reads'] + V['total_reads'] + 1) for V in (V1, V2)]
+  garb1, garb2 = [scipy.stats.randint.logpmf(V['var_reads'], 0, V['total_reads'] + 1) for V in (V1, V2)]
   evidence_per_sample[:,Models.garbage] = garb1 + garb2
   evidence = np.sum(evidence_per_sample, axis=0)
   return (evidence, evidence_per_sample)
