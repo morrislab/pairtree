@@ -125,6 +125,39 @@ def calc_lh_mc_2D_dumb(var1, var2):
 
   return logprob_models
 
+def _calc_garbage_smart(V1, V2):
+  S = len(V1['total_reads']) # S
+  evidence = np.nan * np.ones(S)
+
+  for sidx in range(S):
+    logP = [np.log(4)]
+    for V in (V1, V2):
+      A, B = V['var_reads'][sidx] + 1, V['ref_reads'][sidx] + 1
+      logP.append(util.log_N_choose_K(V['total_reads'][sidx], V['var_reads'][sidx]))
+      logP.append(np.log(scipy.special.betainc(A, B, 0.5)))
+      logP.append(scipy.special.betaln(A, B)) # Denormalization factor for beta
+    evidence[sidx] = np.sum(logP)
+
+  return evidence
+
+def _calc_garbage_dumb(V1, V2):
+  S = len(V1['total_reads']) # S
+  evidence = np.nan * np.ones(S)
+  mcsamps = int(1e5)
+
+  for sidx in range(S):
+    logP = []
+    for V in (V1, V2):
+      phi = scipy.stats.uniform.rvs(loc=0, scale=1, size=mcsamps)
+      binom = scipy.stats.binom.logpmf(V['var_reads'][sidx], V['total_reads'][sidx], (1 - V['mu_v'])*phi)
+      logP.append(scipy.special.logsumexp(binom) - np.log(mcsamps))
+    evidence[sidx] = np.sum(logP)
+
+  return evidence
+
+calc_garbage = _calc_garbage_smart
+#calc_garbage = _calc_garbage_dumb
+
 def calc_lh_mc_1D(V1, V2):
   S = len(V1['total_reads']) # S
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM

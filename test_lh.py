@@ -8,7 +8,7 @@ def softmax(V):
 
 def create_vars():
   variants = {
-    'V1': {'var_reads': [10], 'total_reads': [100]},
+    'V1': {'var_reads': [18], 'total_reads': [100]},
     'V2': {'var_reads': [10], 'total_reads': [100]},
 
     #'V1': {'var_reads': [500], 'total_reads': [1000]},
@@ -46,7 +46,7 @@ def main():
     M_name = M.__name__
     M = util.time_exec(M)
     evidence_per_sample = M(V1, V2)
-    evidence_per_sample[:,common.Models.garbage] = -np.inf
+    evidence_per_sample[:,common.Models.garbage] = lh.calc_garbage(V1, V2)
     evidence = np.sum(evidence_per_sample, axis=0)
     print(
       M_name.ljust(max_estimator_len),
