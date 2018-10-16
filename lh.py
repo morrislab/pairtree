@@ -59,12 +59,12 @@ def calc_lh_grid(var1, var2):
 def _gen_samples(modelidx, S):
   U = scipy.stats.uniform.rvs(loc=0, scale=1, size=S)
   if modelidx == Models.A_B:
-    phi2 = np.sqrt(U)
-    phi1 = scipy.stats.uniform.rvs(loc=0, scale=phi2, size=S)
-    area = 0.5
-  elif modelidx == Models.B_A:
     phi1 = np.sqrt(U)
     phi2 = scipy.stats.uniform.rvs(loc=0, scale=phi1, size=S)
+    area = 0.5
+  elif modelidx == Models.B_A:
+    phi2 = np.sqrt(U)
+    phi1 = scipy.stats.uniform.rvs(loc=0, scale=phi2, size=S)
     area = 0.5
   elif modelidx == Models.diff_branches:
     phi1 = 1 - np.sqrt(1 - U)
