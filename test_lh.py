@@ -34,19 +34,22 @@ def main():
   np.seterr(divide='raise', invalid='raise')
   V1, V2 = create_vars()
 
-  for M in (
+  estimators = (
     lh.calc_lh_quad,
     lh.calc_lh_mc_1D,
     lh.calc_lh_mc_2D,
+    lh.calc_lh_mc_2D_dumb,
     lh.calc_lh_grid,
-  ):
+  )
+  max_estimator_len = max([len(M.__name__) for M in estimators])
+  for M in estimators:
     M_name = M.__name__
     M = util.time_exec(M)
     evidence_per_sample = M(V1, V2)
     evidence_per_sample[:,common.Models.garbage] = -np.inf
     evidence = np.sum(evidence_per_sample, axis=0)
     print(
-      M_name,
+      M_name.ljust(max_estimator_len),
       '%.3f ms' % util.time_exec._ms,
       evidence,
       softmax(evidence),
