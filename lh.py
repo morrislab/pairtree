@@ -108,7 +108,7 @@ def calc_lh_mc_1D(V1, V2):
         logprob_models[sidx,modelidx] = scipy.special.logsumexp(logP[0] + logP[1]) - np.log(mcsamps)
       else:
         logP = scipy.stats.binom.logpmf(V1['var_reads'][sidx], V1['total_reads'][sidx], (1 - V1['mu_v'])*phi1)
-        logP += np.log(2)
+        logP += np.log(4)
         logP += util.log_N_choose_K(V2['total_reads'][sidx], V2['var_reads'][sidx])
 
         lower = _make_lower(phi1, modelidx)
@@ -192,6 +192,6 @@ def calc_lh_quad(V1, V2):
         logdenorm = scipy.special.betaln(V2['var_reads'][sidx] + 1, V2['ref_reads'][sidx] + 1)
         P = np.maximum(_EPSILON, P)
         # TODO: this factor of 2 is presumably wrong when mu_v != 1/2
-        logP = np.log(P) + logmaxP + logdenorm + np.log(2) + util.log_N_choose_K(V2['total_reads'][sidx], V2['var_reads'][sidx])
+        logP = np.log(P) + logmaxP + logdenorm + np.log(4) + util.log_N_choose_K(V2['total_reads'][sidx], V2['var_reads'][sidx])
       logprob_models[sidx,modelidx] = logP
   return logprob_models
