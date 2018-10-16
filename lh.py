@@ -93,6 +93,38 @@ def calc_lh_mc_2D(var1, var2):
 
   return logprob_models
 
+def calc_lh_mc_2D_dumb(var1, var2):
+  S = len(var1['total_reads']) # S
+  logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
+  for s in range(S):
+    for modelidx in (Models.cocluster, Models.A_B, Models.B_A, Models.diff_branches):
+      mcsamps = int(1e6)
+      phi1 = scipy.stats.uniform.rvs(loc=0, scale=1, size=mcsamps)
+      phi2 = scipy.stats.uniform.rvs(loc=0, scale=1, size=mcsamps)
+
+      if modelidx == Models.A_B:
+        prior = phi1 >= phi2
+        area = 0.5
+      elif modelidx == Models.B_A:
+        prior = phi2 >= phi1
+        area = 0.5
+      elif modelidx == Models.diff_branches:
+        prior = phi1 + phi2 <= 1
+        area = 0.5
+      elif modelidx == Models.cocluster:
+        phi2 = phi1
+        prior = np.array(mcsamps * [True])
+        area = 1
+      else:
+        raise Exception('Unknown model: %s' % model)
+
+      logP = []
+      for V, phi in ((var1, phi1), (var2, phi2)):
+        logP.append(scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], (1 - V['mu_v'])*phi))
+      logprob_models[s,modelidx] = scipy.special.logsumexp((logP[0] + logP[1] - np.log(area))[prior]) - np.log(mcsamps)
+
+  return logprob_models
+
 def calc_lh_mc_1D(V1, V2):
   S = len(V1['total_reads']) # S
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
