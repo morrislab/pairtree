@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.stats
+from collections import defaultdict
 
 def make_ancestral_from_adj(adj):
   K = len(adj)
@@ -59,6 +60,7 @@ def generate_tree(K, S):
   eta /= np.sum(eta, axis=0)
 
   phi = np.dot(Z, eta) # KxS
+  assert np.allclose(1, phi[0])
   return (adjm, phi)
 
 def generate_read_counts(phi, omega_v, T):
@@ -66,18 +68,13 @@ def generate_read_counts(phi, omega_v, T):
   # T: total reads. Broadcast operation ensures V and T are same shape.
   T = np.broadcast_to(T, (M,S))
   # V: variant reads
-  V = scipy.stats.binom.rvs(n=T, p=omega_v*phi)
+  V = scipy.stats.binom.rvs(n=T, p=omega_v[:,np.newaxis]*phi)
   return (V, T)
 
 def add_noise(mat, sigma=0.09):
   noisy = np.random.normal(loc=mat, scale=sigma)
   capped = np.maximum(0, np.minimum(1, noisy))
   return capped
-
-def add_garbage(mat, N):
-  K, S = mat.shape
-  garbage = np.random.uniform(size=(N, S))
-  return np.vstack((mat, garbage))
 
 def choose_mutass(K, M):
   # Ensure every cluster has at least one mutation.
@@ -95,23 +92,63 @@ def choose_mutass(K, M):
   np.random.shuffle(mutass)
   return mutass
 
-def generate_data(K, S, T, M):
-  # K: number of clusters
+def make_clusters(mutass):
+  clusters = defaultdict(list)
+  for midx, cidx in enumerate(mutass):
+    clusters[cidx].append(midx)
+  assert set(clusters.keys()) == set(range(1, len(clusters) + 1))
+
+  clusters = [[]] + [clusters[cidx] for cidx in sorted(clusters.keys())]
+  return clusters
+
+def make_variants(V, T, omega_v):
+  variants = {}
+  for midx in range(len(omega_v)):
+    variant = {
+      'id': 's%s' % midx,
+      'name': 'Happy variant %s' % midx,
+      'var_reads': V[midx],
+      'total_reads': T[midx],
+      'omega_v': omega_v[midx],
+      'vaf_correction': 1.,
+    }
+    variant['ref_reads'] = variant['total_reads'] - variant['var_reads']
+    variant['vaf'] = variant['var_reads'] / variant['total_reads']
+    variants[variant['id']] = variant
+  return variants
+
+def generate_data(K, S, T, M, G):
+  # K: number of clusters (excluding normal root)
   # S: number of samples
   # T: reads per mutation
   # M: total number of mutations
-  adjm, phi = generate_tree(K, S)
-  mutass = choose_mutass(K, M)
-  phi_mutations = np.array([phi[cluster] for cluster in mutass])
-  omega_v = 0.5
+  # G: number of (additional) garbage mutations
+  adjm, phi = generate_tree(K + 1, S)
+  # Add 1 to each mutation's assignment to account for normal root.
+  mutass = choose_mutass(K, M) + 1 # Mx1
+  clusters = make_clusters(mutass)
+
+  phi_good_mutations = np.array([phi[cidx] for cidx in mutass]) # MxS
+  phi_garbage = np.random.uniform(size=(G,S))
+  phi_mutations = np.vstack((phi_good_mutations, phi_garbage))
+
+  omega_v = np.broadcast_to(0.5, M + G)
   V, T = generate_read_counts(phi_mutations, omega_v, T)
+
+  variants_all = make_variants(V, T, omega_v)
+  variants_good, variants_garbage = {}, {}
+  for vid, variant in variants_all.items():
+    if int(vid[1:]) < M:
+      variants_good[vid] = variant
+    else:
+      variants_garbage[vid] = variant
   
   return {
     'adjm': adjm,
     'phi': phi,
-    'mutass': mutass,
-    'omega_v': np.broadcast_to(omega_v, M),
-    'V': V,
-    'T': T,
+    'clusters': clusters,
+    'variants_all': variants_all,
+    'variants_good': variants_good,
+    'variants_garbage': variants_garbage,
     'sampnames': ['Sample %s' % (sidx + 1) for sidx in range(S)],
   }

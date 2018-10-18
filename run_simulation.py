@@ -1,7 +1,6 @@
 import argparse
 import numpy as np
 import pickle
-from collections import defaultdict
 
 import common
 import simulator
@@ -22,32 +21,7 @@ def convert_to_array(pairs):
 
   return arr
 
-def make_variants(data):
-  variants = {}
-  for midx in range(len(data['omega_v'])):
-    variant = {
-      'id': 's%s' % midx,
-      'name': 'Happy variant %s' % midx,
-      'var_reads': data['V'][midx],
-      'total_reads': data['T'][midx],
-      'omega_v': data['omega_v'][midx],
-      'vaf_correction': 1.,
-    }
-    variant['ref_reads'] = variant['total_reads'] - variant['var_reads']
-    variant['vaf'] = variant['var_reads'] / variant['total_reads']
-    variants[variant['id']] = variant
-  return variants
-
-def make_clusters(mutass):
-  clusters = defaultdict(list)
-  for midx, cidx in enumerate(mutass):
-    clusters[cidx].append(midx)
-  assert set(clusters.keys()) == set(range(len(clusters)))
-
-  clusters = [clusters[cidx] for cidx in sorted(clusters.keys())]
-  return clusters
-
-def write_results(variants, data, posterior, datafn, resultsfn):
+def write_results(data, posterior, datafn, resultsfn):
   with open(datafn, 'wb') as outf:
     pickle.dump(data, outf)
 
@@ -58,18 +32,14 @@ def write_results(variants, data, posterior, datafn, resultsfn):
     relation_plotter.plot_ml_relations(posterior, outf)
     relation_plotter.plot_relation_probs(posterior, outf)
 
-    # TODO: remove empty first cluster.
-    clusters = [[]] + make_clusters(data['mutass'])
-    data['phi'] = np.insert(data['phi'], 0, 1, axis=0)
-
-    supervars = common.make_cluster_supervars(clusters, variants)
+    supervars = common.make_cluster_supervars(data['clusters'], data['variants_good'])
     garbage = {}
     vaf_plotter.plot_vaf_matrix(
       sampid,
-      clusters,
-      variants,
+      data['clusters'],
+      data['variants_good'],
       supervars,
-      garbage,
+      data['variants_garbage'],
       data['phi'],
       data['sampnames'],
       None,
@@ -93,11 +63,11 @@ def main():
   S = 3
   T = 4000
   M = 10
-  data = simulator.generate_data(K, S, T, M)
-  variants = make_variants(data)
+  G = 3
+  data = simulator.generate_data(K, S, T, M, G)
 
-  posterior, evidence = pairwise.calc_posterior(variants, parallel=args.parallel, include_garbage_in_posterior=True, include_cocluster_in_posterior=True)
-  write_results(variants, data, posterior, args.datafn, args.resultsfn)
+  posterior, evidence = pairwise.calc_posterior(data['variants_all'], parallel=args.parallel, include_garbage_in_posterior=True, include_cocluster_in_posterior=True)
+  write_results(data, posterior, args.datafn, args.resultsfn)
 
 if __name__ == '__main__':
   main()
