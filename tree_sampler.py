@@ -134,8 +134,8 @@ def calc_beta_params(supervars):
   svids = sorted(supervars.keys(), key = lambda V: int(V[1:]))
   V = np.array([supervars[C]['var_reads'] for C in svids])
   R = np.array([supervars[C]['ref_reads'] for C in svids])
-  # Since these are supervars, we can just take 2*V and disregard mu_v, since
-  # supervariants are never haploid.
+  # Since these are supervars, we can just take 2*V and disregard omega_v, since
+  # supervariants are always diploid (i.e., omega_v = 0.5).
   alpha = 2*V + 1
   # Must ensure beta is > 0.
   beta = np.maximum(1, R - V + 1)

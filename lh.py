@@ -48,7 +48,7 @@ def calc_lh_grid(var1, var2):
 
   for s in range(S):
     for modelidx in logprob_phi.keys():
-      pv1, pv2 = [scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], (1 - V['mu_v'])*G) for V in (var1, var2)] # Nx1
+      pv1, pv2 = [scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], V['omega_v']*G) for V in (var1, var2)] # Nx1
       p1 = np.tile(pv1, N)   # pv1 vector tiled as columns
       p2 = np.tile(pv2, N).T # pv2 vector tiled as rows
       P = p1 + p2 + logprob_phi[modelidx]
@@ -88,7 +88,7 @@ def calc_lh_mc_2D(var1, var2):
 
       logP = []
       for V, phi in ((var1, phi1), (var2, phi2)):
-        logP.append(scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], (1 - V['mu_v'])*phi))
+        logP.append(scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], V['omega_v']*phi))
       logprob_models[s,modelidx] = scipy.special.logsumexp(logP[0] + logP[1]) - np.log(mcsamps)
 
   return logprob_models
@@ -120,7 +120,7 @@ def calc_lh_mc_2D_dumb(var1, var2):
 
       logP = []
       for V, phi in ((var1, phi1), (var2, phi2)):
-        logP.append(scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], (1 - V['mu_v'])*phi))
+        logP.append(scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], V['omega_v']*phi))
       logprob_models[s,modelidx] = scipy.special.logsumexp((logP[0] + logP[1] - np.log(area))[prior]) - np.log(mcsamps)
 
   return logprob_models
@@ -149,7 +149,7 @@ def _calc_garbage_dumb(V1, V2):
     logP = []
     for V in (V1, V2):
       phi = scipy.stats.uniform.rvs(loc=0, scale=1, size=mcsamps)
-      binom = scipy.stats.binom.logpmf(V['var_reads'][sidx], V['total_reads'][sidx], (1 - V['mu_v'])*phi)
+      binom = scipy.stats.binom.logpmf(V['var_reads'][sidx], V['total_reads'][sidx], V['omega_v']*phi)
       logP.append(scipy.special.logsumexp(binom) - np.log(mcsamps))
     evidence[sidx] = np.sum(logP)
 
@@ -169,10 +169,10 @@ def calc_lh_mc_1D(V1, V2):
       if modelidx == Models.cocluster:
         logP = []
         for V in (V1, V2):
-          logP.append(scipy.stats.binom.logpmf(V['var_reads'][sidx], V['total_reads'][sidx], (1 - V['mu_v'])*phi1))
+          logP.append(scipy.stats.binom.logpmf(V['var_reads'][sidx], V['total_reads'][sidx], V['omega_v']*phi1))
         logprob_models[sidx,modelidx] = scipy.special.logsumexp(logP[0] + logP[1]) - np.log(mcsamps)
       else:
-        logP = scipy.stats.binom.logpmf(V1['var_reads'][sidx], V1['total_reads'][sidx], (1 - V1['mu_v'])*phi1)
+        logP = scipy.stats.binom.logpmf(V1['var_reads'][sidx], V1['total_reads'][sidx], V1['omega_v']*phi1)
         logP += np.log(4)
         logP += util.log_N_choose_K(V2['total_reads'][sidx], V2['var_reads'][sidx])
 
@@ -217,7 +217,7 @@ def _integral_separate_clusters(phi1, V1, V2, sidx, midx, logsub=None):
   logP = scipy.stats.binom.logpmf(
     V1['var_reads'][sidx],
     V1['total_reads'][sidx],
-    (1 - V1['mu_v'])*phi1
+    V1['omega_v']*phi1
   )
   lower = _make_lower(phi1, midx)
   upper = _make_upper(phi1, midx)
@@ -233,7 +233,7 @@ def _integral_separate_clusters(phi1, V1, V2, sidx, midx, logsub=None):
   return np.exp(logP)
 
 def _integral_same_cluster(phi1, V1, V2, sidx, midx, logsub=None):
-  binom = [scipy.stats.binom.logpmf( V['var_reads'][sidx], V['total_reads'][sidx], (1 - V['mu_v'])*phi1) for V in (V1, V2)]
+  binom = [scipy.stats.binom.logpmf( V['var_reads'][sidx], V['total_reads'][sidx], V['omega_v']*phi1) for V in (V1, V2)]
   logP = binom[0] + binom[1]
   if logsub is not None:
     logP -= logsub
@@ -256,7 +256,7 @@ def calc_lh_quad(V1, V2):
         P, P_error = scipy.integrate.quad(_integral_separate_clusters, 0, 1, args=(V1, V2, sidx, modelidx, logmaxP), limit=max_splits)
         logdenorm = scipy.special.betaln(V2['var_reads'][sidx] + 1, V2['ref_reads'][sidx] + 1)
         P = np.maximum(_EPSILON, P)
-        # TODO: this factor of 2 is presumably wrong when mu_v != 1/2
+        # TODO: this factor of 2 is presumably wrong when omega_v != 1/2
         logP = np.log(P) + logmaxP + logdenorm + np.log(4) + util.log_N_choose_K(V2['total_reads'][sidx], V2['var_reads'][sidx])
       logprob_models[sidx,modelidx] = logP
   return logprob_models
