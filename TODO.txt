@@ -1,7 +1,19 @@
-Remove "dummy prob"
 Think about "hard zeroes" in the method
   E.g., if we have the A -> B edge, we treat this case:
     A = 0.02 and B = 0.05, we trea
   the same as this case:
     A = 0 and B = 0.03
   If something has zero reads, we should treat that differently
+
+Cleanup:
+  Remove "dummy prob"
+  Remove VAF corrections
+  Remove all references to mu_v, replacing with omega_v
+  Remove mu_r
+  Think about new data format
+    Should mutations have unique IDs?
+    How to represent sample names? In a separate file?
+    Store variant reads instead of ref reads
+    Remove files not used by Pairtree
+
+  Maybe remove empty first cluster?
