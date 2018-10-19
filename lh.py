@@ -4,6 +4,7 @@ import scipy.special
 import scipy.integrate
 import numpy as np
 import util
+import warnings
 
 def generate_logprob_phi(N):
   prob = {}
@@ -231,6 +232,12 @@ def _integral_same_cluster(phi1, V1, V2, sidx, midx, logsub=None):
     logP -= logsub
   return np.exp(logP)
 
+def quad(*args, **kwargs):
+  with warnings.catch_warnings():
+    warnings.simplefilter('ignore', category=scipy.integrate.IntegrationWarning)
+    return scipy.integrate.quad(*args, **kwargs)
+
+
 def calc_lh_quad(V1, V2):
   max_splits = 50
   S = len(V1['total_reads']) # S
@@ -240,12 +247,12 @@ def calc_lh_quad(V1, V2):
     for modelidx in (Models.cocluster, Models.A_B, Models.B_A, Models.diff_branches):
       if modelidx == Models.cocluster:
         logmaxP = np.log(_integral_same_cluster(V1['vaf'][sidx], V1, V2, sidx, modelidx) + _EPSILON)
-        P, P_error = scipy.integrate.quad(_integral_same_cluster, 0, 1, args=(V1, V2, sidx, modelidx, logmaxP), limit=max_splits)
+        P, P_error = quad(_integral_same_cluster, 0, 1, args=(V1, V2, sidx, modelidx, logmaxP), limit=max_splits)
         P = np.maximum(_EPSILON, P)
         logP = np.log(P) + logmaxP
       else:
         logmaxP = np.log(_integral_separate_clusters(V1['vaf'][sidx], V1, V2, sidx, modelidx) + _EPSILON)
-        P, P_error = scipy.integrate.quad(_integral_separate_clusters, 0, 1, args=(V1, V2, sidx, modelidx, logmaxP), limit=max_splits)
+        P, P_error = quad(_integral_separate_clusters, 0, 1, args=(V1, V2, sidx, modelidx, logmaxP), limit=max_splits)
         logdenorm = scipy.special.betaln(V2['var_reads'][sidx] + 1, V2['ref_reads'][sidx] + 1)
         P = np.maximum(_EPSILON, P)
         logP = np.log(P) + logmaxP + logdenorm + np.log(2) + util.log_N_choose_K(V2['total_reads'][sidx], V2['var_reads'][sidx]) - np.log(V2['omega_v'])
