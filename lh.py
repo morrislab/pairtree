@@ -217,9 +217,10 @@ def _integral_separate_clusters(phi1, V1, V2, sidx, midx, logsub=None):
 
   A = V2['var_reads'][sidx] + 1
   B = V2['ref_reads'][sidx] + 1
-  betainc = [scipy.special.betainc(A, B, V2['omega_v']*limit) for limit in (upper, lower)]
+  betainc_upper = scipy.special.betainc(A, B, V2['omega_v'] * upper)
+  betainc_lower = scipy.special.betainc(A, B, V2['omega_v'] * lower)
   # Add epsilon to ensure we don't take log of zero.
-  logP += np.log(betainc[0] - betainc[1] + _EPSILON)
+  logP += np.log(betainc_upper - betainc_lower + _EPSILON)
   if logsub is not None:
     logP -= logsub
 
@@ -236,7 +237,6 @@ def quad(*args, **kwargs):
   with warnings.catch_warnings():
     warnings.simplefilter('ignore', category=scipy.integrate.IntegrationWarning)
     return scipy.integrate.quad(*args, **kwargs)
-
 
 def calc_lh_quad(V1, V2):
   max_splits = 50
