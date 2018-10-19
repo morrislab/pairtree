@@ -28,7 +28,7 @@ def parse_ssms(sampid, ssmfn):
         'gene': 'LOL',
         'ref_reads': np.array([float(V) for V in row['a'].split(',')]),
         'total_reads': np.array([float(V) for V in row['d'].split(',')]),
-        'mu_v': float(row['mu_v']),
+        'omega_v': 1 - float(row['mu_v']),
       }
 
       zero_total = variant['total_reads'] == 0

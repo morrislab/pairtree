@@ -15,6 +15,10 @@ def make_colour_from_category(cat):
   scale = cl.scales[str(scalenum)]['qual']['Set1']
   return scale[cat]
 
+def make_colour_from_intensity(intensity):
+  val = np.int(np.round(255*(1 - intensity)))
+  return 'rgb(255, %s, %s)' % (2*(val,))
+
 def make_colour_matrix(vals, colour_maker):
   N, M = vals.shape
   colours = N*[None]
@@ -65,3 +69,13 @@ def plot_ml_relations(model_probs_tensor, outf):
   colours = make_colour_matrix(ml_relations, make_colour_from_category)
   write_table('ML relations', ml_relations, ['C%s' % I for I in ssmidxs], colours, outf)
   write_legend(outf)
+
+def plot_relation_probs(model_probs_tensor, outf):
+  for midx, model in enumerate(Models._all):
+    mat = model_probs_tensor[:,:,midx]
+    mat, ssmidxs = common.reorder_square_matrix(mat)
+    if model in ('cocluster', 'diff_branches'):
+      # These should be symmetric.
+      assert np.allclose(mat, mat.T)
+    colours = make_colour_matrix(mat, make_colour_from_intensity)
+    write_table(model, mat, ['s%s' % I for I in ssmidxs], colours, outf)

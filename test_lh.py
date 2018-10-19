@@ -25,7 +25,7 @@ def create_vars():
       V[K] = np.array(S*V[K]).astype(np.int)
     V['ref_reads'] = V['total_reads'] - V['var_reads']
     V['vaf'] = V['var_reads'].astype(np.float) / V['total_reads']
-    V['mu_v'] = 0.5
+    V['omega_v'] = 0.5
 
   return (variants['V1'], variants['V2'])
 

@@ -9,6 +9,9 @@ with warnings.catch_warnings():
   warnings.simplefilter('ignore', category=DeprecationWarning)
   import sklearn.cluster
 
+_LOGEPSILON = -400
+_EPSILON    = np.exp(_LOGEPSILON)
+
 class Models:
   _all = ('garbage', 'cocluster', 'A_B', 'B_A', 'diff_branches')
 for idx, M in enumerate(Models._all):
@@ -31,8 +34,7 @@ def parse_ssms(sampid, ssmfn):
         'name': row['gene'],
         'ref_reads': np.array([float(V) for V in row['a'].split(',')]),
         'total_reads': np.array([float(V) for V in row['d'].split(',')]),
-        'mu_v': float(row['mu_v']),
-        'mu_r': float(row['mu_r']),
+        'omega_v': 1 - float(row['mu_v']),
       }
       variant['var_reads'] = variant['total_reads'] - variant['ref_reads']
       variant['vaf'] = variant['var_reads'] / variant['total_reads']
@@ -77,9 +79,9 @@ def make_cluster_supervars(clusters, variants):
     cluster_total_reads = np.array([V['total_reads'] for V in cvars])
     cluster_var_reads = np.array([V['var_reads'] for V in cvars])
     # Correct for sex variants.
-    mu_v = np.array([V['mu_v'] for V in cvars])[:,np.newaxis]
+    omega_v = np.array([V['omega_v'] for V in cvars])[:,np.newaxis]
     vaf_corrections = np.array([V['vaf_correction'] for V in cvars])[:,np.newaxis]
-    cluster_var_reads = np.round(vaf_corrections * (cluster_var_reads / (2*(1 - mu_v))))
+    cluster_var_reads = np.round(vaf_corrections * (cluster_var_reads / (2*omega_v)))
 
     S_name = 'C%s' % len(cluster_supervars)
     S = {
@@ -89,7 +91,7 @@ def make_cluster_supervars(clusters, variants):
       'chrom': None,
       'pos': None,
       'cluster': cidx,
-      'mu_v': 0.499,
+      'omega_v': 0.5,
       'var_reads': np.sum(cluster_var_reads, axis=0),
       'total_reads': np.sum(cluster_total_reads, axis=0),
       'vaf_correction': 1.,
