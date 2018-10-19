@@ -21,14 +21,17 @@ def convert_to_array(pairs):
 
   return arr
 
-def write_results(data, posterior, datafn, resultsfn):
+def write_results(data, posterior, evidence, datafn, pairwisefn, resultsfn):
   with open(datafn, 'wb') as outf:
     pickle.dump(data, outf)
+
+  posterior = convert_to_array(posterior)
+  evidence = convert_to_array(evidence)
+  np.savez_compressed(pairwisefn, posterior=posterior, evidence=evidence)
 
   with open(resultsfn, 'w') as outf:
     sampid = 'A sample ID'
     write_header(sampid, outf)
-    posterior = convert_to_array(posterior)
     relation_plotter.plot_ml_relations(posterior, outf)
     relation_plotter.plot_relation_probs(posterior, outf)
 
@@ -53,21 +56,27 @@ def main():
   )
   parser.add_argument('--seed', dest='seed', type=int)
   parser.add_argument('--parallel', dest='parallel', type=int, default=1)
+  parser.add_argument('-K', dest='K', type=int, default=4, help='Number of clusters')
+  parser.add_argument('-S', dest='S', type=int, default=3, help='Number of samples')
+  parser.add_argument('-T', dest='T', type=int, default=4000, help='Total reads per mutation')
+  parser.add_argument('-M', dest='M', type=int, default=10, help='Number of non-garbage mutations')
+  parser.add_argument('-G', dest='G', type=int, default=4, help='Number of garbage mutations')
   parser.add_argument('datafn')
+  parser.add_argument('pairwisefn')
   parser.add_argument('resultsfn')
   args = parser.parse_args()
-  if args.seed is not None:
-    np.random.seed(args.seed)
 
-  K = 4
-  S = 3
-  T = 4000
-  M = 10
-  G = 3
-  data = simulator.generate_data(K, S, T, M, G)
+  if args.seed is None:
+    seed = np.random.randint(2**31)
+  else:
+    seed = args.seed
+  np.random.seed(args.seed)
+
+  data = simulator.generate_data(args.K, args.S, args.T, args.M, args.G)
+  data['seed'] = seed
 
   posterior, evidence = pairwise.calc_posterior(data['variants_all'], parallel=args.parallel, include_garbage_in_posterior=True, include_cocluster_in_posterior=True)
-  write_results(data, posterior, args.datafn, args.resultsfn)
+  write_results(data, posterior, evidence, args.datafn, args.pairwisefn, args.resultsfn)
 
 if __name__ == '__main__':
   main()
