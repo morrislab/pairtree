@@ -17,3 +17,7 @@ Cleanup:
     Remove files not used by Pairtree
 
   Maybe remove empty first cluster?
+
+Bugs:
+  In phi_fitter's calc_mut_p, should I actually use 0.5? or omega_v?
+    Since it's working on superclusters, this is probably okay

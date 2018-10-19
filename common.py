@@ -9,6 +9,9 @@ with warnings.catch_warnings():
   warnings.simplefilter('ignore', category=DeprecationWarning)
   import sklearn.cluster
 
+_LOGEPSILON = -400
+_EPSILON    = np.exp(_LOGEPSILON)
+
 class Models:
   _all = ('garbage', 'cocluster', 'A_B', 'B_A', 'diff_branches')
 for idx, M in enumerate(Models._all):

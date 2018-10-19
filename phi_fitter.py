@@ -14,6 +14,7 @@ def calc_mut_p(A, Z, psi):
   eta = softmax(psi) # Kx1
   phi = np.dot(Z, eta) # Kx1
   mut_phi = np.dot(A, phi) # Mx1
+  # TODO: should this use omega_v?
   mut_p = 0.5 * mut_phi
 
   # Avoid numerical issues.
