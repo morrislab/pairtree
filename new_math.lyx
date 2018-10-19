@@ -134,7 +134,7 @@ p(\phi_{1}|M_{i})= & \frac{p(\phi_{1},\phi_{2}|M_{i})}{p(\phi_{2}|\phi_{1},M_{i}
 = & 1\\
 p(V_{1},R_{1},V_{2,}R_{2}|M_{i})= & \int d\phi_{1}p(V_{1},R_{1}|\phi_{1})p(\phi_{1}|M_{i})\int d\phi_{2}p(V_{2},R_{2}|\phi_{2})p(\phi_{2}|\phi_{1},M_{i})\\
 = & \int d\phi_{1}p(V_{1},R_{1}|\phi_{1})p(V_{2},R_{2}|\phi_{1})\\
-= & \int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\frac{\phi_{1}}{2})Binom(V_{2}|V_{2}+R_{2},\frac{\phi_{1}}{2})
+= & \int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\omega_{v_{1}}\phi_{1})Binom(V_{2}|V_{2}+R_{2},\omega_{v_{2}}\phi_{2})
 \end{align*}
 
 \end_inset
@@ -153,12 +153,11 @@ p(\phi_{1},\phi_{2}|M_{i}) & =p(\phi_{1}|M_{i})p(\phi_{2}|M_{i})\\
  & =1\cdot1\\
 p(V_{1},R_{1},V_{2},R_{2}|M_{i}) & =\int d\phi_{1}d\phi_{2}p(V_{1},R_{1}|\phi_{1})p(V_{2},R_{2}|\phi_{2})p(\phi_{1},\phi_{2}|M_{i})\\
  & =\int d\phi_{1}p(V_{1},R_{1}|\phi_{1})\int d\phi_{2}p(V_{2},R_{2}|\phi_{2})\\
- & =\int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\frac{\phi_{1}}{2})\int d\phi_{2}Binom(V_{2}|V_{2}+R_{2},\frac{\phi_{2}}{2})\\
- & ={V_{1}+R_{1} \choose V_{1}}B(V_{1}+1,R_{1}+1){V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)\int_{0}^{1}d\phi_{1}Beta(\frac{1}{2}\phi_{1}|V_{1}+1,R_{1}+1)\int_{0}^{1}d\phi_{2}Beta(\frac{1}{2}\phi_{2}|V_{2}+1,R_{2}+1)\\
- & ={V_{1}+R_{1} \choose V_{1}}B(V_{1}+1,R_{1}+1){V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)(2\cdot2)\int_{0}^{\frac{1}{2}}dP_{1}Beta(P_{1}|V_{1}+1,R_{1}+1)\int_{0}^{\frac{1}{2}}dP_{2}Beta(P_{2}|V_{2}+1,R_{2}+1)\\
- & ={V_{1}+R_{1} \choose V_{1}}B(V_{1}+1,R_{1}+1){V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)(2\cdot2)\int_{0}^{\frac{1}{2}}dP_{1}Beta(P_{1}|V_{1}+1,R_{1}+1)\int_{0}^{\frac{1}{2}}dP_{2}Beta(P_{2}|V_{2}+1,R_{2}+1)\\
- & ={V_{1}+R_{1} \choose V_{1}}B(V_{1}+1,R_{1}+1){V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)(2\cdot2)\frac{B(\frac{1}{2};V_{1}+1,R_{1}+1)}{B(V_{1}+1,R_{1}+1)}\frac{B(\frac{1}{2};V_{2}+1,R_{2}+1)}{B(V_{2}+1,R_{2}+1)}\\
- & =4{V_{1}+R_{1} \choose V_{1}}{V_{2}+R_{2} \choose V_{2}}B(\frac{1}{2};V_{1}+1,R_{1}+1)B(\frac{1}{2};V_{2}+1,R_{2}+1)
+ & =\int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\omega_{v_{1}}\phi_{1})\int d\phi_{2}Binom(V_{2}|V_{2}+R_{2},\omega_{v_{2}}\phi_{2})\\
+ & ={V_{1}+R_{1} \choose V_{1}}B(V_{1}+1,R_{1}+1){V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)\int_{0}^{1}d\phi_{1}Beta(\omega_{v_{1}}\phi_{1}|V_{1}+1,R_{1}+1)\int_{0}^{1}d\phi_{2}Beta(\omega_{v_{2}}\phi_{2}|V_{2}+1,R_{2}+1)\\
+ & ={V_{1}+R_{1} \choose V_{1}}B(V_{1}+1,R_{1}+1){V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)\frac{1}{\omega_{v_{1}}\omega_{v_{2}}}\int_{0}^{\omega_{v_{1}}}dP_{1}Beta(P_{1}|V_{1}+1,R_{1}+1)\int_{0}^{\omega_{v_{2}}}dP_{2}Beta(P_{2}|V_{2}+1,R_{2}+1)\\
+ & ={V_{1}+R_{1} \choose V_{1}}B(V_{1}+1,R_{1}+1){V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)\frac{1}{\omega_{v_{1}}\omega_{v_{2}}}\frac{B(\omega_{v_{1}};V_{1}+1,R_{1}+1)}{B(V_{1}+1,R_{1}+1)}\frac{B(\omega_{v_{2}};V_{2}+1,R_{2}+1)}{B(V_{2}+1,R_{2}+1)}\\
+ & =\frac{1}{\omega_{v_{1}}\omega_{v_{2}}}{V_{1}+R_{1} \choose V_{1}}{V_{2}+R_{2} \choose V_{2}}B(\omega_{v_{1}};V_{1}+1,R_{1}+1)B(\omega_{v_{2}};V_{2}+1,R_{2}+1)
 \end{align*}
 
 \end_inset
@@ -181,20 +180,20 @@ If
 p(\phi_{2}|\phi_{1},M_{i}) & =\frac{1}{U_{\phi_{2}}(\phi_{1},M_{i})-L_{\phi_{2}}(\phi_{1},M_{i})}I(L_{\phi_{2}}(\phi_{1},M_{i})\leq\phi_{2}\leq U_{\phi_{2}}(\phi_{1},M_{i}))\\
  & \text{(\ensuremath{U} and \ensuremath{L} define upper and lower bounds on \ensuremath{\phi_{2})}}\\
 p(V_{1},R_{1},V_{2,}R_{2}|M_{i}) & =\int d\phi_{1}p(V_{1},R_{1}|\phi_{1})p(\phi_{1}|M_{i})\frac{1}{U_{\phi_{2}}(\phi_{1},M_{i})-L_{\phi_{2}}(\phi_{1},M_{i})}\int_{L_{\phi_{2}}(\phi_{1},M_{i})}^{U_{\phi_{2}}(\phi_{1},M_{i})}d\phi_{2}p(V_{2},R_{2}|\phi_{2})\\
-\int d\phi_{2}p(V_{2},R_{2}|\phi_{2}) & =\int d\phi_{2}Binom(V_{2}|V_{2}+R_{2},\frac{1}{2}\phi_{2})\\
- & =\int d\phi_{2}Beta(\frac{1}{2}\phi_{2}|V_{2}+1,R_{2}+1){V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)\\
- & ={V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)\int d\phi_{2}Beta(\frac{1}{2}\phi_{2}|V_{2}+1,R_{2}+1)\\
- & \text{Let \ensuremath{P_{2}=\frac{1}{2}\phi_{2}.}Then \ensuremath{\frac{dP_{2}}{d\phi_{2}}=\frac{1}{2},}and:}\\
-\int d\phi_{2}Beta(\frac{1}{2}\phi_{2}|V_{2}+1,R_{2}+1)= & 2\int\Bigg(d\phi_{2}\frac{1}{2}\Bigg)Beta(\frac{1}{2}\phi_{2}|V_{2}+1,R_{2}+1)\\
-= & 2\int dP_{2}Beta(P_{2}|V_{2}+1,R_{2}+1)\\
+\int d\phi_{2}p(V_{2},R_{2}|\phi_{2}) & =\int d\phi_{2}Binom(V_{2}|V_{2}+R_{2},\omega_{v_{2}}\phi_{2})\\
+ & =\int d\phi_{2}Beta(\omega_{v_{2}}\phi_{2}|V_{2}+1,R_{2}+1){V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)\\
+ & ={V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)\int d\phi_{2}Beta(\omega_{v_{2}}\phi_{2}|V_{2}+1,R_{2}+1)\\
+ & \text{Let \ensuremath{P_{2}=\omega_{v_{2}}\phi_{2}.}Then \ensuremath{\frac{dP_{2}}{d\phi_{2}}=\omega_{v_{2}},}and:}\\
+\int d\phi_{2}Beta(\omega_{v_{2}}\phi_{2}|V_{2}+1,R_{2}+1)= & \frac{1}{\omega_{v_{2}}}\int\Bigg(d\phi_{2}\omega_{v_{2}}\Bigg)Beta(\omega_{v_{2}}\phi_{2}|V_{2}+1,R_{2}+1)\\
+= & \frac{1}{\omega_{v_{2}}}\int dP_{2}Beta(P_{2}|V_{2}+1,R_{2}+1)\\
 \int_{L_{\phi_{2}}(\phi_{1},M_{i})}^{U_{\phi_{2}}(\phi_{1},M_{i})}d\phi_{2}p(V_{2},R_{2}|\phi_{2})= & \int_{0}^{U_{\phi_{2}}(\phi_{1},M_{i})}d\phi_{2}p(V_{2},R_{2}|\phi_{2})-\int_{0}^{L_{\phi_{2}}(\phi_{1},M_{i})}d\phi_{2}p(V_{2},R_{2}|\phi_{2})\\
 = & {V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)\\
- & \Bigg(\int_{0}^{U_{\phi_{2}}(\phi_{1},M_{i})}d\phi_{2}Beta(\frac{1}{2}\phi_{2}|V_{2}+1,R_{2}+1)-\int_{0}^{L_{\phi_{2}}(\phi_{1},M_{i})}d\phi_{2}Beta(\frac{1}{2}\phi_{2}|V_{2}+1,R_{2}+1)\Bigg)\\
+ & \Bigg(\int_{0}^{U_{\phi_{2}}(\phi_{1},M_{i})}d\phi_{2}Beta(\omega_{v_{2}}\phi_{2}|V_{2}+1,R_{2}+1)-\int_{0}^{L_{\phi_{2}}(\phi_{1},M_{i})}d\phi_{2}Beta(\omega_{v_{2}}\phi_{2}|V_{2}+1,R_{2}+1)\Bigg)\\
 = & {V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)\\
- & \Bigg(2\int_{0}^{\frac{1}{2}U_{\phi_{2}}(\phi_{1},M_{i})}dP_{2}Beta(P_{2}|V_{2}+1,R_{2}+1)-2\int_{0}^{\frac{1}{2}L_{\phi_{2}}(\phi_{1},M_{i})}dP_{2}Beta(P_{2}|V_{2}+1,R_{2}+1)\Bigg)\\
-= & {V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)\frac{2}{B(V_{2}+1,R_{2}+1)}\\
- & \Bigg(B(\frac{1}{2}U_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)-B(\frac{1}{2}L_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)\Bigg)\\
-=2 & {V_{2}+R_{2} \choose V_{2}}\Bigg(B(\frac{1}{2}U_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)-B(\frac{1}{2}L_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)\Bigg)\\
+ & \Bigg(\frac{1}{\omega_{v_{2}}}\int_{0}^{\omega_{v_{2}}U_{\phi_{2}}(\phi_{1},M_{i})}dP_{2}Beta(P_{2}|V_{2}+1,R_{2}+1)-2\int_{0}^{\omega_{v_{2}}L_{\phi_{2}}(\phi_{1},M_{i})}dP_{2}Beta(P_{2}|V_{2}+1,R_{2}+1)\Bigg)\\
+= & {V_{2}+R_{2} \choose V_{2}}B(V_{2}+1,R_{2}+1)\frac{1}{\omega_{v_{2}}B(V_{2}+1,R_{2}+1)}\\
+ & \Bigg(B(\omega_{v_{2}}U_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)-B(\omega_{v_{2}}L_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)\Bigg)\\
+=\frac{1}{\omega_{v_{2}}} & {V_{2}+R_{2} \choose V_{2}}\Bigg(B(\omega_{v_{2}}U_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)-B(\omega_{v_{2}}L_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)\Bigg)\\
 p(\phi_{1}|M_{i}) & =\int d\phi_{2}p(\phi_{1}\phi_{2}|M_{i})\\
  & =\int_{L_{\phi_{2}(\phi_{1},M_{i})}}^{U_{\phi_{2}(\phi_{1},M_{i})}}d\phi_{2}2\\
  & =2\phi_{2}\Big|_{L_{\phi_{2}(\phi_{1},M_{i})}}^{U_{\phi_{2}(\phi_{1},M_{i})}}\\
@@ -206,12 +205,12 @@ p(\phi_{1}|M_{i}) & =\frac{p(\phi_{1},\phi_{2}|M_{i})}{p(\phi_{2}|\phi_{1},M_{i}
  & =\frac{2I(0\leq\phi_{2}\leq\phi_{1}\leq1)}{\frac{1}{U_{\phi_{2}}(\phi_{1},M_{i})-L_{\phi_{2}}(\phi_{1},M_{i})}I(0\leq\phi_{2}\leq\phi_{1}\leq1)}\\
  & =2(U_{\phi_{2}}(\phi_{1},M_{i})-L_{\phi_{2}}(\phi_{1},M_{i}))\\
 p(V_{1},R_{1},V_{2,}R_{2}|M_{i})= & \int d\phi_{1}p(V_{1},R_{1}|\phi_{1})p(\phi_{1}|M_{i})\frac{1}{U_{\phi_{2}}(\phi_{1},M_{i})-L_{\phi_{2}}(\phi_{1},M_{i})}\int_{L_{\phi_{2}}(\phi_{1},M_{i})}^{U_{\phi_{2}}(\phi_{1},M_{i})}d\phi_{2}p(V_{2},R_{2}|\phi_{2})\\
-= & \int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\frac{\phi_{1}}{2})p(\phi_{1}|M_{i})\frac{2{V_{2}+R_{2} \choose V_{2}}}{U_{\phi_{2}}(\phi_{1},M_{i})-L_{\phi_{2}}(\phi_{1},M_{i})}\\
- & \Bigg(B(\frac{1}{2}U_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)-B(\frac{1}{2}L_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)\Bigg)\\
-= & \int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\frac{\phi_{1}}{2})4{V_{2}+R_{2} \choose V_{2}}\\
- & \Bigg(B(\frac{1}{2}U_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)-B(\frac{1}{2}L_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)\Bigg)\\
-= & 4{V_{2}+R_{2} \choose V_{2}}\int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\frac{\phi_{1}}{2})\\
- & \Bigg(B(\frac{1}{2}U_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)-B(\frac{1}{2}L_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)\Bigg)
+= & \int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\omega_{v_{1}}\phi_{1})p(\phi_{1}|M_{i})\frac{1}{U_{\phi_{2}}(\phi_{1},M_{i})-L_{\phi_{2}}(\phi_{1},M_{i})}\\
+ & \frac{{V_{2}+R_{2} \choose V_{2}}}{\omega_{v_{2}}}\Bigg(B(\omega_{v_{2}}U_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)-B(\omega_{v_{2}}L_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)\Bigg)\\
+= & \int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\omega_{v_{1}}\phi_{1})2\frac{{V_{2}+R_{2} \choose V_{2}}}{\omega_{v_{2}}}\\
+ & \Bigg(B(\omega_{v_{2}}U_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)-B(\omega_{v_{2}}L_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)\Bigg)\\
+= & 2\frac{{V_{2}+R_{2} \choose V_{2}}}{\omega_{v_{2}}}\int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\omega_{v_{1}}\phi_{1})\\
+ & \Bigg(B(\omega_{v_{2}}U_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)-B(\omega_{v_{2}}L_{\phi_{2}}(\phi_{1},M_{i});V_{2}+1,R_{2}+1)\Bigg)
 \end{align*}
 
 \end_inset
