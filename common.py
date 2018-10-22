@@ -11,6 +11,18 @@ with warnings.catch_warnings():
 _LOGEPSILON = -400
 _EPSILON    = np.exp(_LOGEPSILON)
 
+Variant = namedtuple('Variant', (
+  'id',
+  'var_reads',
+  'ref_reads',
+  'total_reads',
+  'vaf',
+  'omega_v',
+))
+
+def convert_variant_dict_to_tuple(V):
+  return Variant(**{K: V[K] for K in Variant._fields})
+
 class Models:
   _all = ('garbage', 'cocluster', 'A_B', 'B_A', 'diff_branches')
 for idx, M in enumerate(Models._all):

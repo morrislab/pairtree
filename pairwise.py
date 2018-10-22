@@ -4,7 +4,7 @@ import concurrent.futures
 from tqdm import tqdm
 import itertools
 
-from common import Models
+from common import Models, Variant
 import lh
 import util
 
@@ -45,6 +45,9 @@ def calc_posterior(variants, parallel=1, include_garbage_in_posterior=False, inc
   posterior = {}
   evidence = {}
 
+  # Allow Numba use by converting to namedtuple.
+  variants = {vid: common.convert_variant_dict_to_tuple(V) for vid, V in variants.items()}
+
   combos = list(itertools.combinations(variants.keys(), 2)) + [(K,K) for K in variants.keys()]
   combos = [sorted(C) for C in combos]
   # Don't bother starting more workers than jobs.
@@ -77,7 +80,7 @@ def calc_posterior(variants, parallel=1, include_garbage_in_posterior=False, inc
   return (posterior, evidence)
 
 def calc_lh(V1, V2, _calc_lh=lh.calc_lh_quad):
-  if V1['id'] == V2['id']:
+  if V1.id == V2.id:
     # If they're the same variant, they should cocluster with certainty.
     evidence = -np.inf * np.ones(len(Models._all))
     evidence[Models.cocluster] = 0

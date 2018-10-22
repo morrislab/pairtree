@@ -23,10 +23,12 @@ def create_vars():
   for vid, V in variants.items():
     for K in ('var_reads', 'total_reads'):
       V[K] = np.array(S*V[K]).astype(np.int)
+    V['id'] = vid
     V['ref_reads'] = V['total_reads'] - V['var_reads']
     V['vaf'] = V['var_reads'].astype(np.float) / V['total_reads']
     V['omega_v'] = 0.5
 
+  variants = {vid: common.convert_variant_dict_to_tuple(V) for vid, V in variants.items()}
   return (variants['V1'], variants['V2'])
 
 def main():

@@ -40,13 +40,13 @@ def calc_lh_grid(var1, var2):
   N = 3*int(1/grid_step + 1) # N: number of grid points
   G = np.linspace(start=0, stop=1, num=N)[:,np.newaxis] # Nx1
 
-  S = len(var1['total_reads']) # S
+  S = len(var1.total_reads) # S
   logprob_phi = generate_logprob_phi(N) # MxNxN
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
 
   for s in range(S):
     for modelidx in logprob_phi.keys():
-      pv1, pv2 = [scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], V['omega_v']*G) for V in (var1, var2)] # Nx1
+      pv1, pv2 = [scipy.stats.binom.logpmf(V.var_reads[s], V.total_reads[s], V.omega_v*G) for V in (var1, var2)] # Nx1
       p1 = np.tile(pv1, N)   # pv1 vector tiled as columns
       p2 = np.tile(pv2, N).T # pv2 vector tiled as rows
       P = p1 + p2 + logprob_phi[modelidx]
@@ -77,7 +77,7 @@ def _gen_samples(modelidx, S):
   return (phi1, phi2, area)
 
 def calc_lh_mc_2D(var1, var2):
-  S = len(var1['total_reads']) # S
+  S = len(var1.total_reads) # S
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
   for s in range(S):
     for modelidx in (Models.cocluster, Models.A_B, Models.B_A, Models.diff_branches):
@@ -86,13 +86,13 @@ def calc_lh_mc_2D(var1, var2):
 
       logP = []
       for V, phi in ((var1, phi1), (var2, phi2)):
-        logP.append(scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], V['omega_v']*phi))
+        logP.append(scipy.stats.binom.logpmf(V.var_reads[s], V.total_reads[s], V.omega_v*phi))
       logprob_models[s,modelidx] = scipy.special.logsumexp(logP[0] + logP[1]) - np.log(mcsamps)
 
   return logprob_models
 
 def calc_lh_mc_2D_dumb(var1, var2):
-  S = len(var1['total_reads']) # S
+  S = len(var1.total_reads) # S
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
   for s in range(S):
     for modelidx in (Models.cocluster, Models.A_B, Models.B_A, Models.diff_branches):
@@ -118,28 +118,28 @@ def calc_lh_mc_2D_dumb(var1, var2):
 
       logP = []
       for V, phi in ((var1, phi1), (var2, phi2)):
-        logP.append(scipy.stats.binom.logpmf(V['var_reads'][s], V['total_reads'][s], V['omega_v']*phi))
+        logP.append(scipy.stats.binom.logpmf(V.var_reads[s], V.total_reads[s], V.omega_v*phi))
       logprob_models[s,modelidx] = scipy.special.logsumexp((logP[0] + logP[1] - np.log(area))[prior]) - np.log(mcsamps)
 
   return logprob_models
 
 def _calc_garbage_smart(V1, V2):
-  S = len(V1['total_reads']) # S
+  S = len(V1.total_reads) # S
   evidence = np.nan * np.ones(S)
 
   for sidx in range(S):
-    logP = [-np.log(V1['omega_v']), -np.log(V2['omega_v'])]
+    logP = [-np.log(V1.omega_v), -np.log(V2.omega_v)]
     for V in (V1, V2):
-      A, B = V['var_reads'][sidx] + 1, V['ref_reads'][sidx] + 1
-      logP.append(util.log_N_choose_K(V['total_reads'][sidx], V['var_reads'][sidx]))
-      logP.append(np.log(scipy.special.betainc(A, B, V['omega_v'])))
+      A, B = V.var_reads[sidx] + 1, V.ref_reads[sidx] + 1
+      logP.append(util.log_N_choose_K(V.total_reads[sidx], V.var_reads[sidx]))
+      logP.append(np.log(scipy.special.betainc(A, B, V.omega_v)))
       logP.append(scipy.special.betaln(A, B)) # Denormalization factor for beta
     evidence[sidx] = np.sum(logP)
 
   return evidence
 
 def _calc_garbage_dumb(V1, V2):
-  S = len(V1['total_reads']) # S
+  S = len(V1.total_reads) # S
   evidence = np.nan * np.ones(S)
   mcsamps = int(1e5)
 
@@ -147,7 +147,7 @@ def _calc_garbage_dumb(V1, V2):
     logP = []
     for V in (V1, V2):
       phi = scipy.stats.uniform.rvs(loc=0, scale=1, size=mcsamps)
-      binom = scipy.stats.binom.logpmf(V['var_reads'][sidx], V['total_reads'][sidx], V['omega_v']*phi)
+      binom = scipy.stats.binom.logpmf(V.var_reads[sidx], V.total_reads[sidx], V.omega_v*phi)
       logP.append(scipy.special.logsumexp(binom) - np.log(mcsamps))
     evidence[sidx] = np.sum(logP)
 
@@ -157,7 +157,7 @@ calc_garbage = _calc_garbage_smart
 #calc_garbage = _calc_garbage_dumb
 
 def calc_lh_mc_1D(V1, V2):
-  S = len(V1['total_reads']) # S
+  S = len(V1.total_reads) # S
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
   for sidx in range(S):
     for modelidx in (Models.cocluster, Models.A_B, Models.B_A, Models.diff_branches):
@@ -167,25 +167,25 @@ def calc_lh_mc_1D(V1, V2):
       if modelidx == Models.cocluster:
         logP = []
         for V in (V1, V2):
-          logP.append(scipy.stats.binom.logpmf(V['var_reads'][sidx], V['total_reads'][sidx], V['omega_v']*phi1))
+          logP.append(scipy.stats.binom.logpmf(V.var_reads[sidx], V.total_reads[sidx], V.omega_v*phi1))
         logprob_models[sidx,modelidx] = scipy.special.logsumexp(logP[0] + logP[1]) - np.log(mcsamps)
       else:
-        logP = scipy.stats.binom.logpmf(V1['var_reads'][sidx], V1['total_reads'][sidx], V1['omega_v']*phi1)
+        logP = scipy.stats.binom.logpmf(V1.var_reads[sidx], V1.total_reads[sidx], V1.omega_v*phi1)
 
         lower = _make_lower(phi1, modelidx)
         upper = _make_upper(phi1, modelidx)
-        A = V2['var_reads'][sidx] + 1
-        B = V2['ref_reads'][sidx] + 1
+        A = V2.var_reads[sidx] + 1
+        B = V2.ref_reads[sidx] + 1
 
-        betainc = [scipy.special.betainc(A, B, V2['omega_v']*limit) for limit in (upper, lower)]
+        betainc = [scipy.special.betainc(A, B, V2.omega_v*limit) for limit in (upper, lower)]
         logdenorm = scipy.special.betaln(A, B)
         # Add epsilon to ensure we don't take log of zero.
         logP += np.log(betainc[0] - betainc[1] + _EPSILON) + logdenorm
 
         logP = scipy.special.logsumexp(logP) - np.log(mcsamps)
         logP += np.log(2)
-        logP += util.log_N_choose_K(V2['total_reads'][sidx], V2['var_reads'][sidx])
-        logP -= np.log(V2['omega_v'])
+        logP += util.log_N_choose_K(V2.total_reads[sidx], V2.var_reads[sidx])
+        logP -= np.log(V2.omega_v)
         logprob_models[sidx,modelidx] = logP
 
   return logprob_models
@@ -208,17 +208,17 @@ def _make_upper(phi1, midx):
 
 def _integral_separate_clusters(phi1, V1, V2, sidx, midx, logsub=None):
   logP = scipy.stats.binom.logpmf(
-    V1['var_reads'][sidx],
-    V1['total_reads'][sidx],
-    V1['omega_v']*phi1
+    V1.var_reads[sidx],
+    V1.total_reads[sidx],
+    V1.omega_v*phi1
   )
   lower = _make_lower(phi1, midx)
   upper = _make_upper(phi1, midx)
 
-  A = V2['var_reads'][sidx] + 1
-  B = V2['ref_reads'][sidx] + 1
-  betainc_upper = scipy.special.betainc(A, B, V2['omega_v'] * upper)
-  betainc_lower = scipy.special.betainc(A, B, V2['omega_v'] * lower)
+  A = V2.var_reads[sidx] + 1
+  B = V2.ref_reads[sidx] + 1
+  betainc_upper = scipy.special.betainc(A, B, V2.omega_v * upper)
+  betainc_lower = scipy.special.betainc(A, B, V2.omega_v * lower)
   # Add epsilon to ensure we don't take log of zero.
   logP += np.log(betainc_upper - betainc_lower + _EPSILON)
   if logsub is not None:
@@ -227,7 +227,7 @@ def _integral_separate_clusters(phi1, V1, V2, sidx, midx, logsub=None):
   return np.exp(logP)
 
 def _integral_same_cluster(phi1, V1, V2, sidx, midx, logsub=None):
-  binom = [scipy.stats.binom.logpmf( V['var_reads'][sidx], V['total_reads'][sidx], V['omega_v']*phi1) for V in (V1, V2)]
+  binom = [scipy.stats.binom.logpmf( V.var_reads[sidx], V.total_reads[sidx], V.omega_v*phi1) for V in (V1, V2)]
   logP = binom[0] + binom[1]
   if logsub is not None:
     logP -= logsub
@@ -240,21 +240,21 @@ def quad(*args, **kwargs):
 
 def calc_lh_quad(V1, V2):
   max_splits = 50
-  S = len(V1['total_reads']) # S
+  S = len(V1.total_reads) # S
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
 
   for sidx in range(S):
     for modelidx in (Models.cocluster, Models.A_B, Models.B_A, Models.diff_branches):
       if modelidx == Models.cocluster:
-        logmaxP = np.log(_integral_same_cluster(V1['vaf'][sidx], V1, V2, sidx, modelidx) + _EPSILON)
+        logmaxP = np.log(_integral_same_cluster(V1.vaf[sidx], V1, V2, sidx, modelidx) + _EPSILON)
         P, P_error = quad(_integral_same_cluster, 0, 1, args=(V1, V2, sidx, modelidx, logmaxP), limit=max_splits)
         P = np.maximum(_EPSILON, P)
         logP = np.log(P) + logmaxP
       else:
-        logmaxP = np.log(_integral_separate_clusters(V1['vaf'][sidx], V1, V2, sidx, modelidx) + _EPSILON)
+        logmaxP = np.log(_integral_separate_clusters(V1.vaf[sidx], V1, V2, sidx, modelidx) + _EPSILON)
         P, P_error = quad(_integral_separate_clusters, 0, 1, args=(V1, V2, sidx, modelidx, logmaxP), limit=max_splits)
-        logdenorm = scipy.special.betaln(V2['var_reads'][sidx] + 1, V2['ref_reads'][sidx] + 1)
+        logdenorm = scipy.special.betaln(V2.var_reads[sidx] + 1, V2.ref_reads[sidx] + 1)
         P = np.maximum(_EPSILON, P)
-        logP = np.log(P) + logmaxP + logdenorm + np.log(2) + util.log_N_choose_K(V2['total_reads'][sidx], V2['var_reads'][sidx]) - np.log(V2['omega_v'])
+        logP = np.log(P) + logmaxP + logdenorm + np.log(2) + util.log_N_choose_K(V2.total_reads[sidx], V2.var_reads[sidx]) - np.log(V2.omega_v)
       logprob_models[sidx,modelidx] = logP
   return logprob_models
