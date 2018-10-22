@@ -220,8 +220,9 @@ def main():
     write_trees(args.sampid, len(sampled_adjm) - 1, outf)
     write_phi_matrix(args.sampid, outf)
     relation_plotter.plot_ml_relations(model_probs_tensor, outf)
-    vaf_plotter.plot_vaf_matrix(args.sampid, clusters, variants, supervars, garbage_variants, phi[-1], sampnames, None, False, outf)
+    vaf_plotter.plot_vaf_matrix(args.sampid, clusters, variants, supervars, garbage_variants, phi[-1], sampnames, None, outf)
 
   print_error(phi[-1], supervars, sampled_llh[-1])
 
-main()
+if __name__ == '__main__':
+  main()

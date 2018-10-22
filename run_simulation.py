@@ -46,7 +46,6 @@ def write_results(data, posterior, evidence, datafn, pairwisefn, resultsfn):
       data['phi'],
       data['sampnames'],
       None,
-      False,
       outf)
 
 def main():

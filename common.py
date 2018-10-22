@@ -1,7 +1,6 @@
 import csv
 import numpy as np
 from collections import namedtuple
-import vaf_correcter
 import json
 
 import warnings
@@ -42,7 +41,6 @@ def parse_ssms(sampid, ssmfn):
       variant['pos'] = int(variant['pos'])
       variants[row['id']] = variant
 
-  vaf_correcter.correct_vafs(sampid, variants)
   return variants
 
 def make_ancestral_from_adj(adj):
@@ -80,8 +78,7 @@ def make_cluster_supervars(clusters, variants):
     cluster_var_reads = np.array([V['var_reads'] for V in cvars])
     # Correct for sex variants.
     omega_v = np.array([V['omega_v'] for V in cvars])[:,np.newaxis]
-    vaf_corrections = np.array([V['vaf_correction'] for V in cvars])[:,np.newaxis]
-    cluster_var_reads = np.round(vaf_corrections * (cluster_var_reads / (2*omega_v)))
+    cluster_var_reads = np.round(cluster_var_reads / (2*omega_v))
 
     S_name = 'C%s' % len(cluster_supervars)
     S = {
@@ -94,7 +91,6 @@ def make_cluster_supervars(clusters, variants):
       'omega_v': 0.5,
       'var_reads': np.sum(cluster_var_reads, axis=0),
       'total_reads': np.sum(cluster_total_reads, axis=0),
-      'vaf_correction': 1.,
     }
     S['ref_reads'] = S['total_reads'] - S['var_reads']
     S['vaf'] = S['var_reads'] / S['total_reads']

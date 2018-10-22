@@ -3,7 +3,6 @@ import csv
 import json
 import numpy as np
 from collections import defaultdict
-import vaf_correcter
 import common
 import itertools
 
@@ -170,30 +169,10 @@ def get_next_colour():
   return scale[idx]
 get_next_colour._last_idx = -1
 
-def augment_variant(V, spreadsheet, correct_vaf):
-  if correct_vaf:
-    V['vaf'] *= V['vaf_correction']
+def augment_variant(V, spreadsheet):
   if spreadsheet is None:
     return
   V['gene'] = find_gene_name(V['chrom'], V['pos'], spreadsheet)
-
-def plot_unclustered_vafs(sampid, variants, garbage_variants, sampnames, spreadsheetfn, outf, patient_samples_only=False):
-  print('<h2>Unclustered VAFs (corrected, %s samples)</h2>' % ('patient' if patient_samples_only else 'all') , file=outf)
-  print('<h3>Corrected variants: %s</h3>' % ', '.join(vaf_correcter.corrected_vars(sampid)), file=outf)
-  if spreadsheetfn is not None:
-    spreadsheet = load_spreadsheet(spreadsheetfn)
-  else:
-    spreadsheet = None
-
-  # Copy variant so we don't modify original dict.
-  variants = {vid: dict(variants[vid]) for vid in variants.keys()}
-  if garbage_variants is not None:
-    variants.update({vid: dict(garbage_variants[vid]) for vid in garbage_variants.keys()})
-  for V in variants.values():
-    augment_variant(V, spreadsheet, True)
-    V['cluster'] = None
-
-  print_unclustered_vafs(variants, sampnames, outf, patient_samples_only)
 
 def print_distances(sampid, supervars, phi):
   def _compute_dist(V1, V2):
@@ -217,17 +196,15 @@ def print_distances(sampid, supervars, phi):
     dist, normdist = _compute_dist(supervars[sv], phi_pseudovars[phivid])
     print('phi_dist', int(phivid[1:]), int(sv[1:]) + 1, dist, normdist, sep=',')
 
-def plot_vaf_matrix(sampid, clusters, variants, supervars, garbage_variants, phi, sampnames, spreadsheetfn, correct_vafs, outf):
+def plot_vaf_matrix(sampid, clusters, variants, supervars, garbage_variants, phi, sampnames, spreadsheetfn, outf):
   print('<h2>VAFs (%s)</h2>' % ('corrected' if correct_vafs else 'uncorrected',), file=outf)
-  if correct_vafs is True:
-    print('<h3>Corrected variants: %s</h3>' % ', '.join(vaf_correcter.corrected_vars(sampid)), file=outf)
   spreadsheet = load_spreadsheet(spreadsheetfn)
 
   # Copy variant so we don't modify original dict.
   variants         = {vid: dict(variants[vid])         for vid in variants.keys()}
   garbage_variants = {vid: dict(garbage_variants[vid]) for vid in garbage_variants.keys()}
   for V in list(variants.values()) + list(garbage_variants.values()):
-    augment_variant(V, spreadsheet, correct_vafs)
+    augment_variant(V, spreadsheet)
 
   clustered_vars = [[variants['s%s' % vid] for vid in C] for C in clusters]
   for cidx, cluster in enumerate(clustered_vars):

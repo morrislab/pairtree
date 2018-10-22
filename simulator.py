@@ -110,7 +110,6 @@ def make_variants(V, T, omega_v):
       'var_reads': V[midx],
       'total_reads': T[midx],
       'omega_v': omega_v[midx],
-      'vaf_correction': 1.,
     }
     variant['ref_reads'] = variant['total_reads'] - variant['var_reads']
     variant['vaf'] = variant['var_reads'] / variant['total_reads']
