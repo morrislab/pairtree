@@ -197,7 +197,7 @@ def print_distances(sampid, supervars, phi):
     print('phi_dist', int(phivid[1:]), int(sv[1:]) + 1, dist, normdist, sep=',')
 
 def plot_vaf_matrix(sampid, clusters, variants, supervars, garbage_variants, phi, sampnames, spreadsheetfn, outf):
-  print('<h2>VAFs (%s)</h2>' % ('corrected' if correct_vafs else 'uncorrected',), file=outf)
+  print('<h2>VAFs</h2>', file=outf)
   spreadsheet = load_spreadsheet(spreadsheetfn)
 
   # Copy variant so we don't modify original dict.
