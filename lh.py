@@ -211,7 +211,7 @@ def _make_upper(phi1, midx):
 def binom_logpmf(X, N, P):
   return util.log_N_choose_K(N, X) + X*np.log(P) + (N - X)*np.log(1 - P)
 
-def _integral_separate_clusters(phi1, V1, V2, sidx, midx, logsub=None):
+def _integral_separate_clusters(phi1, V1, V2, sidx, midx, logsub=0):
   logP = binom_logpmf(
     V1.var_reads[sidx],
     V1.total_reads[sidx],
@@ -226,16 +226,14 @@ def _integral_separate_clusters(phi1, V1, V2, sidx, midx, logsub=None):
   betainc_lower = scipy.special.betainc(A, B, V2.omega_v * lower)
   # Add epsilon to ensure we don't take log of zero.
   logP += np.log(betainc_upper - betainc_lower + _EPSILON)
-  if logsub is not None:
-    logP -= logsub
+  logP -= logsub
 
   return np.exp(logP)
 
-def _integral_same_cluster(phi1, V1, V2, sidx, midx, logsub=None):
+def _integral_same_cluster(phi1, V1, V2, sidx, logsub=0):
   binom = [binom_logpmf(V.var_reads[sidx], V.total_reads[sidx], V.omega_v*phi1) for V in (V1, V2)]
   logP = binom[0] + binom[1]
-  if logsub is not None:
-    logP -= logsub
+  logP -= logsub
   return np.exp(logP)
 
 def quad(*args, **kwargs):
@@ -249,14 +247,18 @@ def calc_lh_quad(V1, V2):
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
 
   for sidx in range(S):
+    V1_phi_mle = V1.vaf[sidx] / V1.omega_v
+    V1_phi_mle = np.minimum(1, V1_phi_mle)
+    V1_phi_mle = np.maximum(0, V1_phi_mle)
+
     for modelidx in (Models.cocluster, Models.A_B, Models.B_A, Models.diff_branches):
       if modelidx == Models.cocluster:
-        logmaxP = np.log(_integral_same_cluster(V1.vaf[sidx], V1, V2, sidx, modelidx) + _EPSILON)
-        P, P_error = quad(_integral_same_cluster, 0, 1, args=(V1, V2, sidx, modelidx, logmaxP), limit=max_splits)
+        logmaxP = np.log(_integral_same_cluster(V1_phi_mle, V1, V2, sidx) + _EPSILON)
+        P, P_error = quad(_integral_same_cluster, 0, 1, args=(V1, V2, sidx, logmaxP), limit=max_splits)
         P = np.maximum(_EPSILON, P)
         logP = np.log(P) + logmaxP
       else:
-        logmaxP = np.log(_integral_separate_clusters(V1.vaf[sidx], V1, V2, sidx, modelidx) + _EPSILON)
+        logmaxP = np.log(_integral_separate_clusters(V1_phi_mle, V1, V2, sidx, modelidx) + _EPSILON)
         P, P_error = quad(_integral_separate_clusters, 0, 1, args=(V1, V2, sidx, modelidx, logmaxP), limit=max_splits)
         logdenorm = scipy.special.betaln(V2.var_reads[sidx] + 1, V2.ref_reads[sidx] + 1)
         P = np.maximum(_EPSILON, P)
