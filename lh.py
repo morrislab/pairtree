@@ -206,8 +206,13 @@ def _make_upper(phi1, midx):
   }[midx]
   return np.broadcast_to(ret, np.array(phi1).shape)
 
+# SciPy's implementation is really slow. This is called hundreds of thousands
+# of times, so I need something fast.
+def binom_logpmf(X, N, P):
+  return util.log_N_choose_K(N, X) + X*np.log(P) + (N - X)*np.log(1 - P)
+
 def _integral_separate_clusters(phi1, V1, V2, sidx, midx, logsub=None):
-  logP = scipy.stats.binom.logpmf(
+  logP = binom_logpmf(
     V1.var_reads[sidx],
     V1.total_reads[sidx],
     V1.omega_v*phi1
@@ -227,7 +232,7 @@ def _integral_separate_clusters(phi1, V1, V2, sidx, midx, logsub=None):
   return np.exp(logP)
 
 def _integral_same_cluster(phi1, V1, V2, sidx, midx, logsub=None):
-  binom = [scipy.stats.binom.logpmf( V.var_reads[sidx], V.total_reads[sidx], V.omega_v*phi1) for V in (V1, V2)]
+  binom = [binom_logpmf(V.var_reads[sidx], V.total_reads[sidx], V.omega_v*phi1) for V in (V1, V2)]
   logP = binom[0] + binom[1]
   if logsub is not None:
     logP -= logsub
