@@ -4,7 +4,8 @@ import concurrent.futures
 from tqdm import tqdm
 import itertools
 
-from common import Models, Variant
+from common import Models
+import common
 import lh
 import util
 
