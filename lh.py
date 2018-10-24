@@ -209,7 +209,10 @@ def _make_upper(phi1, midx):
 # SciPy's implementation is really slow. This is called hundreds of thousands
 # of times, so I need something fast.
 def binom_logpmf(X, N, P):
-  return util.log_N_choose_K(N, X) + X*np.log(P) + (N - X)*np.log(1 - P)
+  assert 0 <= X <= N and 0 <= P <= 1
+  if np.isclose(0, P) or np.isclose(1, P):
+    return -np.inf
+  return + X*np.log(P) + (N - X)*np.log(1 - P)
 
 def _integral_separate_clusters(phi1, V1, V2, sidx, midx, logsub=0):
   logP = binom_logpmf(
