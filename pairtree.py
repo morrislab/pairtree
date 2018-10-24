@@ -77,7 +77,6 @@ def write_trees(sampid, tidx, outf):
 
   print('''<div id="trees"></div>''', file=outf)
   print('''<script type="text/javascript">$(document).ready(function() {''', file=outf)
-  print('new VafMatrix("#vafmatrix_toggles");', file=outf)
   for colouring in colourings[sampid]:
     print('''(new TreePlotter()).plot('%s.summ.json', %s, '%s', '%s', '%s', '#trees');''' % (
       sampid,

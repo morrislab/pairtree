@@ -72,6 +72,9 @@ def make_phi_pseudovars(phi):
 
 def print_vaftable_header(sampnames, outf):
   print('<style>.vafmatrix td, .vafmatrix { padding: 5px; margin: 0; border-collapse: collapse; } .vafmatrix th { transform: rotate(45deg); font-weight: normal !important; } .vafmatrix span { visibility: hidden; } .vafmatrix td:hover > span { visibility: visible; }</style>', file=outf)
+  print('''<script type="text/javascript">$(document).ready(function() {''', file=outf)
+  print('new VafMatrix("#vafmatrix_toggles");', file=outf)
+  print('});</script>', file=outf);
   print('<div id="vafmatrix_toggles" class="btn-group" data-toggle="buttons">', file=outf)
   print('<label class="btn btn-primary active toggle_phi"><input type="checkbox" autocomplete="off" checked> &phi;</label>', file=outf)
   print('<label class="btn btn-primary active toggle_cluster_means"><input type="checkbox" autocomplete="off" checked> Cluster means</label>', file=outf)
