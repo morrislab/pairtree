@@ -59,6 +59,7 @@ def partition_garbage_variants(cluster_supervars, garbage_variants):
   return parted
 
 def make_phi_pseudovars(phi):
+  omega_v = 0.5
   V = [{
     'gene': None,
     'id': 'P%s' % cidx,
@@ -66,7 +67,8 @@ def make_phi_pseudovars(phi):
     'chrom': None,
     'pos': None,
     'cluster': cidx,
-    'vaf': 0.5 * row,
+    'vaf': omega_v * row,
+    'omega_v': omega_v,
   } for cidx, row in enumerate(phi)]
   return V
 
@@ -88,9 +90,13 @@ def print_vaftable_header(sampnames, outf):
   print(''.join(['<th>%s</th>' % H for H in header]), file=outf)
   print('</tr></thead><tbody>', file=outf)
 
-def print_vaftable_row(V, bgcolour, outf):
+def print_vaftable_row(V, bgcolour, should_correct_vaf, outf):
+  if should_correct_vaf:
+    vaf = V['vaf'] / V['omega_v']
+  else:
+    vaf = V['vaf']
   td = ['<td class="%s">%s</td>' % (K, V[K] if K in V and V[K] is not None else '&mdash;') for K in ('gene', 'id', 'chrom', 'pos', 'cluster')]
-  td += ['<td style="background-color: %s"><span>%s</span></td>' % (make_colour(v), make_vaf_label(v)) for v in V['vaf']]
+  td += ['<td style="background-color: %s"><span>%s</span></td>' % (make_colour(v), make_vaf_label(v)) for v in vaf]
   print('<tr style="background-color: %s">%s</tr>' % (
     bgcolour,
     ''.join(td)
@@ -99,7 +105,7 @@ def print_vaftable_row(V, bgcolour, outf):
 def print_vaftable_footer(outf):
   print('</tbody></table>', file=outf)
 
-def print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, outf):
+def print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, should_correct_vaf, outf):
   nclusters = len(clustered_vars)
   cluster_colours = assign_colours(nclusters)
   parted_garbage_vars = partition_garbage_variants(supervars, garbage_variants)
@@ -118,7 +124,7 @@ def print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, outf
     cluster_rows += cluster
     cluster_rows += garbage
     for V in cluster_rows:
-      print_vaftable_row(V, cluster_colours[V['cluster']], outf)
+      print_vaftable_row(V, cluster_colours[V['cluster']], should_correct_vaf, outf)
 
   print_vaftable_footer(outf)
 
@@ -199,8 +205,8 @@ def print_distances(sampid, supervars, phi):
     dist, normdist = _compute_dist(supervars[sv], phi_pseudovars[phivid])
     print('phi_dist', int(phivid[1:]), int(sv[1:]) + 1, dist, normdist, sep=',')
 
-def plot_vaf_matrix(sampid, clusters, variants, supervars, garbage_variants, phi, sampnames, spreadsheetfn, outf):
-  print('<h2>VAFs</h2>', file=outf)
+def plot_vaf_matrix(sampid, clusters, variants, supervars, garbage_variants, phi, sampnames, spreadsheetfn, should_correct_vaf, outf):
+  print('<h2>VAFs (%s)</h2>' % ('corrected' if should_correct_vaf else 'uncorrected'), file=outf)
   spreadsheet = load_spreadsheet(spreadsheetfn)
 
   # Copy variant so we don't modify original dict.
@@ -213,5 +219,5 @@ def plot_vaf_matrix(sampid, clusters, variants, supervars, garbage_variants, phi
   for cidx, cluster in enumerate(clustered_vars):
     for var in cluster:
       var['cluster'] = cidx
-  print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, outf)
+  print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, should_correct_vaf, outf)
   print_distances(sampid, supervars, phi)
