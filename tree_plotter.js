@@ -476,6 +476,7 @@ ClusterMatrix.prototype.plot = function(clustermat_path, container) {
 
 function VafMatrix(container) {
   this._configure_toggles(container);
+  this._configure_filter(container);
 }
 
 VafMatrix.prototype._configure_toggles = function(container) {
@@ -507,6 +508,37 @@ VafMatrix.prototype._configure_toggles = function(container) {
     } else {
       E.addClass('active');
       targets.show();
+    }
+  });
+}
+
+VafMatrix.prototype._filter_rows = function(container, targets) {
+  var rows = $(container).find('.matrix tr');
+  if(targets.length === 0) {
+    rows.show();
+    return;
+  }
+
+  var targets = rows.filter(function() {
+    var tid = $(this).find('.id').text();
+    return targets.includes(tid);
+  });
+  var other = rows.not(targets);
+
+  targets.show();
+  other.hide();
+}
+
+VafMatrix.prototype._configure_filter = function(container) {
+  var filter = $(container).find('.filter');
+  var self = this;
+  filter.keydown(function(E) {
+    if(E.which === 13) {
+      E.preventDefault();
+      var targets = filter.val().trim().split(',');
+      targets = targets.map(function(T) { return T.trim(); });
+      targets = targets.filter(function(T) { return T !== ''; });
+      self._filter_rows(container, targets);
     }
   });
 }

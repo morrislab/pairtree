@@ -87,6 +87,7 @@ def print_vaftable_header(sampnames, outf):
   print('});</script>', file=outf)
 
   print(f'<div id="{container_id}">', file=outf)
+  print('<p><input type="text" class="filter" placeholder="s0,s1,..."></p>', file=outf)
   print('<div class="vafmatrix_toggles btn-group" data-toggle="buttons">', file=outf)
   print('<label class="btn btn-primary active toggle_phi"><input type="checkbox" autocomplete="off" checked> &phi;</label>', file=outf)
   print('<label class="btn btn-primary active toggle_cluster_means"><input type="checkbox" autocomplete="off" checked> Cluster means</label>', file=outf)
