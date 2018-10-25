@@ -8,14 +8,17 @@ def softmax(V):
 
 def create_vars():
   variants = {
-    'V1': {'var_reads': [18], 'total_reads': [100]},
-    'V2': {'var_reads': [10], 'total_reads': [100]},
+    #'V1': {'var_reads': [18], 'total_reads': [100]},
+    #'V2': {'var_reads': [10], 'total_reads': [100]},
 
     #'V1': {'var_reads': [500], 'total_reads': [1000]},
     #'V2': {'var_reads': [100], 'total_reads': [1000]},
 
     #'V1': {'var_reads': [1702], 'total_reads': [4069]},
     #'V2': {'var_reads': [2500], 'total_reads': [19100]},
+
+    'V2': {'var_reads': [179], 'total_reads': [356]},
+    'V1': {'var_reads': [0], 'total_reads': [200]},
   }
   print(sorted(variants.items()))
 
