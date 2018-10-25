@@ -80,6 +80,22 @@ def calc_posterior(variants, parallel=1, include_garbage_in_posterior=False, inc
     posterior[pair] = _calc_posterior(evidence[pair], include_garbage_in_posterior, include_cocluster_in_posterior)
   return (posterior, evidence)
 
+# In cases where we have zero variant reads for both variants, the garbage
+# models ends up taking considerable posterior mass, but we have no information
+# to judge whether the pair should be garbage. The contribution from lots of
+# samples with zero variant reads on both variants can end up overwhelming
+# informative samples with non-zero variant reads, such that the pair across
+# samples jointly is deemed garbage. This is undesireable behaviour, clearly,
+# and so ignore such (0, 0) cases by zeroing out their evidence. This
+# effectively states that we have a uniform posterior over the relations of
+# those mutations in that sample, which is the sensible thing to do.
+#
+# See this discussion on Slack for more details:
+# https://morrislab.slack.com/archives/CCE5HNVSP/p1540392641000100
+def _fix_zero_var_read_samples(V1, V2, evidence):
+  zero_indices = np.logical_and(V1.var_reads == 0, V2.var_reads == 0)
+  evidence[zero_indices,:] = 0
+
 def calc_lh(V1, V2, _calc_lh=lh.calc_lh_quad):
   if V1.id == V2.id:
     # If they're the same variant, they should cocluster with certainty.
@@ -89,6 +105,7 @@ def calc_lh(V1, V2, _calc_lh=lh.calc_lh_quad):
 
   evidence_per_sample = _calc_lh(V1, V2) # SxM
   evidence_per_sample[:,Models.garbage] = lh.calc_garbage(V1, V2)
+  _fix_zero_var_read_samples(V1, V2, evidence_per_sample)
   evidence = np.sum(evidence_per_sample, axis=0)
   return (evidence, evidence_per_sample)
 
