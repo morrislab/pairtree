@@ -5,6 +5,11 @@ import numpy as np
 from collections import defaultdict
 import common
 import itertools
+import random
+import string
+
+def make_random_id(K=8):
+  return ''.join(random.choices(string.ascii_letters, k=K))
 
 def find_gene_name(chrom, pos, spreadsheet_rows):
   for row in spreadsheet_rows:
@@ -73,18 +78,23 @@ def make_phi_pseudovars(phi):
   return V
 
 def print_vaftable_header(sampnames, outf):
-  print('<style>.vafmatrix td, .vafmatrix { padding: 5px; margin: 0; border-collapse: collapse; } .vafmatrix th { transform: rotate(45deg); font-weight: normal !important; } .vafmatrix span { visibility: hidden; } .vafmatrix td:hover > span { visibility: visible; }</style>', file=outf)
+  container_id = 'vafmatrix_' + make_random_id()
+  container = f'#{container_id}'
+
+  print('<style>{container} .matrix td, {container} .matrix {{ padding: 5px; margin: 0; border-collapse: collapse; }} {container} .matrix th {{ transform: rotate(45deg); font-weight: normal !important; }} {container} .matrix span {{ visibility: hidden; }} {container} .matrix td:hover > span {{ visibility: visible; }}</style>'.format(container=container), file=outf)
   print('''<script type="text/javascript">$(document).ready(function() {''', file=outf)
-  print('new VafMatrix("#vafmatrix_toggles");', file=outf)
-  print('});</script>', file=outf);
-  print('<div id="vafmatrix_toggles" class="btn-group" data-toggle="buttons">', file=outf)
+  print(f'new VafMatrix("{container}");', file=outf)
+  print('});</script>', file=outf)
+
+  print(f'<div id="{container_id}">', file=outf)
+  print('<div class="vafmatrix_toggles btn-group" data-toggle="buttons">', file=outf)
   print('<label class="btn btn-primary active toggle_phi"><input type="checkbox" autocomplete="off" checked> &phi;</label>', file=outf)
   print('<label class="btn btn-primary active toggle_cluster_means"><input type="checkbox" autocomplete="off" checked> Cluster means</label>', file=outf)
   print('<label class="btn btn-primary active toggle_cluster_members"><input type="checkbox" autocomplete="off" checked> Cluster members</label>', file=outf)
   print('<label class="btn btn-primary active toggle_garbage"><input type="checkbox" autocomplete="off" checked> Garbage</label>', file=outf)
   print('</div>', file=outf)
   print('<br><br><br>', file=outf)
-  print('<table class="vafmatrix matrix"><thead><tr>', file=outf)
+  print('<table class="matrix"><thead><tr>', file=outf)
   header = ['Gene', 'ID', 'Chrom', 'Locus', 'Cluster']
   header += munge_samp_names(sampnames)
   print(''.join(['<th>%s</th>' % H for H in header]), file=outf)
@@ -103,7 +113,7 @@ def print_vaftable_row(V, bgcolour, should_correct_vaf, outf):
   ), file=outf)
 
 def print_vaftable_footer(outf):
-  print('</tbody></table>', file=outf)
+  print('</div></tbody></table>', file=outf)
 
 def print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, should_correct_vaf, outf):
   nclusters = len(clustered_vars)

@@ -474,11 +474,11 @@ ClusterMatrix.prototype.plot = function(clustermat_path, container) {
   });
 }
 
-function VafMatrix(elemid) {
-  this._configure_toggles(elemid);
+function VafMatrix(container) {
+  this._configure_toggles(container);
 }
 
-VafMatrix.prototype._configure_toggles = function(elemid) {
+VafMatrix.prototype._configure_toggles = function(container) {
   var togglers = {
     phi: function() {
       return $(this).find('td.id').text().startsWith('P');
@@ -495,11 +495,11 @@ VafMatrix.prototype._configure_toggles = function(elemid) {
     }
   };
 
-  $(elemid).find('.btn').change(function() {
+  $(container).find('.vafmatrix_toggles .btn').change(function() {
     var E = $(this);
     var active = E.hasClass('active');
     var toggle_type = E.attr('class').split(/\s+/).filter(function(cls) { return cls.startsWith('toggle_'); })[0].replace(/^toggle_/, '');
-    var targets = $('.vafmatrix tbody').find('tr').filter(togglers[toggle_type]);
+    var targets = $(container).find('.matrix tr').filter(togglers[toggle_type]);
 
     if(active) {
       E.removeClass('active');
