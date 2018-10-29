@@ -74,7 +74,7 @@ def main():
   data = simulator.generate_data(args.K, args.S, args.T, args.M, args.G)
   data['seed'] = seed
 
-  posterior, evidence = pairwise.calc_posterior(data['variants_all'], parallel=args.parallel, include_garbage_in_posterior=True, include_cocluster_in_posterior=True)
+  posterior, evidence = pairwise.calc_posterior(data['variants_all'], prior=None, parallel=args.parallel)
   write_results(data, posterior, evidence, args.datafn, args.pairwisefn, args.resultsfn)
 
 if __name__ == '__main__':

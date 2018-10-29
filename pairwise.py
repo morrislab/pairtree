@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.stats
+import scipy.special
 import concurrent.futures
 from tqdm import tqdm
 import itertools
@@ -23,25 +24,53 @@ def swap_evidence(evidence):
   assert not np.any(np.isnan(swapped))
   return swapped
 
-def _calc_posterior(evidence, include_garbage, include_cocluster):
-  evidence = np.copy(evidence)
-  if not include_garbage:
-    evidence[Models.garbage] = -np.inf
-  if not include_cocluster:
-    # We still want the posterior for coclustering of node `i` with `i` to be
-    # certain. To signal that we're computing the (i, i) pairwise posterior,
-    # the evidence for coclustering will be set to 0, and all other entries
-    # will be -inf. In this instance, don't set the coclustering evidence to
-    # -inf -- instead, leave it at 0 so that the posterior will indicate
-    # certainty about coclustering.
-    if evidence[Models.cocluster] < 0:
-      evidence[Models.cocluster] = -np.inf
-  B = np.max(evidence)
-  evidence -= B
-  posterior = np.exp(evidence) / np.sum(np.exp(evidence))
+def _calc_posterior(evidence, logprior):
+  # If both variants have zero variant reads, the evidence will be all zeroes.
+  # Ensure we don't hit this case when working with coclustering.
+  if evidence[Models.cocluster] == 0 and np.all(np.delete(evidence, Models.cocluster) == -np.inf):
+    # Regardless of what the prior is on coclustering (even if it's zero), if
+    # we're dealing with a pair consisting of variant `i` and variant `i`, we
+    # want the posterior to indicate coclustering certainty.
+    posterior = np.zeros(len(evidence))
+    posterior[Models.cocluster] = 1
+    return posterior
+
+  joint = evidence + logprior
+  B = np.max(joint)
+  joint -= B
+  posterior = np.exp(joint) / np.sum(np.exp(joint))
   return posterior
 
-def calc_posterior(variants, parallel=1, include_garbage_in_posterior=False, include_cocluster_in_posterior=False):
+def complete_prior(prior):
+  '''
+  If you don't want to include a certain model in the posterior (e.g., perhaps
+  you're computing pairwise probabilities for supervariants, and so don't want
+  to allow them to cocluster unless they're the same supervariant), set the
+  corresponding entry in prior to 0.
+  '''
+  if prior is None:
+    prior = {}
+  for K in prior.keys():
+    assert K in Models._all
+    assert 0 <= prior[K] <= 1
+
+  total = np.sum(list(prior.values()))
+  assert 0 <= total <= 1
+  remaining = set(Models._all) - set(prior.keys())
+  for K in remaining:
+    prior[K] = (1 - total) / len(remaining)
+
+  logprior = -np.inf * np.ones(len(prior))
+  for K in prior:
+    if prior[K] == 0:
+      continue
+    logprior[getattr(Models, K)] = np.log(prior[K])
+
+  assert np.isclose(0, scipy.special.logsumexp(logprior))
+  return logprior
+
+def calc_posterior(variants, prior=None, parallel=1):
+  logprior = complete_prior(prior)
   N = len(variants)
   posterior = {}
   evidence = {}
@@ -77,7 +106,7 @@ def calc_posterior(variants, parallel=1, include_garbage_in_posterior=False, inc
       continue
     evidence[(B,A)] = swap_evidence(evidence[(A,B)])
   for pair in evidence.keys():
-    posterior[pair] = _calc_posterior(evidence[pair], include_garbage_in_posterior, include_cocluster_in_posterior)
+    posterior[pair] = _calc_posterior(evidence[pair], logprior)
   return (posterior, evidence)
 
 # In cases where we have zero variant reads for both variants, the garbage
@@ -108,59 +137,6 @@ def calc_lh(V1, V2, _calc_lh=lh.calc_lh_quad):
   _fix_zero_var_read_samples(V1, V2, evidence_per_sample)
   evidence = np.sum(evidence_per_sample, axis=0)
   return (evidence, evidence_per_sample)
-
-def test_calc_lh(V1, V2):
-  inputs = {
-    'vaf': np.array([V['vaf'] for V in (V1, V2)]),
-    'var_reads': np.array([V['var_reads'] for V in (V1, V2)]),
-    'total_reads': np.array([V['total_reads'] for V in (V1, V2)]),
-  }
-  records = {'evidence': {}, 'norm_evidence': {}, 'posterior': {}}
-
-  for M in (
-    lh.calc_lh_quad,
-    lh.calc_lh_mc_1D,
-    lh.calc_lh_mc_2D,
-    lh.calc_lh_grid,
-  ):
-    M_name = M.__name__
-    M = util.time_exec(M)
-    evidence, evidence_per_sample = calc_lh(V1, V2, _calc_lh=M)
-    records['evidence'][M_name] = evidence
-    records['norm_evidence'][M_name] = evidence - np.max(evidence)
-    records['posterior'][M_name] = _calc_posterior(evidence, include_garbage=True, include_cocluster=False)
-
-    sep = np.zeros(len(evidence_per_sample))[:,None] + np.nan
-    combined = np.hstack((
-      inputs['vaf'].T,
-      sep,
-      inputs['var_reads'].T,
-      sep,
-      inputs['total_reads'].T,
-      sep,
-      evidence_per_sample,
-      sep,
-      evidence_per_sample - np.max(evidence_per_sample, axis=1)[:,None],
-    ))
-    print(M_name, '(%.3f ms)' % util.time_exec._ms)
-    print(combined)
-    for J in sorted(records.keys()):
-      print(J, records[J][M_name], sep='\t')
-    print()
-
-  for K in inputs.keys():
-    print(K)
-    print(inputs[K])
-  print()
-
-  for J in sorted(records.keys()):
-    print(J)
-    for K in sorted(records[J].keys()):
-      print(K, records[J][K], sep='\t')
-    print()
-
-  import sys
-  sys.exit()
 
 def generate_results(posterior, evidence, variants):
   model_probs = {}
