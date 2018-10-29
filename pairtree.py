@@ -13,6 +13,7 @@ import tree_sampler
 import phi_fitter
 import vaf_plotter
 import relation_plotter
+import inputparser
 
 def create_matrix(model, model_probs, variants):
   N = len(variants)
@@ -155,7 +156,6 @@ def main():
   parser.add_argument('--tree-samples', dest='tree_samples', type=int, default=1000)
   parser.add_argument('--tree-chains', dest='tree_chains', type=int, default=1)
   parser.add_argument('--parallel', dest='parallel', type=int, default=1)
-  parser.add_argument('--run-tests', dest='run_tests', action='store_true')
   parser.add_argument('sampid')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
@@ -166,8 +166,9 @@ def main():
   if args.seed is not None:
     np.random.seed(args.seed)
 
-  variants = common.parse_ssms(args.sampid, args.ssm_fn)
-  sampnames = common.load_sampnames(args.params_fn)
+  variants = inputparser.load_ssms(args.ssm_fn)
+  params = inputparser.load_params(args.params_fn)
+  sampnames = params['samples']
   clusters = handbuilt.load_clusters(args.clusters_fn, variants, args.tree_type, sampnames)
   garbage_vids = handbuilt.load_garbage(args.clusters_fn, args.tree_type)
   garbage_variants = remove_garbage(garbage_vids, variants)
@@ -195,7 +196,7 @@ def main():
     sampled_adjm = [adjm]
     sampled_llh = [0]
   else:
-    posterior, evidence = pairwise.calc_posterior(supervars, parallel=args.parallel, include_garbage_in_posterior=False, include_cocluster_in_posterior=False)
+    posterior, evidence = pairwise.calc_posterior(supervars, prior=None, parallel=args.parallel)
     results = pairwise.generate_results(posterior, evidence, supervars)
     model_probs_tensor = create_model_prob_tensor(results)
     sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, supervars, superclusters, nsamples=args.tree_samples, nchains=args.tree_chains, parallel=args.parallel)
@@ -219,7 +220,7 @@ def main():
     write_trees(args.sampid, len(sampled_adjm) - 1, outf)
     write_phi_matrix(args.sampid, outf)
     relation_plotter.plot_ml_relations(model_probs_tensor, outf)
-    vaf_plotter.plot_vaf_matrix(args.sampid, clusters, variants, supervars, garbage_variants, phi[-1], sampnames, None, outf)
+    vaf_plotter.plot_vaf_matrix(args.sampid, clusters, variants, supervars, garbage_variants, phi[-1], sampnames, None, True, outf)
 
   print_error(phi[-1], supervars, sampled_llh[-1])
 

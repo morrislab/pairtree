@@ -1,7 +1,5 @@
-import csv
 import numpy as np
 from collections import namedtuple
-import json
 
 import warnings
 with warnings.catch_warnings():
@@ -27,33 +25,6 @@ class Models:
   _all = ('garbage', 'cocluster', 'A_B', 'B_A', 'diff_branches')
 for idx, M in enumerate(Models._all):
   setattr(Models, M, idx)
-
-def parse_ssms(sampid, ssmfn):
-  # TODO: remove sampid as argument.
-  vaf = []
-  ssm_ids = []
-  var_names = []
-  variants = {}
-
-  with open(ssmfn) as F:
-    reader = csv.DictReader(F, delimiter='\t')
-    for row in reader:
-      if False and len(variants) >= 3:
-        break
-      variant = {
-        'id': row['id'],
-        'name': row['gene'],
-        'ref_reads': np.array([float(V) for V in row['a'].split(',')]),
-        'total_reads': np.array([float(V) for V in row['d'].split(',')]),
-        'omega_v': 1 - float(row['mu_v']),
-      }
-      variant['var_reads'] = variant['total_reads'] - variant['ref_reads']
-      variant['vaf'] = variant['var_reads'] / variant['total_reads']
-      variant['chrom'], variant['pos'] = variant['name'].split('_')
-      variant['pos'] = int(variant['pos'])
-      variants[row['id']] = variant
-
-  return variants
 
 def make_ancestral_from_adj(adj):
   K = len(adj)
@@ -194,12 +165,6 @@ def extract_patient_samples(variants, sampnames):
   variants = munged
   sampnames = [S for (S, is_patient) in zip(sampnames, patient_mask) if is_patient]
   return (variants, sampnames)
-
-def load_sampnames(paramsfn):
-  with open(paramsfn) as P:
-    params = json.load(P)
-  sampnames = params['samples']
-  return sampnames
 
 def debug(*args, **kwargs):
   if debug.DEBUG:
