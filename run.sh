@@ -1,38 +1,59 @@
-RESULTSDIR=~/tmp/pairtree
-PROTDIR=~/work/pairtree
-DATADIR=~/work/steph/data
+#!/bin/bash
+set -euo pipefail
 
-PARALLEL=15
+PROTDIR=~/work/pairtree
+RESULTSDIR=~/work/pairtree/scratch
+DATADIR=~/work/pairtree/data
+HANDBUILTDIR=~/work/steph/data/handbuilt_trees
+JOBDIR=$SCRATCH/jobs
+
+PARALLEL=40
 TREE_SAMPLES=1000
 PHI_ITERATIONS=10000
 
 function make_trees {
-  for treetype in patient xeno; do
+  #for treetype in patient xeno; do
+  for treetype in xeno; do
     OUTDIR=$RESULTSDIR/$treetype
+    mkdir -p $OUTDIR
+
     rm -f $OUTDIR/SJ*.{html,json,csv,stdout}
     mkdir -p $OUTDIR
 
     if [[ $treetype == "xeno" ]]; then
-      INPUTSDIR=$DATADIR/inputs/steph.xenos.nocns
+      INPUTSDIR=$DATADIR/steph.xenos.nocns
     else
-      INPUTSDIR=$DATADIR/inputs/steph.vanilla
+      INPUTSDIR=$DATADIR/steph.vanilla
     fi
 
-    for ssmfn in $INPUTSDIR/SJ*.sampled.ssm; do
+    for ssmfn in $INPUTSDIR/SJ*.ssm; do
       runid=$(basename $ssmfn | cut -d. -f1)
-      echo "cd $OUTDIR && " \
-        "python3 $PROTDIR/pairtree.py" \
-        "--tree-samples $TREE_SAMPLES" \
-        "--phi-iterations $PHI_ITERATIONS" \
-        "--tree-chains $PARALLEL" \
-        "--parallel $PARALLEL" \
-          "$runid" \
-          "$INPUTSDIR/$runid.{sampled.ssm,params.json}" \
-          "$DATADIR/handbuilt_trees/$runid.json handbuilt.$treetype" \
-          ">$runid.stdout" \
-          "2>$runid.stderr"
+      jobname="${treetype}_${runid}"
+      (
+        echo "#!/bin/bash"
+        echo "#SBATCH --nodes=1"
+        echo "#SBATCH --ntasks=$PARALLEL"
+        echo "#SBATCH --time=24:00:00"
+        echo "#SBATCH --job-name $jobname"
+        echo "#SBATCH --output=$JOBDIR/slurm_${jobname}_%j.txt"
+        echo "#SBATCH --mail-type=FAIL"
+
+        echo "cd $OUTDIR && " \
+          "python3 $PROTDIR/pairtree.py" \
+          "--tree-samples $TREE_SAMPLES" \
+          "--phi-iterations $PHI_ITERATIONS" \
+          "--tree-chains $PARALLEL" \
+          "--parallel $PARALLEL" \
+            "$runid" \
+            "$INPUTSDIR/$runid.{ssm,params.json}" \
+            "$HANDBUILTDIR/$runid.json handbuilt.$treetype" \
+            ">$runid.stdout" \
+            "2>$runid.stderr"
+      ) > $JOBDIR/job.sh
+      sbatch $JOBDIR/job.sh
+      rm $JOBDIR/job.sh
     done
-  done | parallel -j3 --halt 1
+  done
 }
 
 function write_indices {
@@ -64,29 +85,9 @@ function write_indices {
   done
 }
 
-function tweak_clusters {
-  for treetype in xeno patient; do
-    if [[ $treetype == "xeno" ]]; then
-      INPUTSDIR=$DATADIR/inputs/steph.xenos.nocns
-    else
-      INPUTSDIR=$DATADIR/inputs/steph.vanilla
-    fi
-    for sampid in SJBALL022610steph SJETV010stephR1R2; do
-      hb=$DATADIR/handbuilt_trees/$sampid.json
-      echo python3 $PROTDIR/tweak_clusters.py \
-        $sampid \
-        $INPUTSDIR/$sampid.sampled.ssm \
-        $hb \
-        $treetype \
-        $hb
-    done
-  done #| bash
-}
-
 function main {
-  #tweak_clusters
   make_trees
-  write_indices
+  #write_indices
 }
 
 main
