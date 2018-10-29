@@ -10,7 +10,7 @@ PARALLEL=40
 function main {
   mkdir -p $RESULTSDIR
 
-  M=50
+  M=1000
   G=10
   for K in 2 4 8; do
     for S in 1 3 10 30; do
