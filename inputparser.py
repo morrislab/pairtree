@@ -30,16 +30,19 @@ def load_ssms(ssmfn, max_ssms=None):
   return variants
 
 def load_params(paramsfn):
+  if paramsfn is None:
+    return {}
   with open(paramsfn) as P:
     return json.load(P)
 
 def write_ssms(variants, ssm_fn):
-  colnames = ('id', 'name', 'var_reads', 'total_reads', 'var_read_prob')
-  keys     = colnames[:-1] + ('omega_v',)
+  keys = ('id', 'name', 'var_reads', 'total_reads', 'var_read_prob')
 
   with open(ssm_fn, 'w') as outf:
     print(*keys, sep='\t', file=outf)
     for V in variants.values():
+      V = dict(V) # Don't modify original variant.
       for K in ('var_reads', 'total_reads'):
         V[K] = ','.join([str(R) for R in V[K]])
+      V['var_read_prob'] = V['omega_v']
       print(*[V[K] for K in keys], sep='\t', file=outf)

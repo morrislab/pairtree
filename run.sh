@@ -2,8 +2,7 @@
 set -euo pipefail
 
 PROTDIR=~/work/pairtree
-RESULTSDIR=~/work/pairtree/scratch/results
-INPUTSDIR=~/work/pairtree/inputs
+RESULTSDIR=$PROTDIR/scratch/results
 HANDBUILTDIR=~/work/steph/data/handbuilt_trees
 JOBDIR=$SCRATCH/jobs
 
@@ -11,7 +10,35 @@ PARALLEL=40
 TREE_SAMPLES=1000
 PHI_ITERATIONS=10000
 
-function make_trees {
+function run_sims {
+  INDIR=$PROTDIR/scratch/inputs/sims
+  OUTDIR=$RESULTSDIR/sims
+
+  for ssmfn in $INDIR/*.ssm; do
+    runid=$(basename $ssmfn | cut -d. -f1)
+    (
+      echo "#!/bin/bash"
+      echo "#SBATCH --nodes=1"
+      echo "#SBATCH --ntasks=$PARALLEL"
+      echo "#SBATCH --time=24:00:00"
+      echo "#SBATCH --job-name $runid"
+      echo "#SBATCH --output=$JOBDIR/slurm_${runid}_%j.txt"
+      echo "#SBATCH --mail-type=NONE"
+
+      echo "cd $OUTDIR && " \
+        "python3 $PROTDIR/basic.py" \
+        "--parallel $PARALLEL" \
+          "$runid" \
+          "$INDIR/$runid.ssm" \
+          ">$runid.stdout" \
+          "2>$runid.stderr"
+    ) #> $JOBDIR/job.sh
+    #sbatch $JOBDIR/job.sh
+    #rm $JOBDIR/job.sh
+  done
+}
+
+function run_steph {
   #for treetype in patient xeno; do
   for treetype in xeno; do
     OUTDIR=$RESULTSDIR/$treetype
@@ -21,9 +48,9 @@ function make_trees {
     mkdir -p $OUTDIR
 
     if [[ $treetype == "xeno" ]]; then
-      INDIR=$INPUTSDIR/steph.xenos.nocns
+      INDIR=$PROTDIR/inputs/steph.xenos.nocns
     else
-      INDIR=$INPUTSDIR/steph.vanilla
+      INDIR=$PROTDIR/inputs/steph.vanilla
     fi
 
     for ssmfn in $INDIR/*.ssm; do
@@ -36,7 +63,7 @@ function make_trees {
         echo "#SBATCH --time=24:00:00"
         echo "#SBATCH --job-name $jobname"
         echo "#SBATCH --output=$JOBDIR/slurm_${jobname}_%j.txt"
-        echo "#SBATCH --mail-type=FAIL"
+        echo "#SBATCH --mail-type=NONE"
 
         echo "cd $OUTDIR && " \
           "python3 $PROTDIR/pairtree.py" \
@@ -86,8 +113,9 @@ function write_indices {
 }
 
 function main {
-  make_trees
+  #run_steph
   #write_indices
+  run_sims
 }
 
 main
