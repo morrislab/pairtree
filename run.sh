@@ -2,8 +2,8 @@
 set -euo pipefail
 
 PROTDIR=~/work/pairtree
-RESULTSDIR=~/work/pairtree/scratch
-DATADIR=~/work/pairtree/data
+RESULTSDIR=~/work/pairtree/scratch/results
+INPUTSDIR=~/work/pairtree/inputs
 HANDBUILTDIR=~/work/steph/data/handbuilt_trees
 JOBDIR=$SCRATCH/jobs
 
@@ -17,16 +17,16 @@ function make_trees {
     OUTDIR=$RESULTSDIR/$treetype
     mkdir -p $OUTDIR
 
-    rm -f $OUTDIR/SJ*.{html,json,csv,stdout}
+    #rm -f $OUTDIR/SJ*.{html,json,csv,stdout}
     mkdir -p $OUTDIR
 
     if [[ $treetype == "xeno" ]]; then
-      INPUTSDIR=$DATADIR/steph.xenos.nocns
+      INDIR=$INPUTSDIR/steph.xenos.nocns
     else
-      INPUTSDIR=$DATADIR/steph.vanilla
+      INDIR=$INPUTSDIR/steph.vanilla
     fi
 
-    for ssmfn in $INPUTSDIR/SJ*.ssm; do
+    for ssmfn in $INDIR/*.ssm; do
       runid=$(basename $ssmfn | cut -d. -f1)
       jobname="${treetype}_${runid}"
       (
@@ -45,13 +45,13 @@ function make_trees {
           "--tree-chains $PARALLEL" \
           "--parallel $PARALLEL" \
             "$runid" \
-            "$INPUTSDIR/$runid.{ssm,params.json}" \
+            "$INDIR/$runid.{ssm,params.json}" \
             "$HANDBUILTDIR/$runid.json handbuilt.$treetype" \
             ">$runid.stdout" \
             "2>$runid.stderr"
-      ) > $JOBDIR/job.sh
-      sbatch $JOBDIR/job.sh
-      rm $JOBDIR/job.sh
+      ) #> $JOBDIR/job.sh
+      #sbatch $JOBDIR/job.sh
+      #rm $JOBDIR/job.sh
     done
   done
 }

@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.stats
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 def make_ancestral_from_adj(adj):
   K = len(adj)
@@ -102,11 +102,11 @@ def make_clusters(mutass):
   return clusters
 
 def make_variants(V, T, omega_v):
-  variants = {}
+  variants = OrderedDict()
   for midx in range(len(omega_v)):
     variant = {
       'id': 's%s' % midx,
-      'name': 'Happy variant %s' % midx,
+      'name': 'S_%s' % midx,
       'var_reads': V[midx],
       'total_reads': T[midx],
       'omega_v': omega_v[midx],
@@ -135,7 +135,7 @@ def generate_data(K, S, T, M, G):
   V, T = generate_read_counts(phi_mutations, omega_v, T)
 
   variants_all = make_variants(V, T, omega_v)
-  variants_good, variants_garbage = {}, {}
+  variants_good, variants_garbage = OrderedDict(), OrderedDict()
   for vid, variant in variants_all.items():
     if int(vid[1:]) < M:
       variants_good[vid] = variant

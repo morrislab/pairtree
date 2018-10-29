@@ -17,7 +17,10 @@ def load_ssms(ssmfn, max_ssms=None):
         'total_reads': np.array([float(V) for V in row['total_reads'].split(',')], dtype=np.int),
         'omega_v': float(row['var_read_prob']),
       }
+
       assert np.all(variant['total_reads'] >= variant['var_reads'])
+      assert 0 <= variant['omega_v'] <= 1
+
       variant['ref_reads'] = variant['total_reads'] - variant['var_reads']
       variant['vaf'] = variant['var_reads'] / variant['total_reads']
       variant['chrom'], variant['pos'] = variant['name'].split('_')
@@ -29,3 +32,14 @@ def load_ssms(ssmfn, max_ssms=None):
 def load_params(paramsfn):
   with open(paramsfn) as P:
     return json.load(P)
+
+def write_ssms(variants, ssm_fn):
+  colnames = ('id', 'name', 'var_reads', 'total_reads', 'var_read_prob')
+  keys     = colnames[:-1] + ('omega_v',)
+
+  with open(ssm_fn, 'w') as outf:
+    print(*keys, sep='\t', file=outf)
+    for V in variants.values():
+      for K in ('var_reads', 'total_reads'):
+        V[K] = ','.join([str(R) for R in V[K]])
+      print(*[V[K] for K in keys], sep='\t', file=outf)
