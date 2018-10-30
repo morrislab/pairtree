@@ -1,13 +1,20 @@
 import argparse
 import numpy as np
 import pickle
-import inputparser
+import json
 
+import inputparser
 import simulator
 
-def write_data(data, datafn, ssmfn):
+def write_data(data, datafn, paramsfn, ssmfn):
   with open(datafn, 'wb') as outf:
     pickle.dump(data, outf)
+  with open(paramsfn, 'w') as outf:
+    json.dump({
+      'samples': data['sampnames'],
+      'clusters': data['clusters'],
+    }, outf)
+
   inputparser.write_ssms(data['variants_all'], ssmfn)
 
 def main():
@@ -22,6 +29,7 @@ def main():
   parser.add_argument('-M', dest='M', type=int, default=10, help='Number of non-garbage mutations')
   parser.add_argument('-G', dest='G', type=int, default=4, help='Number of garbage mutations')
   parser.add_argument('datafn')
+  parser.add_argument('paramsfn')
   parser.add_argument('ssmfn')
   args = parser.parse_args()
 
@@ -33,7 +41,7 @@ def main():
 
   data = simulator.generate_data(args.K, args.S, args.T, args.M, args.G)
   data['seed'] = seed
-  write_data(data, args.datafn, args.ssmfn)
+  write_data(data, args.datafn, args.paramsfn, args.ssmfn)
 
 if __name__ == '__main__':
   main()
