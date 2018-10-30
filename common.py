@@ -65,7 +65,6 @@ def make_cluster_supervars(clusters, variants):
 
     S_name = 'C%s' % len(cluster_supervars)
     S = {
-      'gene': None,
       'id': S_name,
       'name': S_name,
       'chrom': None,
