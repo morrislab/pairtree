@@ -2,6 +2,7 @@ import csv
 import numpy as np
 import argparse
 import inputparser
+import json
 from collections import OrderedDict
 
 def load_phylowgs(pwgs_fn):
@@ -22,17 +23,71 @@ def load_phylowgs(pwgs_fn):
 
   return variants
 
+def remove_garbage(variants, garbage_ids, clusters):
+  garbage_variants = {}
+  N = len(variants)
+  for varid in sorted(variants.keys(), key = lambda S: int(S[1:])):
+    if int(varid[1:]) in garbage_ids:
+      garbage_variants[varid] = variants[varid]
+      del variants[varid]
+  assert len(variants) == N - len(garbage_ids)
+  return garbage_variants
+
+def make_varids_contiguous(variants, garbage_ids, clusters):
+  mapping = {}
+  for idx, old_varid in enumerate(sorted(variants.keys(), key = lambda S: int(S[1:]))):
+    old_varidx = int(old_varid[1:])
+    new_varidx = idx
+    mapping[old_varidx] = new_varidx
+
+  new_variants = {'s%s' % mapping[int(V[1:])]: variants[V] for V in variants.keys()}
+  for V in new_variants.keys():
+    new_variants[V]['id'] = V
+
+  new_clusters = [sorted([mapping[V] for V in C]) for C in clusters]
+
+  assert set([int(V[1:]) for V in new_variants.keys()]) == \
+    set([V for C in new_clusters for V in C]) == \
+    set([int(V['id'][1:]) for V in new_variants.values()])
+
+  return (new_variants, new_clusters)
+
+def load_handbuilt(hbfn, tree_type):
+  with open(hbfn) as F:
+    return json.load(F)[tree_type]
+
+def write_pairtree_params(sampnames, clusters, pairtree_params_fn):
+  params = {
+    'samples': sampnames,
+    'clusters': clusters,
+  }
+  with open(pairtree_params_fn, 'w') as F:
+    json.dump(params, F)
+
 def main():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('pwgsfn')
-  parser.add_argument('pairtreefn')
+  parser.add_argument('--handbuilt', dest='handbuilt_fn', required=True)
+  parser.add_argument('pwgs_ssm_fn')
+  parser.add_argument('pwgs_params_fn')
+  parser.add_argument('pairtree_ssm_fn')
+  parser.add_argument('pairtree_params_fn')
   args = parser.parse_args()
 
-  variants = load_phylowgs(args.pwgsfn)
-  inputparser.write_ssms(variants, args.pairtreefn)
+  tree_type = 'handbuilt.xeno'
+  hb = load_handbuilt(args.handbuilt_fn, tree_type)
+  clusters = hb['clusters']
+  garbage = hb['garbage']
+
+  pwgs_params = inputparser.load_params(args.pwgs_params_fn)
+  variants = load_phylowgs(args.pwgs_ssm_fn)
+  remove_garbage(variants, garbage, clusters)
+  variants, clusters = make_varids_contiguous(variants, garbage, clusters)
+
+  inputparser.write_ssms(variants, args.pairtree_ssm_fn)
+  write_pairtree_params(pwgs_params['samples'], clusters, args.pairtree_params_fn)
 
 if __name__ == '__main__':
   main()
