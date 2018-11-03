@@ -4,6 +4,8 @@ import argparse
 import common
 import inputparser
 
+# TODO: remove garbage variants
+
 def extract_matrix(variants, key):
   return np.array([variants[K][key] for K in sorted(variants.keys(), key = lambda vid: int(vid[1:]))])
 
