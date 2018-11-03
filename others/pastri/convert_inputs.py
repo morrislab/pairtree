@@ -1,10 +1,12 @@
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+
 import numpy as np
 import argparse
 
 import common
 import inputparser
-
-# TODO: remove garbage variants
 
 def extract_matrix(variants, key):
   return np.array([variants[K][key] for K in sorted(variants.keys(), key = lambda vid: int(vid[1:]))])
