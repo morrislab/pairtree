@@ -48,10 +48,9 @@ def generate_mutlist(variants):
     var = variants[varid]
     mutlist['ssms'][varid] = {
       'name': var['name'],
-      'ref_reads': list(var['ref_reads']),
-      'total_reads': list(var['total_reads']),
-      'expected_ref_in_ref': var['mu_r'],
-      'expected_ref_in_variant': 1 - var['omega_v'],
+      'ref_reads': var['ref_reads'].tolist(),
+      'total_reads': var['total_reads'].tolist(),
+      'var_read_prob': int(var['omega_v']),
     }
 
   return mutlist

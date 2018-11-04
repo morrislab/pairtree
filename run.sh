@@ -7,7 +7,7 @@ HANDBUILTDIR=~/work/steph/data/handbuilt_trees
 JOBDIR=$SCRATCH/jobs
 
 PARALLEL=40
-TREE_SAMPLES=1000
+TREES_PER_CHAIN=1000
 PHI_ITERATIONS=10000
 
 function run_sims {
@@ -39,47 +39,38 @@ function run_sims {
 }
 
 function run_steph {
-  #for treetype in patient xeno; do
-  for treetype in xeno; do
-    OUTDIR=$RESULTSDIR/$treetype
-    mkdir -p $OUTDIR
+  INDIR=$PROTDIR/scratch/inputs/steph.xeno.nogarb
+  OUTDIR=$RESULTSDIR/steph.xeno.nogarb
+  mkdir -p $OUTDIR
+  #rm -f $OUTDIR/SJ*.{html,json,csv,stdout}
 
-    #rm -f $OUTDIR/SJ*.{html,json,csv,stdout}
-    mkdir -p $OUTDIR
+  for ssmfn in $INDIR/*.ssm; do
+    runid=$(basename $ssmfn | cut -d. -f1)
+    jobname="steph_${runid}"
+    (
+      echo "#!/bin/bash"
+      echo "#SBATCH --nodes=1"
+      echo "#SBATCH --ntasks=$PARALLEL"
+      echo "#SBATCH --time=24:00:00"
+      echo "#SBATCH --job-name $jobname"
+      echo "#SBATCH --output=$JOBDIR/slurm_${jobname}_%j.txt"
+      echo "#SBATCH --mail-type=NONE"
 
-    if [[ $treetype == "xeno" ]]; then
-      INDIR=$PROTDIR/inputs/steph.xenos.nocns
-    else
-      INDIR=$PROTDIR/inputs/steph.vanilla
-    fi
-
-    for ssmfn in $INDIR/*.ssm; do
-      runid=$(basename $ssmfn | cut -d. -f1)
-      jobname="${treetype}_${runid}"
-      (
-        echo "#!/bin/bash"
-        echo "#SBATCH --nodes=1"
-        echo "#SBATCH --ntasks=$PARALLEL"
-        echo "#SBATCH --time=24:00:00"
-        echo "#SBATCH --job-name $jobname"
-        echo "#SBATCH --output=$JOBDIR/slurm_${jobname}_%j.txt"
-        echo "#SBATCH --mail-type=NONE"
-
-        echo "cd $OUTDIR && " \
-          "python3 $PROTDIR/pairtree.py" \
-          "--tree-samples $TREE_SAMPLES" \
-          "--phi-iterations $PHI_ITERATIONS" \
-          "--tree-chains $PARALLEL" \
-          "--parallel $PARALLEL" \
-            "$runid" \
-            "$INDIR/$runid.{ssm,params.json}" \
-            "$HANDBUILTDIR/$runid.json handbuilt.$treetype" \
-            ">$runid.stdout" \
-            "2>$runid.stderr"
-      ) #> $JOBDIR/job.sh
-      #sbatch $JOBDIR/job.sh
-      #rm $JOBDIR/job.sh
-    done
+      echo "cd $OUTDIR && " \
+        "python3 $PROTDIR/basic.py" \
+        "--seed 1" \
+        "--parallel $PARALLEL" \
+        "--tree-chains $PARALLEL" \
+        "--trees-per-chain $TREES_PER_CHAIN" \
+        "--phi-iterations $PHI_ITERATIONS" \
+        "--params $INDIR/${runid}.params.json" \
+        "$runid" \
+        "$INDIR/$runid.ssm" \
+        ">$runid.stdout" \
+        "2>$runid.stderr"
+    ) > $JOBDIR/job.sh
+    sbatch $JOBDIR/job.sh
+    rm $JOBDIR/job.sh
   done
 }
 
@@ -113,9 +104,9 @@ function write_indices {
 }
 
 function main {
-  #run_steph
+  run_steph
   #write_indices
-  run_sims
+  #run_sims
 }
 
 main

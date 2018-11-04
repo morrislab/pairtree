@@ -181,7 +181,7 @@ def run_chain(data_mutrel, supervars, superclusters, nsamples, progress_queue=No
   return choose_best_tree(cluster_adj, llh)
 
 def choose_best_tree(adj, llh):
-  best_llh = -float('inf')
+  best_llh = -np.inf
   best_adj = None
   for A, L in zip(adj, llh):
     if L > best_llh:
@@ -189,9 +189,9 @@ def choose_best_tree(adj, llh):
       best_adj = A
   return (best_adj, best_llh)
 
-def sample_trees(data_mutrel, supervars, superclusters, nsamples, nchains, parallel):
+def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, nchains, parallel):
   jobs = []
-  total = nchains * nsamples
+  total = nchains * trees_per_chain
 
   assert parallel > 0
   # Don't use (hard-to-debug) parallelism machinery unless necessary.
@@ -206,7 +206,7 @@ def sample_trees(data_mutrel, supervars, superclusters, nsamples, nchains, paral
     with tqdm(total=total, desc='Sampling trees', unit=' trees', dynamic_ncols=True) as progress_bar:
       with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
         for C in range(nchains):
-          jobs.append(ex.submit(run_chain, data_mutrel, supervars, superclusters, nsamples, progress_queue))
+          jobs.append(ex.submit(run_chain, data_mutrel, supervars, superclusters, trees_per_chain, progress_queue))
 
         # Exactly `total` items will be added to the queue. Once we've
         # retrieved that many items from the queue, we can assume that our
@@ -221,7 +221,7 @@ def sample_trees(data_mutrel, supervars, superclusters, nsamples, nchains, paral
   else:
     results = []
     for C in range(nchains):
-      results.append(run_chain(data_mutrel, supervars, superclusters, nsamples))
+      results.append(run_chain(data_mutrel, supervars, superclusters, trees_per_chain))
 
   adj, llh = choose_best_tree(*zip(*results))
   return ([adj], [llh])

@@ -137,18 +137,3 @@ def calc_lh(V1, V2, _calc_lh=lh.calc_lh_quad):
   _fix_zero_var_read_samples(V1, V2, evidence_per_sample)
   evidence = np.sum(evidence_per_sample, axis=0)
   return (evidence, evidence_per_sample)
-
-def generate_results(posterior, evidence, variants):
-  model_probs = {}
-  model_evidence = {}
-  for midx, model in enumerate(Models._all):
-    model_probs[model]    = {'%s,%s' % (vid1, vid2): P[midx] for (vid1, vid2), P in posterior.items() }
-    model_evidence[model] = {'%s,%s' % (vid1, vid2): P[midx] for (vid1, vid2), P in evidence.items()  }
-
-  results = {
-    'models': Models._all,
-    'model_probs': model_probs,
-    'model_evidence': model_evidence,
-    'variants': { V: {'name': variants[V]['name']} for V in variants.keys() },
-  }
-  return results
