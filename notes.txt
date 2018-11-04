@@ -1,0 +1,18 @@
+Canopy:
+  MCMC chains are run serially, not in parallel
+  No seeming means to provide omega_v -- it assumes diploid
+  Given K leaves (corresponding to normal + (K-1) extant subclones), which is the same as K parameter used in Canopy API, you have (C = 2K - 3) edges on which mutation clusters can be placed
+    I.e., your C edges lead to cancer (not normal) vertices
+    Consequently, C must be odd -- if C is even, I suspect it will place one "empty" edge (not associated with a mutaiton cluster) at the bottom of the tree
+
+PASTRI:
+  I had to hack the source -- "is None" instead of "== None"
+  The RunPASTRI.bash file is dumb
+  /home/q/qmorris/jawinter/.apps/pastri/src/RunPASTRI.py
+  Actually requires -o prefix:
+    Traceback (most recent call last):
+      File "/home/q/qmorris/jawinter/.apps/pastri/src/RunPASTRI.py", line 264, in <module>
+        main()
+      File "/home/q/qmorris/jawinter/.apps/pastri/src/RunPASTRI.py", line 246, in main
+        with open(prefix+".trees", 'w') as out:
+    TypeError: unsupported operand type(s) for +: 'NoneType' and 'str'
