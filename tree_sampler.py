@@ -6,39 +6,11 @@ import phi_fitter
 Models = common.Models
 debug = common.debug
 
-def make_mutrel_tensor_from_cluster_adj(cluster_adj, clusters):
-  cluster_anc = common.make_ancestral_from_adj(cluster_adj)
-  # In determining A_B relations, don't want to set mutaitons (i,j), where i
-  # and j are in same cluster, to 1.
-  np.fill_diagonal(cluster_anc, 0)
-
-  M = sum([len(clus) for clus in clusters])
-  K = len(clusters)
-  mutrel = np.zeros((M, M, len(Models._all)))
-
-  for k in range(K):
-    self_muts = np.array(clusters[k])
-    desc_clusters = np.flatnonzero(cluster_anc[k])
-    desc_muts = np.array([midx for cidx in desc_clusters for midx in clusters[cidx]])
-
-    if len(self_muts) > 0:
-      mutrel[self_muts[:,None,None], self_muts[None,:,None], Models.cocluster] = 1
-    if len(self_muts) > 0 and len(desc_muts) > 0:
-      mutrel[self_muts[:,None,None], desc_muts[None,:,None], Models.A_B] = 1
-
-  mutrel[:,:,Models.B_A] = mutrel[:,:,Models.A_B].T
-  existing = (Models.cocluster, Models.A_B, Models.B_A)
-  already_filled = np.sum(mutrel[:,:,existing], axis=2)
-  mutrel[already_filled == 0,Models.diff_branches] = 1
-  assert np.array_equal(np.ones((M,M)), np.sum(mutrel, axis=2))
-
-  return mutrel
-
 def calc_llh(data_mutrel, supervars, superclusters, cluster_adj, fit_phis=True):
-  tree_mutrel = make_mutrel_tensor_from_cluster_adj(cluster_adj, superclusters)
+  tree_mutrel = common.make_mutrel_tensor_from_cluster_adj(cluster_adj, superclusters)
   mutrel_fit = 1 - np.abs(data_mutrel - tree_mutrel)
   # Prevent log of zero.
-  mutrel_fit = np.maximum(1e-20, mutrel_fit)
+  mutrel_fit = np.maximum(common._EPSILON, mutrel_fit)
   mutrel_fit = np.sum(np.log(mutrel_fit))
 
   if fit_phis:

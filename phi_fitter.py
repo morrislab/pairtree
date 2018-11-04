@@ -40,7 +40,7 @@ def fit_phis(adj, superclusters, supervars, iterations, parallel):
   return fit_all_phis(adj, A, ref_reads, var_reads, iterations, parallel)
 
 def fit_phi_S(eta_S, var_reads_S, ref_reads_S, A, Z, iterations):
-  eta_S = np.maximum(1e-10, eta_S)
+  eta_S = np.maximum(common._EPSILON, eta_S)
   psi_S = np.log(eta_S)
   psi_S = grad_desc(var_reads_S, ref_reads_S, A, Z, psi_S, iterations)
   eta_S = softmax(psi_S)
