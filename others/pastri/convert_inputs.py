@@ -17,6 +17,7 @@ def write_matrices(*matrices, outfn):
       print(matrix.shape, file=F)
       for row in matrix:
         print(*row, sep='\t', file=F)
+      # PASTRI's example matrices also have a blank trailing line, so mine will as well.
       print('', file=F)
 
 def main():
@@ -36,8 +37,8 @@ def main():
   supervars = common.make_cluster_supervars(clusters, variants)
 
   matrices = {
-    'var_reads': extract_matrix(variants, 'var_reads'),
-    'total_reads': extract_matrix(variants, 'total_reads'),
+    'var_reads': extract_matrix(supervars, 'var_reads'),
+    'total_reads': extract_matrix(supervars, 'total_reads'),
     'alpha': extract_matrix(supervars, 'var_reads'),
     'beta': extract_matrix(supervars, 'total_reads'),
   }

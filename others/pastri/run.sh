@@ -13,7 +13,8 @@ NUM_ITERS=10000
 function convert_inputs {
   mkdir -p $INDIR
 
-  for ssmfn in $PAIRTREE_INPUTS_DIR/*.ssm; do sampid=$(basename $ssmfn | cut -d. -f1)
+  for ssmfn in $PAIRTREE_INPUTS_DIR/*.ssm; do
+    sampid=$(basename $ssmfn | cut -d. -f1)
     echo "python3 $BASEDIR/others/pastri/convert_inputs.py " \
       "$PAIRTREE_INPUTS_DIR/$sampid.ssm" \
       "$PAIRTREE_INPUTS_DIR/$sampid.params.json" \

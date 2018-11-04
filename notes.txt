@@ -7,12 +7,12 @@ Canopy:
 
 PASTRI:
   I had to hack the source -- "is None" instead of "== None"
-  The RunPASTRI.bash file is dumb
-  /home/q/qmorris/jawinter/.apps/pastri/src/RunPASTRI.py
+  The RunPASTRI.bash file is dumb -- it's not used, I don't think
   Actually requires -o prefix:
-    Traceback (most recent call last):
-      File "/home/q/qmorris/jawinter/.apps/pastri/src/RunPASTRI.py", line 264, in <module>
-        main()
-      File "/home/q/qmorris/jawinter/.apps/pastri/src/RunPASTRI.py", line 246, in main
-        with open(prefix+".trees", 'w') as out:
-    TypeError: unsupported operand type(s) for +: 'NoneType' and 'str'
+    /home/q/qmorris/jawinter/.apps/pastri/src/RunPASTRI.py
+      Traceback (most recent call last):
+        File "/home/q/qmorris/jawinter/.apps/pastri/src/RunPASTRI.py", line 264, in <module>
+          main()
+        File "/home/q/qmorris/jawinter/.apps/pastri/src/RunPASTRI.py", line 246, in main
+          with open(prefix+".trees", 'w') as out:
+      TypeError: unsupported operand type(s) for +: 'NoneType' and 'str'
