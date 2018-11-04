@@ -5,6 +5,9 @@ import inputparser
 import json
 from collections import OrderedDict
 
+# Convert from PWGS format to Pairtree format, discarding garbage variants in
+# the process.
+
 def load_phylowgs(pwgs_fn):
   variants = OrderedDict()
 

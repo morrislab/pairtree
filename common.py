@@ -71,8 +71,8 @@ def make_cluster_supervars(clusters, variants):
       'pos': None,
       'cluster': cidx,
       'omega_v': 0.5,
-      'var_reads': np.sum(cluster_var_reads, axis=0),
-      'total_reads': np.sum(cluster_total_reads, axis=0),
+      'var_reads': np.sum(cluster_var_reads, axis=0, dtype=np.int),
+      'total_reads': np.sum(cluster_total_reads, axis=0, dtype=np.int),
     }
     S['ref_reads'] = S['total_reads'] - S['var_reads']
     S['vaf'] = S['var_reads'] / S['total_reads']

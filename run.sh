@@ -39,14 +39,14 @@ function run_sims {
 }
 
 function run_steph {
-  INDIR=$PROTDIR/scratch/inputs/steph.xeno.nogarb
-  OUTDIR=$RESULTSDIR/steph.xeno.nogarb
+  INDIR=$PROTDIR/scratch/inputs/steph.xeno.nogarb.pairtree
+  OUTDIR=$RESULTSDIR/steph.xeno.nogarb.pairtree
   mkdir -p $OUTDIR
   #rm -f $OUTDIR/SJ*.{html,json,csv,stdout}
 
   for ssmfn in $INDIR/*.ssm; do
     runid=$(basename $ssmfn | cut -d. -f1)
-    jobname="steph_${runid}"
+    jobname="steph_pairtree_${runid}"
     (
       echo "#!/bin/bash"
       echo "#SBATCH --nodes=1"

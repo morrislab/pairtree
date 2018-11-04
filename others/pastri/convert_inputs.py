@@ -1,10 +1,9 @@
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
 import numpy as np
 import argparse
 
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 import common
 import inputparser
 
@@ -33,7 +32,6 @@ def main():
 
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.params_fn)
-  sampnames = params['samples']
   clusters = params['clusters']
   supervars = common.make_cluster_supervars(clusters, variants)
 
