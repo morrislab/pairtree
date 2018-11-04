@@ -1,15 +1,28 @@
 #!/bin/bash
 set -euo pipefail
+module load gnu-parallel
 
-PROTDIR=~/work/pairtree
+BASEDIR=~/work/pairtree
 JOBDIR=$SCRATCH/jobs
+INDIR=$BASEDIR/scratch/inputs/steph.xeno.nogarb.pwgs
+OUTBASE=$BASEDIR/scratch/results/steph.xeno.nogarb.pwgs
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.nogarb.pairtree
 PARALLEL=40
 
+function convert_inputs {
+  mkdir -p $INDIR
+
+  for ssmfn in $PAIRTREE_INPUTS_DIR/*.ssm; do
+    sampid=$(basename $ssmfn | cut -d. -f1)
+    echo "python3 $BASEDIR/others/pwgs/convert_inputs.py " \
+      "$PAIRTREE_INPUTS_DIR/$sampid.ssm" \
+      "$PAIRTREE_INPUTS_DIR/$sampid.params.json" \
+      "$INDIR/$sampid.ssm" \
+      "$INDIR/$sampid.params.json"
+  done | parallel -j$PARALLEL --halt 1
+}
 
 function run_steph {
-  INDIR=$PROTDIR/scratch/inputs/steph.xeno.nogarb.pwgs
-  OUTBASE=$PROTDIR/scratch/results/steph.xeno.nogarb.pwgs
-
   for ssmfn in $INDIR/*.ssm; do
     runid=$(basename $ssmfn | cut -d. -f1)
     jobname="steph_pwgs_${runid}"
@@ -43,4 +56,9 @@ function run_steph {
   done
 }
 
-run_steph
+function main {
+  #convert_inputs
+  run_steph
+}
+
+main
