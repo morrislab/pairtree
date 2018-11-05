@@ -50,15 +50,29 @@ function run_steph {
         "--params $INDIR/${runid}.params.json" \
         ">$runid.stdout" \
         "2>$runid.stderr"
-    ) > $JOBDIR/job.sh
-    sbatch $JOBDIR/job.sh
-    rm $JOBDIR/job.sh
+    ) #> $JOBDIR/job.sh
+    #sbatch $JOBDIR/job.sh
+    #rm $JOBDIR/job.sh
   done
+}
+
+function create_mutrels {
+  cd $OUTBASE
+  for runid in *; do
+    OUTDIR=$OUTBASE/$runid
+    [[ -f $OUTDIR/$runid.summ.json.gz ]] || continue
+    echo "cd $OUTDIR &&" \
+      "python3 $BASEDIR/others/pwgs/convert_outputs.py" \
+      "$PAIRTREE_INPUTS_DIR/$runid.{ssm,params.json}" \
+      "$OUTDIR/$runid.{summ.json.gz,muts.json.gz,mutass.zip}" \
+      "$OUTDIR/$runid.mutrel.npz"
+  done | parallel -j$PARALLEL --halt 1
 }
 
 function main {
   #convert_inputs
-  run_steph
+  #run_steph
+  create_mutrels
 }
 
 main
