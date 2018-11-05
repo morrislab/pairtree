@@ -50,7 +50,7 @@ def make_ancestral_from_adj(adj):
   return Z
 
 def make_mutrel_tensor_from_cluster_adj(cluster_adj, clusters):
-  cluster_anc = common.make_ancestral_from_adj(cluster_adj)
+  cluster_anc = make_ancestral_from_adj(cluster_adj)
   # In determining A_B relations, don't want to set mutaitons (i,j), where i
   # and j are in same cluster, to 1.
   np.fill_diagonal(cluster_anc, 0)
