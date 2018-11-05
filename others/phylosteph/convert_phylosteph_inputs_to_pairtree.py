@@ -1,9 +1,13 @@
 import csv
 import numpy as np
 import argparse
-import inputparser
 import json
 from collections import OrderedDict
+
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+import inputparser
 
 # Convert from PWGS format to Pairtree format, discarding garbage variants in
 # the process.
@@ -52,6 +56,7 @@ def make_varids_contiguous(variants, garbage_ids, clusters):
   assert set([int(V[1:]) for V in new_variants.keys()]) == \
     set([V for C in new_clusters for V in C]) == \
     set([int(V['id'][1:]) for V in new_variants.values()])
+  assert len(new_clusters[0]) == 0 and not np.any(np.array([len(C) for C in new_clusters[1:]]) == 0)
 
   return (new_variants, new_clusters)
 
@@ -59,10 +64,11 @@ def load_handbuilt(hbfn, tree_type):
   with open(hbfn) as F:
     return json.load(F)[tree_type]
 
-def write_pairtree_params(sampnames, clusters, pairtree_params_fn):
+def write_pairtree_params(sampnames, clusters, structure, pairtree_params_fn):
   params = {
     'samples': sampnames,
     'clusters': clusters,
+    'structure': structure,
   }
   with open(pairtree_params_fn, 'w') as F:
     json.dump(params, F)
@@ -83,6 +89,7 @@ def main():
   hb = load_handbuilt(args.handbuilt_fn, tree_type)
   clusters = hb['clusters']
   garbage = hb['garbage']
+  structure = hb['structure']
 
   pwgs_params = inputparser.load_params(args.pwgs_params_fn)
   variants = load_phylowgs(args.pwgs_ssm_fn)
@@ -90,7 +97,7 @@ def main():
   variants, clusters = make_varids_contiguous(variants, garbage, clusters)
 
   inputparser.write_ssms(variants, args.pairtree_ssm_fn)
-  write_pairtree_params(pwgs_params['samples'], clusters, args.pairtree_params_fn)
+  write_pairtree_params(pwgs_params['samples'], clusters, structure, args.pairtree_params_fn)
 
 if __name__ == '__main__':
   main()
