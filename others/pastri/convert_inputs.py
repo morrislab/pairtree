@@ -48,7 +48,7 @@ def main():
   matrices['beta']  = matrices['beta'][:C_max,]
 
   write_matrices(('A', matrices['var_reads']), ('D', matrices['total_reads']), outfn = args.pastri_allele_counts_fn)
-  write_matrices(('A', matrices['alpha']),     ('B', matrices['beta']),        outfn = args.pastri_proposal_fn)
+  write_matrices(('Alpha', matrices['alpha']), ('Beta', matrices['beta']), outfn = args.pastri_proposal_fn)
 
 if __name__ == '__main__':
   main()
