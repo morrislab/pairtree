@@ -1,6 +1,7 @@
 import json
 import collections
 import numpy as np
+import common
 
 def _check_dupes(coll):
   if len(set(coll)) != len(coll):
@@ -28,20 +29,6 @@ def _load_clusters(hb, variants):
   assert clusters[0] == []
 
   return clusters
-
-def _convert_adjlist_to_adjmatrix(adjlist):
-  all_children = [child for C in adjlist.values() for child in C]
-  root = 0
-  assert root not in all_children and root in adjlist.keys()
-
-  N = max(all_children) + 1
-  adjm = np.eye(N)
-
-  for parent in adjlist.keys():
-    children = adjlist[parent]
-    adjm[parent, children] = 1
-
-  return adjm
 
 def _load_tree(hb):
   struct = hb['structure']
@@ -91,7 +78,7 @@ def load_clusters_and_tree(handbuilt_jsonfn, variants, tree_type, sampnames):
   tstruct = _load_tree(hbjson)
   colourings = hbjson['colourings']
   clusters, tstruct = _renumber_clusters(clusters, tstruct, variants, sampnames, colourings)
-  adjm = _convert_adjlist_to_adjmatrix(tstruct)
+  adjm = common.convert_adjlist_to_adjmatrix(tstruct)
   return (clusters, adjm, colourings)
 
 def load_clusters(handbuilt_jsonfn, variants, tree_type, sampnames):
@@ -104,7 +91,7 @@ def load_tree(handbuilt_jsonfn, tree_type):
   if 'structure' not in hbjson:
     return None
   tstruct = _load_tree(hbjson)
-  adjm = _convert_adjlist_to_adjmatrix(tstruct)
+  adjm = common.convert_adjlist_to_adjmatrix(tstruct)
   return adjm
 
 def load_samporders(handbuilt_jsonfn, tree_type):

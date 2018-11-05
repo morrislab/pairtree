@@ -77,6 +77,20 @@ def make_mutrel_tensor_from_cluster_adj(cluster_adj, clusters):
 
   return mutrel
 
+def convert_adjlist_to_adjmatrix(adjlist):
+  all_children = [child for C in adjlist.values() for child in C]
+  root = 0
+  assert root not in all_children and root in adjlist.keys()
+
+  N = max(all_children) + 1
+  adjm = np.eye(N)
+
+  for parent in adjlist.keys():
+    children = adjlist[parent]
+    adjm[parent, children] = 1
+
+  return adjm
+
 def make_cluster_supervars(clusters, variants):
   cluster_supervars = {}
 
