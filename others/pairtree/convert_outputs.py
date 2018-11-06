@@ -44,12 +44,10 @@ def calc_pairs_mutrel(posterior, clusters):
 
   num_models = len(common.Models._all)
   mutrel = np.zeros((M, M, num_models))
-  from IPython import embed
-  embed()
   assert posterior.shape == (K, K, num_models)
 
   for modelidx in range(num_models):
-    mut_vs_cluster = np.dot(membership, posterior[modelidx]) # MxK
+    mut_vs_cluster = np.dot(membership, posterior[:,:,modelidx]) # MxK
     mutrel[:,:,modelidx] = np.dot(mut_vs_cluster, mut_vs_cluster.T) # KxK
   return mutrel
 
