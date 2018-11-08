@@ -42,6 +42,8 @@ def main():
     'alpha': extract_matrix(supervars, 'var_reads'),
     'beta': extract_matrix(supervars, 'total_reads'),
   }
+  matrices['alpha'][:] = 1
+  matrices['beta'][:] = 2
 
   C_max = 10
   matrices['alpha'] = matrices['alpha'][:C_max,]
