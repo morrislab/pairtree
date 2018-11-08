@@ -49,6 +49,8 @@ def calc_pairs_mutrel(posterior, clusters):
   for modelidx in range(num_models):
     mut_vs_cluster = np.dot(membership, posterior[:,:,modelidx]) # MxK
     mutrel[:,:,modelidx] = np.dot(mut_vs_cluster, mut_vs_cluster.T) # KxK
+  assert np.all(0 <= posterior) and np.all(posterior <= 1)
+  assert np.all(0 <= mutrel) and np.all(mutrel <= 1)
   return mutrel
 
 def main():
