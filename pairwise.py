@@ -8,15 +8,15 @@ from common import Models
 import common
 import lh
 
-def swap_evidence(evidence):
-  swapped = np.zeros(len(evidence)) + np.nan
+def swap_A_B(arr):
+  swapped = np.zeros(len(arr)) + np.nan
   for midx, M in enumerate(Models._all):
     if midx in (Models.garbage, Models.cocluster, Models.diff_branches):
-      swapped[midx] = evidence[midx]
+      swapped[midx] = arr[midx]
     elif midx == Models.A_B:
-      swapped[midx] = evidence[Models.B_A]
+      swapped[midx] = arr[Models.B_A]
     elif midx == Models.B_A:
-      swapped[midx] = evidence[Models.A_B]
+      swapped[midx] = arr[Models.A_B]
     else:
       raise Exception('Unknown model')
   assert not np.any(np.isnan(swapped))
@@ -97,27 +97,25 @@ def calc_posterior(variants, prior=None, rel_type='variant', parallel=1):
     futures = []
     with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
       for A, B in pairs:
-        futures.append(ex.submit(calc_lh, variants[A], variants[B]))
+        futures.append(ex.submit(calc_lh_and_posterior, variants[A], variants[B], logprior))
       for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Computing %s relations' % rel_type, unit='pair', dynamic_ncols=True, disable=None):
         pass
     for (A, B), F in zip(pairs, futures):
-      evidence[A,B], _ = F.result()
+      evidence[A,B], posterior[A,B] = F.result()
   else:
     for A, B in pairs:
-      evidence[A,B], _ = calc_lh(variants[A], variants[B])
+      evidence[A,B], posterior[A,B] = calc_lh_and_posterior(variants[A], variants[B], logprior)
 
   # Duplicate evidence's keys, since we'll be modifying dictionary.
   for A, B in pairs:
     if A == B:
       continue
-    evidence[B,A] = swap_evidence(evidence[A,B])
-  for A in range(M):
-    for B in range(M):
-      # TODO: move this into the parallel calcs.
-      posterior[A,B] = _calc_posterior(evidence[A,B], logprior)
+    evidence[B,A] = swap_A_B(evidence[A,B])
+    posterior[B,A] = swap_A_B(posterior[A,B])
 
   _sanity_check_tensor(evidence)
   _sanity_check_tensor(posterior)
+  assert np.all(np.isclose(1, np.sum(posterior, axis=2)))
   return (posterior, evidence)
 
 # In cases where we have zero variant reads for both variants, the garbage
@@ -136,7 +134,8 @@ def _fix_zero_var_read_samples(V1, V2, evidence):
   zero_indices = np.logical_and(V1.var_reads == 0, V2.var_reads == 0)
   evidence[zero_indices,:] = 0
 
-def calc_lh(V1, V2, _calc_lh=lh.calc_lh_quad):
+_DEFAULT_CALC_LH = lh.calc_lh_quad
+def calc_lh(V1, V2, _calc_lh=_DEFAULT_CALC_LH):
   if V1.id == V2.id:
     # If they're the same variant, they should cocluster with certainty.
     evidence = -np.inf * np.ones(len(Models._all))
@@ -148,3 +147,8 @@ def calc_lh(V1, V2, _calc_lh=lh.calc_lh_quad):
   _fix_zero_var_read_samples(V1, V2, evidence_per_sample)
   evidence = np.sum(evidence_per_sample, axis=0)
   return (evidence, evidence_per_sample)
+
+def calc_lh_and_posterior(V1, V2, logprior, _calc_lh=_DEFAULT_CALC_LH):
+  evidence, evidence_per_sample = calc_lh(V1, V2, _calc_lh)
+  posterior = _calc_posterior(evidence, logprior)
+  return (evidence, posterior)
