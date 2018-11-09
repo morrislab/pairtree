@@ -57,10 +57,7 @@ def fit_all_phis(adj, A, ref_reads, var_reads, iterations, parallel):
   eta = np.dot(np.linalg.inv(Z), phi_implied).T
   assert eta.shape == (S, K)
 
-  assert parallel > 0
-  # Don't bother invoking all the parallelism machinery if we're only fitting a
-  # single sample at a time.
-  if parallel > 1:
+  if parallel > 0:
     modified_samples = []
     futures = []
     import concurrent.futures

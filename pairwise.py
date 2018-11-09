@@ -75,17 +75,8 @@ def _sanity_check_tensor(tensor):
     mat = tensor[:,:,midx]
     assert np.allclose(mat, mat.T)
 
-def calc_posterior(variants, prior=None, parallel=1):
+def calc_posterior(variants, prior=None, rel_type='variant', parallel=1):
   logprior = complete_prior(prior)
-  make_tqdm = lambda I, I_len: tqdm(
-    I,
-    total=I_len,
-    desc='Computing relations',
-    unit='pair',
-    dynamic_ncols=True,
-    disable=None # Disable on non-TTY
-  )
-
   M = len(variants)
   # Allow Numba use by converting to namedtuple.
   variants = [common.convert_variant_dict_to_tuple(V) for V in variants]
@@ -99,19 +90,20 @@ def calc_posterior(variants, prior=None, parallel=1):
   pairs = [sorted(C) for C in pairs]
   # Don't bother starting more workers than jobs.
   parallel = min(parallel, len(pairs))
-  # Don't bother invoking all the parallelism machinery if we're only fitting a
-  # single sample at a time.
-  if parallel > 1:
+
+  # If you set parallel = 0, we don't invoke the parallelism machinery. This
+  # makes debugging easier.
+  if parallel > 0:
     futures = []
     with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
       for A, B in pairs:
         futures.append(ex.submit(calc_lh, variants[A], variants[B]))
-      for F in make_tqdm(concurrent.futures.as_completed(futures), len(futures)):
+      for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Computing %s relations' % rel_type, unit='pair', dynamic_ncols=True, disable=None):
         pass
     for (A, B), F in zip(pairs, futures):
       evidence[A,B], _ = F.result()
   else:
-    for A, B in make_tqdm(pairs, len(pairs)):
+    for A, B in pairs:
       evidence[A,B], _ = calc_lh(variants[A], variants[B])
 
   # Duplicate evidence's keys, since we'll be modifying dictionary.

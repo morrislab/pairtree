@@ -168,9 +168,8 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, nchains
   jobs = []
   total = nchains * trees_per_chain
 
-  assert parallel > 0
   # Don't use (hard-to-debug) parallelism machinery unless necessary.
-  if parallel > 1:
+  if parallel > 0:
     import concurrent.futures
     import multiprocessing
     manager = multiprocessing.Manager()

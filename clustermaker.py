@@ -19,7 +19,7 @@ def use_pre_existing(variants, mutrel, prior, parallel, clusters, garbage):
   garbage = [vidmap[vid] for vid in garbage]
 
   supervars = _make_cluster_supervars(clusters, variants)
-  clust_posterior, clust_evidence = pairwise.calc_posterior(supervars, prior, parallel)
+  clust_posterior, clust_evidence = pairwise.calc_posterior(supervars, prior, 'supervariant', parallel)
 
   _check_clusters(variants, clusters, garbage)
   return (supervars, clust_posterior, clusters, garbage)
