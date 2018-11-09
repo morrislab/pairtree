@@ -2,9 +2,14 @@ import numpy as np
 import pairwise
 
 def _check_clusters(variants, clusters, garbage):
+  for cidx, C in enumerate(clusters):
+    if cidx == 0:
+      assert len(C) == 0
+    else:
+      assert len(C) > 0
+
   vids = [int(V['id'][1:]) for V in variants]
   clustered = [child for C in clusters for child in C]
-
   garbage = set(garbage)
   clustered = set(clustered)
   assert len(clustered & garbage) == 0
@@ -31,7 +36,6 @@ def _make_cluster_supervars(clusters, variants):
   supervars = []
 
   for cidx, cluster in enumerate(clusters):
-    # TODO: change this to an assertion
     if len(cluster) == 0:
       continue
     cvars = [variants[vidx] for vidx in cluster]
@@ -63,6 +67,6 @@ def _make_cluster_supervars(clusters, variants):
 def make_superclusters(supervars):
   N = len(supervars)
   superclusters = [[C] for C in range(N)]
-  # TODO: remove empty cluster
+  # Add empty initial cluster, which serves as tree root.
   superclusters.insert(0, [])
   return superclusters
