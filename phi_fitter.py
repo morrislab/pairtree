@@ -30,13 +30,14 @@ def calc_llh(var_reads, ref_reads, A, Z, psi):
   mut_probs = scipy.stats.binom.logpmf(var_reads, total_reads, mut_p)
   return np.sum(mut_probs)
 
-def fit_phis(adj, superclusters, supervars, iterations, parallel):
+def fit_phis(adj, superclusters, supervars, iterations, parallel, disable_pbar=None):
+  # disable_pbar=None will disable progress bar if we're not writing to a TTY.
   ref_reads = np.array([S['ref_reads'] for S in supervars])
   var_reads = np.array([S['var_reads'] for S in supervars])
   assert len(supervars) == len(adj) - 1
   # Supervar `i` is in cluster `i`. Cluster 0 is empty.
   A = np.insert(np.eye(len(supervars)), 0, 0, axis=1)
-  return fit_all_phis(adj, A, ref_reads, var_reads, iterations, parallel)
+  return fit_all_phis(adj, A, ref_reads, var_reads, iterations, parallel, disable_pbar)
 
 def fit_phi_S(eta_S, var_reads_S, ref_reads_S, A, Z, iterations):
   eta_S = np.maximum(common._EPSILON, eta_S)
@@ -45,7 +46,7 @@ def fit_phi_S(eta_S, var_reads_S, ref_reads_S, A, Z, iterations):
   eta_S = softmax(psi_S)
   return eta_S
 
-def fit_all_phis(adj, A, ref_reads, var_reads, iterations, parallel):
+def fit_all_phis(adj, A, ref_reads, var_reads, iterations, parallel, disable_pbar):
   Z = common.make_ancestral_from_adj(adj)
   M, K = A.shape
   _, S = ref_reads.shape
@@ -69,7 +70,7 @@ def fit_all_phis(adj, A, ref_reads, var_reads, iterations, parallel):
         if np.any(eta[s] < 0):
           modified_samples.append(s)
           futures.append(ex.submit(fit_phi_S, eta[s], var_reads[:,s], ref_reads[:,s], A, Z, iterations))
-      for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Fitting phis', unit=' samples', dynamic_ncols=True):
+      for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Fitting phis', unit=' samples', dynamic_ncols=True, disable=disable_pbar):
         pass
     for s, F in zip(modified_samples, futures):
       eta[s] = F.result()

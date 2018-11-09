@@ -16,7 +16,7 @@ def calc_llh(data_mutrel, supervars, superclusters, cluster_adj, fit_phis=True):
   mutrel_fit = np.sum(np.log(mutrel_fit))
 
   if fit_phis:
-    phi, eta = phi_fitter.fit_phis(cluster_adj, superclusters, supervars, iterations=100, parallel=1)
+    phi, eta = phi_fitter.fit_phis(cluster_adj, superclusters, supervars, iterations=100, disable_pbar=True, parallel=1)
     K, S = phi.shape
     alpha, beta = calc_beta_params(supervars)
     assert alpha.shape == beta.shape == (K-1, S)

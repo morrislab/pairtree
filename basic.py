@@ -3,6 +3,8 @@ import os
 import numpy as np
 import scipy.integrate
 import warnings
+import random
+import multiprocessing
 
 import common
 import pairwise
@@ -41,7 +43,7 @@ def lolsomething(variants, prior, args):
     from IPython import embed
     embed()
   elif task == 'calc':
-    posterior, evidence = pairwise.calc_posterior(variants, prior=prior, parallel=args.parallel)
+    posterior, evidence = pairwise.calc_posterior(variants, prior=prior, parallel=parallel)
     posterior = convert_to_array(posterior)
     evidence = convert_to_array(evidence)
     np.savez_compressed(pairwisefn, posterior=posterior, evidence=evidence)
@@ -92,20 +94,24 @@ def main():
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--seed', dest='seed', type=int)
-  parser.add_argument('--parallel', dest='parallel', type=int, default=1)
+  parser.add_argument('--parallel', dest='parallel', type=int, default=None)
   parser.add_argument('--params', dest='params_fn')
   parser.add_argument('--trees-per-chain', dest='trees_per_chain', type=int, default=1000)
-  parser.add_argument('--tree-chains', dest='tree_chains', type=int, default=1)
+  parser.add_argument('--tree-chains', dest='tree_chains', type=int, default=None)
   parser.add_argument('--phi-iterations', dest='phi_iterations', type=int, default=1000)
   parser.add_argument('sampid')
   parser.add_argument('ssm_fn')
   args = parser.parse_args()
 
+  # Note that multiprocessing.cpu_count() returns number of logical cores, so
+  # if you're using a hyperthreaded CPU, this will be more than the number of
+  # physical cores you have.
+  parallel = args.parallel if args.parallel is not None else multiprocessing.cpu_count()
+  tree_chains = args.tree_chains if args.tree_chains is not None else parallel
   prior = {'garbage': 0.001}
 
   if args.seed is not None:
     np.random.seed(args.seed)
-    import random
     random.seed(args.seed)
 
   variants = inputparser.load_ssms(args.ssm_fn)
@@ -121,7 +127,7 @@ def main():
     results = {}
 
   if 'mutrel_posterior' not in results:
-    results['mutrel_posterior'], results['mutrel_evidence'] = pairwise.calc_posterior(variants, prior=prior, parallel=args.parallel)
+    results['mutrel_posterior'], results['mutrel_evidence'] = pairwise.calc_posterior(variants, prior=prior, parallel=parallel)
 
   if 'clustrel_posterior' not in results:
     if 'clusters' in params and 'garbage' in params:
@@ -129,7 +135,7 @@ def main():
         variants,
         results['mutrel_posterior'],
         prior,
-        args.parallel,
+        parallel,
         params['clusters'],
         params['garbage'],
       )
@@ -138,7 +144,7 @@ def main():
         variants,
         results['mutrel_posterior'],
         prior,
-        args.parallel,
+        parallel,
       )
   else:
     supervars = clustermaker._make_cluster_supervars(results['clusters'], variants)
@@ -150,8 +156,8 @@ def main():
       supervars,
       superclusters,
       trees_per_chain = args.trees_per_chain,
-      nchains = args.tree_chains,
-      parallel = args.parallel,
+      nchains = tree_chains,
+      parallel = parallel,
     )
 
   if 'phi' not in results:
@@ -161,7 +167,7 @@ def main():
       superclusters,
       tidxs = (-1,),
       iterations = args.phi_iterations,
-      parallel = args.parallel,
+      parallel = parallel,
     )
 
   #json_writer.write_json(
