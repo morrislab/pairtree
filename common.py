@@ -50,13 +50,27 @@ def make_ancestral_from_adj(adj):
   return Z
 
 def make_mutrel_tensor_from_cluster_adj(cluster_adj, clusters):
+  '''
+  * `M` = # of mutations
+  * `K` = # of clusters
+
+  Arguments:
+  `cluster_adj`: a `KxK` adjacency matrix, where `cluster_adj[a,b] = 1` iff
+  `a = b` or `b` is a child of `a`
+  `clusters`: a `K`-length list of lists, forming a partition over the integers `[0, 1, ..., M-1]`
+
+  Returns:
+  an `MxMx5` binary mutation relation tensor
+  '''
+  K = len(clusters)
+  M = sum([len(clus) for clus in clusters])
+  assert cluster_adj.shape == (K, K)
+  assert set([vidx for cluster in clusters for vidx in cluster]) == set(range(M))
+
   cluster_anc = make_ancestral_from_adj(cluster_adj)
   # In determining A_B relations, don't want to set mutaitons (i,j), where i
   # and j are in same cluster, to 1.
   np.fill_diagonal(cluster_anc, 0)
-
-  M = sum([len(clus) for clus in clusters])
-  K = len(clusters)
   mutrel = np.zeros((M, M, len(Models._all)))
 
   for k in range(K):
@@ -90,44 +104,6 @@ def convert_adjlist_to_adjmatrix(adjlist):
     adjm[parent, children] = 1
 
   return adjm
-
-def make_cluster_supervars(clusters, variants):
-  cluster_supervars = {}
-
-  for cidx, cluster in enumerate(clusters):
-    if len(cluster) == 0:
-      continue
-    cvars = [variants['s%s' % vidx] for vidx in cluster]
-
-    cluster_total_reads = np.array([V['total_reads'] for V in cvars])
-    cluster_var_reads = np.array([V['var_reads'] for V in cvars])
-    # Correct for sex variants.
-    omega_v = np.array([V['omega_v'] for V in cvars])[:,np.newaxis]
-    cluster_var_reads = np.round(cluster_var_reads / (2*omega_v))
-
-    S_name = 'C%s' % len(cluster_supervars)
-    S = {
-      'id': S_name,
-      'name': S_name,
-      'chrom': None,
-      'pos': None,
-      'cluster': cidx,
-      'omega_v': 0.5,
-      'var_reads': np.sum(cluster_var_reads, axis=0, dtype=np.int),
-      'total_reads': np.sum(cluster_total_reads, axis=0, dtype=np.int),
-    }
-    S['ref_reads'] = S['total_reads'] - S['var_reads']
-    S['vaf'] = S['var_reads'] / S['total_reads']
-
-    cluster_supervars[S_name] = S
-
-  return cluster_supervars
-
-def make_superclusters(supervars):
-  N = len(supervars)
-  superclusters = [[C] for C in range(N)]
-  superclusters.insert(0, [])
-  return superclusters
 
 def agglo_children_to_adjlist(children, nleaves):
   assert len(children) == nleaves - 1

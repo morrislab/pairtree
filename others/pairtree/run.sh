@@ -6,7 +6,7 @@ SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 BASEDIR=~/work/pairtree
 JOBDIR=$SCRATCH/jobs
 HANDBUILTDIR=~/work/steph/data/handbuilt_trees
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.nogarb.pairtree
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 PHYLOSTEPH_INPUTS_DIR=~/work/steph/data/inputs/steph.xenos.nocns
 PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/steph.xeno.nogarb.pairtree
 TRUTH_DIR=$BASEDIR/scratch/results/steph.xeno.nogarb.truth
@@ -18,6 +18,7 @@ function convert_phylosteph_inputs {
 
   for ssmfn in $PHYLOSTEPH_INPUTS_DIR/*.ssm; do
     runid=$(basename $ssmfn | cut -d. -f1)
+      #"--discard-garbage" \
     echo "python3 $SCRIPTDIR/convert_phylosteph_inputs_to_pairtree.py " \
       "--handbuilt $HANDBUILTDIR/$runid.json" \
       "$PHYLOSTEPH_INPUTS_DIR/$runid.{sampled.ssm,params.json}" \
@@ -47,9 +48,9 @@ function create_mutrels {
 }
 
 function main {
-  #convert_phylosteph_inputs
+  convert_phylosteph_inputs
   #make_truth_mutrels
-  create_mutrels
+  #create_mutrels
 }
 
 main

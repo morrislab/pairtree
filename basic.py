@@ -12,6 +12,7 @@ import inputparser
 import json_writer
 import tree_sampler
 import phi_fitter
+import clustermaker
 
 def read_file(fn):
   basedir = os.path.abspath(os.path.dirname(__file__))
@@ -29,24 +30,6 @@ def write_header(sampid, outf):
   print('<style type="text/css">%s</style>' % read_file('tree.css'), file=outf)
   print('<style type="text/css">%s</style>' % read_file('matrix.css'), file=outf)
   print('<style type="text/css">td, th, table { padding: 5px; margin: 0; border-collapse: collapse; font-weight: normal; } span { visibility: hidden; } td:hover > span { visibility: visible; } .highlighted { background-color: black !important; color: white; }</style>', file=outf)
-
-def make_tensor(pairs):
-  N = int(np.sqrt(len(pairs)))
-  assert len(pairs) == N**2
-  tensor = np.nan * np.ones((N, N, len(common.Models._all)))
-
-  for pair in pairs.keys():
-    V1, V2 = [int(V[1:]) for V in pair]
-    tensor[V1,V2,:] = pairs[pair]
-
-  assert not np.any(np.isnan(tensor))
-  for model in ('garbage', 'cocluster', 'diff_branches'):
-    # These should be symmetric.
-    midx = getattr(common.Models, model)
-    mat = tensor[:,:,midx]
-    assert np.allclose(mat, mat.T)
-
-  return tensor
 
 def lolsomething(variants, prior, args):
   #task = 'embed'
@@ -76,7 +59,7 @@ def lolsomething(variants, prior, args):
 
 def fit_phis(adjm, variants, clusters, tidxs, iterations, parallel=1):
   ntrees = len(adjm)
-  nsamples = len(list(variants.values())[0]['total_reads'])
+  nsamples = len(variants[0]['total_reads'])
 
   N, K, S = ntrees, len(clusters), nsamples
   eta = np.ones((N, K, S))
@@ -98,9 +81,6 @@ def load_sampnames(params):
     return params['samples']
   else:
     return None
-
-def load_clusters(params):
-  return params['clusters']
 
 def main():
   np.set_printoptions(linewidth=400, precision=3, threshold=np.nan, suppress=True)
@@ -125,17 +105,14 @@ def main():
 
   if args.seed is not None:
     np.random.seed(args.seed)
+    import random
+    random.seed(args.seed)
 
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.params_fn)
   sampnames = load_sampnames(params)
-  clusters = load_clusters(params)
-
-  supervars = common.make_cluster_supervars(clusters, variants)
-  superclusters = common.make_superclusters(supervars)
 
   resultsfn = args.sampid + '.results.npz'
-  must_save = False
   import os
   if os.path.exists(resultsfn):
     results = np.load(resultsfn)
@@ -143,24 +120,42 @@ def main():
   else:
     results = {}
 
-  if 'posterior' not in results:
-    posterior, evidence = pairwise.calc_posterior(supervars, prior=prior, parallel=args.parallel)
-    results['posterior'] = make_tensor(posterior)
-    must_save = True
+  if 'mutrel_posterior' not in results:
+    results['mutrel_posterior'], results['mutrel_evidence'] = pairwise.calc_posterior(variants, prior=prior, parallel=args.parallel)
 
-  if 'adjm' not in results or 'llh' not in results:
+  if 'clustrel_posterior' not in results:
+    if 'clusters' in params and 'garbage' in params:
+      supervars, results['clustrel_posterior'], results['clusters'], results['garbage'] = clustermaker.use_pre_existing(
+        variants,
+        results['mutrel_posterior'],
+        prior,
+        args.parallel,
+        params['clusters'],
+        params['garbage'],
+      )
+    else:
+      supervars, results['clustrel_posterior'], results['clusters'], results['garbage'] = clustermaker.cluster_and_discard_garbage(
+        variants,
+        results['mutrel_posterior'],
+        prior,
+        args.parallel,
+      )
+  else:
+    supervars = clustermaker._make_cluster_supervars(results['clusters'], variants)
+  superclusters = clustermaker.make_superclusters(supervars)
+
+  if 'adjm' not in results:
     results['adjm'], results['llh'] = tree_sampler.sample_trees(
-      results['posterior'],
+      results['clustrel_posterior'],
       supervars,
       superclusters,
       trees_per_chain = args.trees_per_chain,
       nchains = args.tree_chains,
       parallel = args.parallel,
     )
-    must_save = True
 
   if 'phi' not in results:
-    results['phi'], eta = fit_phis(
+    results['phi'], results['eta'] = fit_phis(
       results['adjm'],
       supervars,
       superclusters,
@@ -168,24 +163,20 @@ def main():
       iterations = args.phi_iterations,
       parallel = args.parallel,
     )
-    must_save = True
 
-  json_writer.write_json(
-    args.sampid,
-    sampnames,
-    variants,
-    clusters,
-    results['adjm'],
-    results['llh'],
-    results['phi'],
-    '%s.summ.json' % args.sampid,
-    '%s.muts.json' % args.sampid,
-  )
+  #json_writer.write_json(
+  #  args.sampid,
+  #  sampnames,
+  #  variants,
+  #  clusters,
+  #  results['adjm'],
+  #  results['llh'],
+  #  results['phi'],
+  #  '%s.summ.json' % args.sampid,
+  #  '%s.muts.json' % args.sampid,
+  #)
 
-  if must_save:
-    np.savez_compressed(resultsfn, **results)
-
-
+  np.savez_compressed(resultsfn, **results)
   #lolsomething(variants, prior, args)
 
 if __name__ == '__main__':

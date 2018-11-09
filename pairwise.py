@@ -1,5 +1,4 @@
 import numpy as np
-import scipy.stats
 import scipy.special
 import concurrent.futures
 from tqdm import tqdm
@@ -8,7 +7,6 @@ import itertools
 from common import Models
 import common
 import lh
-import util
 
 def swap_evidence(evidence):
   swapped = np.zeros(len(evidence)) + np.nan
@@ -69,44 +67,65 @@ def complete_prior(prior):
   assert np.isclose(0, scipy.special.logsumexp(logprior))
   return logprior
 
+def _sanity_check_tensor(tensor):
+  assert not np.any(np.isnan(tensor))
+  for model in ('garbage', 'cocluster', 'diff_branches'):
+    # These should be symmetric.
+    midx = getattr(common.Models, model)
+    mat = tensor[:,:,midx]
+    assert np.allclose(mat, mat.T)
+
 def calc_posterior(variants, prior=None, parallel=1):
   logprior = complete_prior(prior)
-  N = len(variants)
-  posterior = {}
-  evidence = {}
+  make_tqdm = lambda I, I_len: tqdm(
+    I,
+    total=I_len,
+    desc='Computing relations',
+    unit='pair',
+    dynamic_ncols=True,
+    disable=None # Disable on non-TTY
+  )
 
+  M = len(variants)
   # Allow Numba use by converting to namedtuple.
-  variants = {vid: common.convert_variant_dict_to_tuple(V) for vid, V in variants.items()}
+  variants = [common.convert_variant_dict_to_tuple(V) for V in variants]
 
-  combos = list(itertools.combinations(variants.keys(), 2)) + [(K,K) for K in variants.keys()]
-  combos = [sorted(C) for C in combos]
+  evidence = np.nan * np.ones((M, M, len(Models._all)))
+  posterior = np.copy(evidence)
+
+  pairs = list(itertools.combinations(range(M), 2)) + [(V, V) for V in range(M)]
+  # TODO: change ordering of pairs based on what will provide optimal
+  # integration accuracy according to Quaid's advice.
+  pairs = [sorted(C) for C in pairs]
   # Don't bother starting more workers than jobs.
-  parallel = min(parallel, len(combos))
+  parallel = min(parallel, len(pairs))
   # Don't bother invoking all the parallelism machinery if we're only fitting a
   # single sample at a time.
   if parallel > 1:
-    pairs = []
     futures = []
     with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
-      for vidx1, vidx2 in combos:
-        pairs.append((vidx1, vidx2))
-        futures.append(ex.submit(calc_lh, variants[vidx1], variants[vidx2]))
-      for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Computing relations', unit=' pairs', dynamic_ncols=True):
+      for A, B in pairs:
+        futures.append(ex.submit(calc_lh, variants[A], variants[B]))
+      for F in make_tqdm(concurrent.futures.as_completed(futures), len(futures)):
         pass
-    for pair, F in zip(pairs, futures):
-      evidence[pair], _ = F.result()
+    for (A, B), F in zip(pairs, futures):
+      evidence[A,B], _ = F.result()
   else:
-    for vidx1, vidx2 in combos:
-      pair = (vidx1, vidx2)
-      evidence[pair], _ = calc_lh(variants[vidx1], variants[vidx2])
+    for A, B in make_tqdm(pairs, len(pairs)):
+      evidence[A,B], _ = calc_lh(variants[A], variants[B])
 
   # Duplicate evidence's keys, since we'll be modifying dictionary.
-  for A, B in list(evidence.keys()):
+  for A, B in pairs:
     if A == B:
       continue
-    evidence[(B,A)] = swap_evidence(evidence[(A,B)])
-  for pair in evidence.keys():
-    posterior[pair] = _calc_posterior(evidence[pair], logprior)
+    evidence[B,A] = swap_evidence(evidence[A,B])
+  for A in range(M):
+    for B in range(M):
+      # TODO: move this into the parallel calcs.
+      posterior[A,B] = _calc_posterior(evidence[A,B], logprior)
+
+  _sanity_check_tensor(evidence)
+  _sanity_check_tensor(posterior)
   return (posterior, evidence)
 
 # In cases where we have zero variant reads for both variants, the garbage

@@ -31,9 +31,8 @@ def calc_llh(var_reads, ref_reads, A, Z, psi):
   return np.sum(mut_probs)
 
 def fit_phis(adj, superclusters, supervars, iterations, parallel):
-  supervar_ids = sorted(supervars.keys(), key = lambda C: int(C[1:]))
-  ref_reads = np.array([supervars[cid]['ref_reads'] for cid in supervar_ids])
-  var_reads = np.array([supervars[cid]['var_reads'] for cid in supervar_ids])
+  ref_reads = np.array([S['ref_reads'] for S in supervars])
+  var_reads = np.array([S['var_reads'] for S in supervars])
   assert len(supervars) == len(adj) - 1
   # Supervar `i` is in cluster `i`. Cluster 0 is empty.
   A = np.insert(np.eye(len(supervars)), 0, 0, axis=1)

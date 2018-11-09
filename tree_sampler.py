@@ -6,6 +6,8 @@ import phi_fitter
 Models = common.Models
 debug = common.debug
 
+MIN_FLOAT = np.finfo(np.float).min
+
 def calc_llh(data_mutrel, supervars, superclusters, cluster_adj, fit_phis=True):
   tree_mutrel = common.make_mutrel_tensor_from_cluster_adj(cluster_adj, superclusters)
   mutrel_fit = 1 - np.abs(data_mutrel - tree_mutrel)
@@ -28,6 +30,8 @@ def calc_llh(data_mutrel, supervars, superclusters, cluster_adj, fit_phis=True):
   # I had NaNs creep into my LLH when my alpha and beta params were invalid
   # (i.e., when I had elements of beta that were <= 0).
   assert not np.isnan(llh)
+  # Prevent LLH of -inf.
+  llh = np.maximum(llh, MIN_FLOAT)
   return llh
 
 def init_cluster_adj_linear(K):
@@ -103,9 +107,8 @@ def permute_adj(adj):
 permute_adj.blah = set()
 
 def calc_beta_params(supervars):
-  svids = sorted(supervars.keys(), key = lambda V: int(V[1:]))
-  V = np.array([supervars[C]['var_reads'] for C in svids])
-  R = np.array([supervars[C]['ref_reads'] for C in svids])
+  V = np.array([S['var_reads'] for S in supervars])
+  R = np.array([S['ref_reads'] for S in supervars])
   # Since these are supervars, we can just take 2*V and disregard omega_v, since
   # supervariants are always diploid (i.e., omega_v = 0.5).
   alpha = 2*V + 1
@@ -175,7 +178,7 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, nchains
     # so that child processes can signal when they've sampled a tree, allowing
     # the main process to update the progress bar.
     progress_queue = manager.Queue()
-    with tqdm(total=total, desc='Sampling trees', unit=' trees', dynamic_ncols=True) as progress_bar:
+    with tqdm(total=total, desc='Sampling trees', unit='tree', dynamic_ncols=True) as progress_bar:
       with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
         for C in range(nchains):
           jobs.append(ex.submit(run_chain, data_mutrel, supervars, superclusters, trees_per_chain, progress_queue))

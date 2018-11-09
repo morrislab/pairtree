@@ -64,11 +64,14 @@ def load_handbuilt(hbfn, tree_type):
   with open(hbfn) as F:
     return json.load(F)[tree_type]
 
-def write_pairtree_params(sampnames, clusters, structure, pairtree_params_fn):
+def write_pairtree_params(sampnames, garbage, clusters, structure, pairtree_params_fn):
+  clusters = [['s%s' % V for V in C] for C in clusters]
+  garbage = ['s%s' % V for V in garbage]
   params = {
     'samples': sampnames,
     'clusters': clusters,
     'structure': structure,
+    'garbage': garbage,
   }
   with open(pairtree_params_fn, 'w') as F:
     json.dump(params, F)
@@ -78,6 +81,7 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('--discard-garbage', dest='discard_garbage', action='store_true')
   parser.add_argument('--handbuilt', dest='handbuilt_fn', required=True)
   parser.add_argument('pwgs_ssm_fn')
   parser.add_argument('pwgs_params_fn')
@@ -93,11 +97,13 @@ def main():
 
   pwgs_params = inputparser.load_params(args.pwgs_params_fn)
   variants = load_phylowgs(args.pwgs_ssm_fn)
-  remove_garbage(variants, garbage, clusters)
-  variants, clusters = make_varids_contiguous(variants, garbage, clusters)
+  if args.discard_garbage:
+    remove_garbage(variants, garbage, clusters)
+    variants, clusters = make_varids_contiguous(variants, garbage, clusters)
+    garbage = []
 
   inputparser.write_ssms(variants, args.pairtree_ssm_fn)
-  write_pairtree_params(pwgs_params['samples'], clusters, structure, args.pairtree_params_fn)
+  write_pairtree_params(pwgs_params['samples'], garbage, clusters, structure, args.pairtree_params_fn)
 
 if __name__ == '__main__':
   main()

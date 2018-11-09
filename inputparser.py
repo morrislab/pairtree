@@ -1,10 +1,9 @@
 import csv
 import json
 import numpy as np
-from collections import OrderedDict
 
 def load_ssms(ssmfn, max_ssms=None):
-  variants = OrderedDict()
+  variants = []
 
   with open(ssmfn) as F:
     reader = csv.DictReader(F, delimiter='\t')
@@ -26,8 +25,12 @@ def load_ssms(ssmfn, max_ssms=None):
       variant['vaf'] = variant['var_reads'] / variant['total_reads']
       variant['chrom'], variant['pos'] = variant['name'].split('_')
       variant['pos'] = int(variant['pos'])
-      variants[row['id']] = variant
+      variants.append(variant)
 
+  variants.sort(key = lambda V: int(V['id'][1:]))
+
+  vids = set([int(V['id'][1:]) for V in variants])
+  assert vids == set(range(len(variants)))
   return variants
 
 def load_params(paramsfn):
