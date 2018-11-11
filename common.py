@@ -18,6 +18,14 @@ Variant = namedtuple('Variant', (
   'omega_v',
 ))
 
+Mutrel = namedtuple('Mutrel', ('vids', 'rels'))
+
+def sort_vids(vids):
+  return sorted(vids, key = lambda V: int(V[1:]))
+
+def extract_vids(variants):
+  return sort_vids(variants.keys())
+
 def convert_variant_dict_to_tuple(V):
   return Variant(**{K: V[K] for K in Variant._fields})
 
@@ -65,7 +73,10 @@ def make_mutrel_tensor_from_cluster_adj(cluster_adj, clusters):
   K = len(clusters)
   M = sum([len(clus) for clus in clusters])
   assert cluster_adj.shape == (K, K)
-  assert set([vidx for cluster in clusters for vidx in cluster]) == set(range(M))
+
+  vids = sort_vids([vid for cluster in clusters for vid in cluster])
+  vidmap = {vid: vidx for vidx, vid in enumerate(vids)}
+  clusters = [[vidmap[vid] for vid in cluster] for cluster in clusters]
 
   cluster_anc = make_ancestral_from_adj(cluster_adj)
   # In determining A_B relations, don't want to set mutaitons (i,j), where i
@@ -76,7 +87,7 @@ def make_mutrel_tensor_from_cluster_adj(cluster_adj, clusters):
   for k in range(K):
     self_muts = np.array(clusters[k])
     desc_clusters = np.flatnonzero(cluster_anc[k])
-    desc_muts = np.array([midx for cidx in desc_clusters for midx in clusters[cidx]])
+    desc_muts = np.array([vidx for cidx in desc_clusters for vidx in clusters[cidx]])
 
     if len(self_muts) > 0:
       mutrel[self_muts[:,None,None], self_muts[None,:,None], Models.cocluster] = 1
@@ -89,7 +100,7 @@ def make_mutrel_tensor_from_cluster_adj(cluster_adj, clusters):
   mutrel[already_filled == 0,Models.diff_branches] = 1
   assert np.array_equal(np.ones((M,M)), np.sum(mutrel, axis=2))
 
-  return mutrel
+  return Mutrel(vids=vids, rels=mutrel)
 
 def convert_adjlist_to_adjmatrix(adjlist):
   all_children = [child for C in adjlist.values() for child in C]

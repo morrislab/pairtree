@@ -3,7 +3,7 @@ import json
 import numpy as np
 
 def load_ssms(ssmfn, max_ssms=None):
-  variants = []
+  variants = {}
 
   with open(ssmfn) as F:
     reader = csv.DictReader(F, delimiter='\t')
@@ -25,11 +25,11 @@ def load_ssms(ssmfn, max_ssms=None):
       variant['vaf'] = variant['var_reads'] / variant['total_reads']
       variant['chrom'], variant['pos'] = variant['name'].split('_')
       variant['pos'] = int(variant['pos'])
-      variants.append(variant)
 
-  variants.sort(key = lambda V: int(V['id'][1:]))
+      assert variant['id'] not in variants
+      variants[variant['id']] = variant
 
-  vids = set([int(V['id'][1:]) for V in variants])
+  vids = set([int(vid[1:]) for vid in variants.keys()])
   assert vids == set(range(len(variants)))
   return variants
 

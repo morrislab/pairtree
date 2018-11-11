@@ -8,6 +8,7 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 import inputparser
+import common
 
 # Convert from PWGS format to Pairtree format, discarding garbage variants in
 # the process.
@@ -30,39 +31,42 @@ def load_phylowgs(pwgs_fn):
 
   return variants
 
-def remove_garbage(variants, garbage_ids, clusters):
+def remove_garbage(variants, garbage):
   garbage_variants = {}
   N = len(variants)
-  for varid in sorted(variants.keys(), key = lambda S: int(S[1:])):
-    if int(varid[1:]) in garbage_ids:
+  for varid in common.extract_vids(variants):
+    if varid in garbage:
       garbage_variants[varid] = variants[varid]
       del variants[varid]
   assert len(variants) == N - len(garbage_ids)
   return garbage_variants
 
-def make_varids_contiguous(variants, garbage_ids, clusters):
+def make_varids_contiguous(variants, garbage, clusters):
   mapping = {}
-  for idx, old_varid in enumerate(sorted(variants.keys(), key = lambda S: int(S[1:]))):
-    old_varidx = int(old_varid[1:])
-    new_varidx = idx
-    mapping[old_varidx] = new_varidx
+  for new_idx, old_varid in enumerate(common.extract_vids(variants)):
+    mapping[old_varid] = 's%s' % new_varidx
 
-  new_variants = {'s%s' % mapping[int(V[1:])]: variants[V] for V in variants.keys()}
+  new_variants = {mapping[V]: variants[V] for V in variants.keys()}
   for V in new_variants.keys():
     new_variants[V]['id'] = V
 
-  new_clusters = [sorted([mapping[V] for V in C]) for C in clusters]
+  new_clusters = [common.sort_vids([mapping[V] for V in C]) for C in clusters]
 
-  assert set([int(V[1:]) for V in new_variants.keys()]) == \
+  assert set(new_variants.keys()) == \
     set([V for C in new_clusters for V in C]) == \
-    set([int(V['id'][1:]) for V in new_variants.values()])
-  assert len(new_clusters[0]) == 0 and not np.any(np.array([len(C) for C in new_clusters[1:]]) == 0)
+    set([V['id'] for V in new_variants.values()])
+  assert not np.any(np.array([len(C) for C in new_clusters]) == 0)
 
   return (new_variants, new_clusters)
 
 def load_handbuilt(hbfn, tree_type):
   with open(hbfn) as F:
     return json.load(F)[tree_type]
+
+def convert_clusters(clusters):
+  # Remove empty first cluster.
+  assert len(clusters[0]) == 0
+  return clusters[1:]
 
 def write_pairtree_params(sampnames, garbage, clusters, structure, pairtree_params_fn):
   clusters = [['s%s' % V for V in C] for C in clusters]
@@ -91,14 +95,18 @@ def main():
 
   tree_type = 'handbuilt.xeno'
   hb = load_handbuilt(args.handbuilt_fn, tree_type)
-  clusters = hb['clusters']
+  clusters = convert_clusters(hb['clusters'])
   garbage = hb['garbage']
+  # Since we remove the empty first cluster, the indexing on `structure` is now
+  # a little weird -- cluster `i` is now represented by `i + 1` in `structure`.
+  # That's okay.
+  # TODO: I guess this means we need to change how we evaluate results in method comparison?
   structure = hb['structure']
 
   pwgs_params = inputparser.load_params(args.pwgs_params_fn)
   variants = load_phylowgs(args.pwgs_ssm_fn)
   if args.discard_garbage:
-    remove_garbage(variants, garbage, clusters)
+    remove_garbage(variants, garbage)
     variants, clusters = make_varids_contiguous(variants, garbage, clusters)
     garbage = []
 

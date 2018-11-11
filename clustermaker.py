@@ -1,44 +1,33 @@
 import numpy as np
 import pairwise
+import common
 
 def _check_clusters(variants, clusters, garbage):
-  for cidx, C in enumerate(clusters):
-    if cidx == 0:
-      assert len(C) == 0
-    else:
+  for C in clusters:
       assert len(C) > 0
 
-  vids = [int(V['id'][1:]) for V in variants]
+  vids = common.extract_vids(variants)
   clustered = [child for C in clusters for child in C]
   garbage = set(garbage)
   clustered = set(clustered)
   assert len(clustered & garbage) == 0
-  assert set(vids) == clustered | garbage == set(range(len(variants)))
+  assert set(vids) == (clustered | garbage)
 
 def use_pre_existing(variants, mutrel, prior, parallel, clusters, garbage):
-  vidmap = {V['id']: vidx for vidx, V in enumerate(variants)}
-  # Convert from vids ("s0", "s1", "s3" -- gaps are possible, even though they
-  # shouldn't occur, which we'll enforce elsewhere) to contiguous integer
-  # indices.
-  clusters = [[vidmap[vid] for vid in clust] for clust in clusters]
-  garbage = [vidmap[vid] for vid in garbage]
-
-  supervars = _make_cluster_supervars(clusters, variants)
+  supervars = make_cluster_supervars(clusters, variants)
   clust_posterior, clust_evidence = pairwise.calc_posterior(supervars, prior, 'supervariant', parallel)
-
   _check_clusters(variants, clusters, garbage)
-  return (supervars, clust_posterior, clusters, garbage)
+  return (supervars, clust_posterior, clust_evidence, clusters, garbage)
 
 def cluster_and_discard_garbage(variants, mutrel, prior, parallel):
   raise Exception('Not implemented yet')
 
-def _make_cluster_supervars(clusters, variants):
-  supervars = []
+def make_cluster_supervars(clusters, variants):
+  supervars = {}
 
   for cidx, cluster in enumerate(clusters):
-    if len(cluster) == 0:
-      continue
-    cvars = [variants[vidx] for vidx in cluster]
+    assert len(cluster) > 0
+    cvars = [variants[vid] for vid in cluster]
 
     cluster_total_reads = np.array([V['total_reads'] for V in cvars])
     cluster_var_reads = np.array([V['var_reads'] for V in cvars])
@@ -46,7 +35,7 @@ def _make_cluster_supervars(clusters, variants):
     omega_v = np.array([V['omega_v'] for V in cvars])[:,np.newaxis]
     cluster_var_reads = np.round(cluster_var_reads / (2*omega_v))
 
-    S_name = 'C%s' % len(supervars)
+    S_name = 'S%s' % len(supervars)
     S = {
       'id': S_name,
       'name': S_name,
@@ -60,13 +49,12 @@ def _make_cluster_supervars(clusters, variants):
     S['ref_reads'] = S['total_reads'] - S['var_reads']
     S['vaf'] = S['var_reads'] / S['total_reads']
 
-    supervars.append(S)
+    supervars[S_name] = S
 
   return supervars
 
 def make_superclusters(supervars):
   N = len(supervars)
-  superclusters = [[C] for C in range(N)]
-  # Add empty initial cluster, which serves as tree root.
-  superclusters.insert(0, [])
+  svids = common.extract_vids(supervars)
+  superclusters = [[S] for S in svids]
   return superclusters

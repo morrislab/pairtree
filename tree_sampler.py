@@ -10,13 +10,13 @@ MIN_FLOAT = np.finfo(np.float).min
 
 def calc_llh(data_mutrel, supervars, superclusters, cluster_adj, fit_phis=True):
   tree_mutrel = common.make_mutrel_tensor_from_cluster_adj(cluster_adj, superclusters)
-  mutrel_fit = 1 - np.abs(data_mutrel - tree_mutrel)
+  mutrel_fit = 1 - np.abs(data_mutrel.rels - tree_mutrel.rels)
   # Prevent log of zero.
   mutrel_fit = np.maximum(common._EPSILON, mutrel_fit)
   mutrel_fit = np.sum(np.log(mutrel_fit))
 
   if fit_phis:
-    phi, eta = phi_fitter.fit_phis(cluster_adj, superclusters, supervars, iterations=100, disable_pbar=True, parallel=1)
+    phi, eta = phi_fitter.fit_phis(cluster_adj, superclusters, supervars, iterations=100, parallel=0)
     K, S = phi.shape
     alpha, beta = calc_beta_params(supervars)
     assert alpha.shape == beta.shape == (K-1, S)
@@ -107,8 +107,9 @@ def permute_adj(adj):
 permute_adj.blah = set()
 
 def calc_beta_params(supervars):
-  V = np.array([S['var_reads'] for S in supervars])
-  R = np.array([S['ref_reads'] for S in supervars])
+  svids = common.extract_vids(supervars)
+  V = np.array([supervars[svid]['var_reads'] for svid in svids])
+  R = np.array([supervars[svid]['ref_reads'] for svid in svids])
   # Since these are supervars, we can just take 2*V and disregard omega_v, since
   # supervariants are always diploid (i.e., omega_v = 0.5).
   alpha = 2*V + 1

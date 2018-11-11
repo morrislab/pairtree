@@ -15,6 +15,7 @@ import json_writer
 import tree_sampler
 import phi_fitter
 import clustermaker
+import resultserializer
 
 def read_file(fn):
   basedir = os.path.abspath(os.path.dirname(__file__))
@@ -51,7 +52,7 @@ def lolsomething(variants, prior, args):
     if not os.path.exists(pairwisefn):
       import sys
       sys.exit()
-    results = np.load(pairwisefn)
+    results = resultserializer.load(pairwisefn)
     with open('%s.results.html' % args.sampid, 'w') as outf:
       write_header(args.sampid, outf)
       relation_plotter.plot_ml_relations(results['posterior'], outf)
@@ -59,19 +60,19 @@ def lolsomething(variants, prior, args):
   import sys
   sys.exit()
 
-def fit_phis(adjm, variants, clusters, tidxs, iterations, parallel=1):
+def fit_phis(adjm, supervars, superclusters, tidxs, iterations, parallel):
   ntrees = len(adjm)
-  nsamples = len(variants[0]['total_reads'])
+  nsamples = len(next(iter(supervars.values()))['total_reads'])
 
-  N, K, S = ntrees, len(clusters), nsamples
+  N, K, S = ntrees, len(superclusters), nsamples
   eta = np.ones((N, K, S))
   phi = np.ones((N, K, S))
 
   for tidx in tidxs:
     phi[tidx,:,:], eta[tidx,:,:] = phi_fitter.fit_phis(
       adjm[tidx],
-      clusters,
-      variants,
+      superclusters,
+      supervars,
       iterations,
       parallel
     )
@@ -121,8 +122,7 @@ def main():
   resultsfn = args.sampid + '.results.npz'
   import os
   if os.path.exists(resultsfn):
-    results = np.load(resultsfn)
-    results = dict(results)
+    results = resultserializer.load(resultsfn)
   else:
     results = {}
 
@@ -131,7 +131,7 @@ def main():
 
   if 'clustrel_posterior' not in results:
     if 'clusters' in params and 'garbage' in params:
-      supervars, results['clustrel_posterior'], results['clusters'], results['garbage'] = clustermaker.use_pre_existing(
+      supervars, results['clustrel_posterior'], results['clustrel_evidence'], results['clusters'], results['garbage'] = clustermaker.use_pre_existing(
         variants,
         results['mutrel_posterior'],
         prior,
@@ -140,15 +140,18 @@ def main():
         params['garbage'],
       )
     else:
-      supervars, results['clustrel_posterior'], results['clusters'], results['garbage'] = clustermaker.cluster_and_discard_garbage(
+      supervars, results['clustrel_posterior'], results['clustrel_evidence'], results['clusters'], results['garbage'] = clustermaker.cluster_and_discard_garbage(
         variants,
         results['mutrel_posterior'],
         prior,
         parallel,
       )
   else:
-    supervars = clustermaker._make_cluster_supervars(results['clusters'], variants)
+    supervars = clustermaker.make_cluster_supervars(results['clusters'], variants)
+
   superclusters = clustermaker.make_superclusters(supervars)
+  # Add empty initial cluster, which serves as tree root.
+  superclusters.insert(0, [])
 
   if 'adjm' not in results:
     results['adjm'], results['llh'] = tree_sampler.sample_trees(
@@ -182,7 +185,7 @@ def main():
   #  '%s.muts.json' % args.sampid,
   #)
 
-  np.savez_compressed(resultsfn, **results)
+  resultserializer.save(results, resultsfn)
   #lolsomething(variants, prior, args)
 
 if __name__ == '__main__':

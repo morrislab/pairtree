@@ -4,7 +4,7 @@ import concurrent.futures
 from tqdm import tqdm
 import itertools
 
-from common import Models
+from common import Models, Mutrel
 import common
 import lh
 
@@ -79,10 +79,11 @@ def calc_posterior(variants, prior=None, rel_type='variant', parallel=1):
   logprior = complete_prior(prior)
   M = len(variants)
   # Allow Numba use by converting to namedtuple.
-  variants = [common.convert_variant_dict_to_tuple(V) for V in variants]
+  variants = {vid: common.convert_variant_dict_to_tuple(V) for vid, V in variants.items()}
+  vids = common.extract_vids(variants)
 
-  evidence = np.nan * np.ones((M, M, len(Models._all)))
-  posterior = np.copy(evidence)
+  evidence = Mutrel(vids=list(vids), rels=np.nan*np.ones((M, M, len(Models._all))))
+  posterior = Mutrel(vids=list(vids), rels=np.copy(evidence.rels))
 
   pairs = list(itertools.combinations(range(M), 2)) + [(V, V) for V in range(M)]
   # TODO: change ordering of pairs based on what will provide optimal
@@ -97,25 +98,25 @@ def calc_posterior(variants, prior=None, rel_type='variant', parallel=1):
     futures = []
     with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
       for A, B in pairs:
-        futures.append(ex.submit(calc_lh_and_posterior, variants[A], variants[B], logprior))
+        futures.append(ex.submit(calc_lh_and_posterior, variants[vids[A]], variants[vids[B]], logprior))
       for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Computing %s relations' % rel_type, unit='pair', dynamic_ncols=True, disable=None):
         pass
     for (A, B), F in zip(pairs, futures):
-      evidence[A,B], posterior[A,B] = F.result()
+      evidence.rels[A,B], posterior.rels[A,B] = F.result()
   else:
     for A, B in pairs:
-      evidence[A,B], posterior[A,B] = calc_lh_and_posterior(variants[A], variants[B], logprior)
+      evidence.rels[A,B], posterior.rels[A,B] = calc_lh_and_posterior(variants[vids[A]], variants[vids[B]], logprior)
 
   # Duplicate evidence's keys, since we'll be modifying dictionary.
   for A, B in pairs:
     if A == B:
       continue
-    evidence[B,A] = swap_A_B(evidence[A,B])
-    posterior[B,A] = swap_A_B(posterior[A,B])
+    evidence.rels[B,A] = swap_A_B(evidence.rels[A,B])
+    posterior.rels[B,A] = swap_A_B(posterior.rels[A,B])
 
-  _sanity_check_tensor(evidence)
-  _sanity_check_tensor(posterior)
-  assert np.all(np.isclose(1, np.sum(posterior, axis=2)))
+  _sanity_check_tensor(evidence.rels)
+  _sanity_check_tensor(posterior.rels)
+  assert np.all(np.isclose(1, np.sum(posterior.rels, axis=2)))
   return (posterior, evidence)
 
 # In cases where we have zero variant reads for both variants, the garbage
