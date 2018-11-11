@@ -16,13 +16,8 @@ Cleanup:
     Store variant reads instead of ref reads
     Remove files not used by Pairtree
 
-  Maybe remove empty first cluster?
-
 Instead of just including garbage variants where *every* sample is drawn from uniform, have some garbage where only some samples are drawn from uniform
-Eliminate empty first cluster
 Change my grad desc to use Adam instead
-Make --tree-chains default to --parallel -- don't want the user to only get one chain by default
-Make progress bars appear when --parallel=1
 
 Bugs:
   In phi_fitter's calc_mut_p, should I actually use 0.5? or omega_v?

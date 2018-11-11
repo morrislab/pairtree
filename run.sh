@@ -39,8 +39,8 @@ function run_sims {
 }
 
 function run_steph {
-  INDIR=$PROTDIR/scratch/inputs/steph.xeno.nogarb.pairtree
-  OUTDIR=$RESULTSDIR/steph.xeno.nogarb.pairtree
+  INDIR=$PROTDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+  OUTDIR=$RESULTSDIR/steph.xeno.withgarb.pairtree
   mkdir -p $OUTDIR
   #rm -f $OUTDIR/SJ*.{html,json,csv,stdout}
 
