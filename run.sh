@@ -64,8 +64,8 @@ function run_steph {
         "--trees-per-chain $TREES_PER_CHAIN" \
         "--phi-iterations $PHI_ITERATIONS" \
         "--params $INDIR/${runid}.params.json" \
-        "$runid" \
         "$INDIR/$runid.ssm" \
+        "$OUTDIR/$runid.results.npz" \
         ">$runid.stdout" \
         "2>$runid.stderr"
     ) > $JOBDIR/job.sh
