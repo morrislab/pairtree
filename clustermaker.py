@@ -128,6 +128,21 @@ def _cluster_variants(variants, mutrel_posterior, mutrel_evidence, prior, parall
       mutrel_evidence = _remove_variants(mutrel_evidence, (A, B))
       mutrel_posterior, mutrel_evidence = pairwise.add_variant(svid, variants, mutrel_posterior, mutrel_evidence, prior=prior, parallel=parallel)
 
+  supervars, mutrel_posterior, mutrel_evidence, clusters = _sort_clusters_by_vaf(variants, mutrel_posterior, mutrel_evidence, clusters)
+  return (supervars, mutrel_posterior, mutrel_evidence, clusters)
+
+def _sort_clusters_by_vaf(variants, mutrel_posterior, mutrel_evidence, clusters):
+  supervars = [variants[svid] for svid in mutrel_posterior.vids]
+  sv_vaf = np.array([S['vaf'] for S in supervars])
+  mean_vaf = np.mean(sv_vaf, axis=1)
+  order = np.argsort(-mean_vaf)
+  assert len(order) == len(mutrel_posterior.vids) == len(mutrel_evidence.vids) == len(clusters)
+
+  clusters = [clusters[idx] for idx in order]
+  new_vids = [mutrel_posterior.vids[idx] for idx in order]
+  mutrel_posterior = mutrel_posterior._replace(vids=new_vids)
+  mutrel_evidence = mutrel_evidence._replace(vids=new_vids)
+
   # Collect supervars into single dict. Supervar `S<i>` should correspond to
   # cluster `i`.
   supervars = {}
@@ -138,16 +153,17 @@ def _cluster_variants(variants, mutrel_posterior, mutrel_evidence, prior, parall
     # ensure we avoid modifying it (specifically, we want to avoid changing its
     # name & ID).
     var = dict(variants[V])
+    del variants[V]
     S_name = 'S%s' % vidx
     # Ensure we've never used this name before (though it shouldn't matter if
     # we have).
     assert S_name not in variants
     var['id'] = var['name'] = S_name
-    supervars[S_name] = var
+    supervars[S_name] = variants[S_name] = var
     for mutrel in (mutrel_posterior, mutrel_evidence):
       mutrel.vids[vidx] = S_name
 
-  return (supervars, mutrel_posterior, mutrel_evidence, clusters)
+  return supervars, mutrel_posterior, mutrel_evidence, clusters
 
 def cluster_and_discard_garbage(variants, mutrel_posterior, mutrel_evidence, prior, parallel):
   supervars, clust_posterior, clust_evidence, clusters = _cluster_variants(variants, mutrel_posterior, mutrel_evidence, prior, parallel)

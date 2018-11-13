@@ -174,8 +174,11 @@ def reorder_cols(mat, start=None, end=None):
 
 def reorder_square_matrix(mat):
   # Reorders the rows, then reorders the columns using the same indices. This
-  # works for symmetric matrices. It can also be used for non-symmetric
-  # matrices, as it doesn't require symmetry.
+  # works for symmetric matrices, which would have the same result whether I
+  # order the rows and then columns, or vice versa. It can also be used for
+  # non-symmetric matrices, as it doesn't require symmetry, but there the
+  # results will obviously be dependent on whether you order the original
+  # matrix or its transpose.
   assert mat.shape[0] == mat.shape[1]
   mat, idxs = reorder_rows(mat)
   mat = mat.T[idxs,:].T
