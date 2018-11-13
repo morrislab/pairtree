@@ -75,22 +75,26 @@ def _sanity_check_tensor(tensor):
     mat = tensor[:,:,midx]
     assert np.allclose(mat, mat.T)
 
-def calc_posterior(variants, prior=None, rel_type='variant', parallel=1):
-  logprior = complete_prior(prior)
-  M = len(variants)
-  # Allow Numba use by converting to namedtuple.
-  variants = {vid: common.convert_variant_dict_to_tuple(V) for vid, V in variants.items()}
-  vids = common.extract_vids(variants)
-
+def _init_posterior(vids):
+  M = len(vids)
   evidence = Mutrel(vids=list(vids), rels=np.nan*np.ones((M, M, len(Models._all))))
   posterior = Mutrel(vids=list(vids), rels=np.copy(evidence.rels))
+  return (posterior, evidence)
 
-  pairs = list(itertools.combinations(range(M), 2)) + [(V, V) for V in range(M)]
+def _compute_pairs(pairs, variants, prior, posterior, evidence, rel_type=None, parallel=1):
+  logprior = complete_prior(prior)
   # TODO: change ordering of pairs based on what will provide optimal
   # integration accuracy according to Quaid's advice.
   pairs = [sorted(C) for C in pairs]
   # Don't bother starting more workers than jobs.
   parallel = min(parallel, len(pairs))
+
+  if rel_type is None:
+    disable_pbar = True
+  else:
+    # By setting to None, the progress bar will be enabled if writing to a TTY,
+    # and disabled otherwise.
+    disable_pbar = None
 
   # If you set parallel = 0, we don't invoke the parallelism machinery. This
   # makes debugging easier.
@@ -98,14 +102,21 @@ def calc_posterior(variants, prior=None, rel_type='variant', parallel=1):
     futures = []
     with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
       for A, B in pairs:
-        futures.append(ex.submit(calc_lh_and_posterior, variants[vids[A]], variants[vids[B]], logprior))
-      for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Computing %s relations' % rel_type, unit='pair', dynamic_ncols=True, disable=None):
+        futures.append(ex.submit(calc_lh_and_posterior, variants[A], variants[B], logprior))
+      for F in tqdm(
+        concurrent.futures.as_completed(futures),
+        total=len(futures),
+        desc='Computing %s relations' % rel_type,
+        unit='pair',
+        dynamic_ncols=True,
+        disable=disable_pbar
+      ):
         pass
     for (A, B), F in zip(pairs, futures):
       evidence.rels[A,B], posterior.rels[A,B] = F.result()
   else:
     for A, B in pairs:
-      evidence.rels[A,B], posterior.rels[A,B] = calc_lh_and_posterior(variants[vids[A]], variants[vids[B]], logprior)
+      evidence.rels[A,B], posterior.rels[A,B] = calc_lh_and_posterior(variants[A], variants[B], logprior)
 
   # Duplicate evidence's keys, since we'll be modifying dictionary.
   for A, B in pairs:
@@ -118,6 +129,47 @@ def calc_posterior(variants, prior=None, rel_type='variant', parallel=1):
   _sanity_check_tensor(posterior.rels)
   assert np.all(np.isclose(1, np.sum(posterior.rels, axis=2)))
   return (posterior, evidence)
+
+def calc_posterior(variants, prior, rel_type, parallel=1):
+  M = len(variants)
+  # Allow Numba use by converting to namedtuple.
+  vids = common.extract_vids(variants)
+  variants = [common.convert_variant_dict_to_tuple(variants[V]) for V in vids]
+
+  posterior, evidence = _init_posterior(vids)
+  pairs = list(itertools.combinations(range(M), 2)) + [(V, V) for V in range(M)]
+  return _compute_pairs(
+    pairs,
+    variants,
+    prior,
+    posterior,
+    evidence,
+    rel_type = rel_type,
+    parallel = parallel,
+  )
+
+def add_variant(vid, variants, mutrel_posterior, mutrel_evidence, prior, parallel):
+  assert vid in variants
+  new_vids = mutrel_posterior.vids + [vid]
+  M = len(new_vids)
+  assert len(mutrel_posterior.vids) == len(mutrel_evidence.vids) == M - 1
+  variants = [common.convert_variant_dict_to_tuple(variants[V]) for V in new_vids]
+
+  new_posterior, new_evidence = _init_posterior(new_vids)
+  new_posterior.rels[:-1,:-1] = mutrel_posterior.rels
+  new_evidence.rels[:-1,:-1] = mutrel_evidence.rels
+
+  pairs = [(vidx, M - 1) for vidx in range(M)]
+
+  return _compute_pairs(
+    pairs,
+    variants,
+    prior,
+    new_posterior,
+    new_evidence,
+    rel_type = None,
+    parallel = parallel,
+  )
 
 # In cases where we have zero variant reads for both variants, the garbage
 # models ends up taking considerable posterior mass, but we have no information

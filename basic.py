@@ -44,7 +44,7 @@ def lolsomething(variants, prior, args):
     from IPython import embed
     embed()
   elif task == 'calc':
-    posterior, evidence = pairwise.calc_posterior(variants, prior=prior, parallel=parallel)
+    posterior, evidence = pairwise.calc_posterior(variants, prior=prior, rel_type='variant', parallel=parallel)
     posterior = convert_to_array(posterior)
     evidence = convert_to_array(evidence)
     np.savez_compressed(pairwisefn, posterior=posterior, evidence=evidence)
@@ -127,10 +127,11 @@ def main():
     results = {}
 
   if 'mutrel_posterior' not in results:
-    results['mutrel_posterior'], results['mutrel_evidence'] = pairwise.calc_posterior(variants, prior=prior, parallel=parallel)
+    results['mutrel_posterior'], results['mutrel_evidence'] = pairwise.calc_posterior(variants, prior=prior, rel_type='variant', parallel=parallel)
+  resultserializer.save(results, resultsfn)
 
   if 'clustrel_posterior' not in results:
-    if 'clusters' in params and 'garbage' in params:
+    if False and 'clusters' in params and 'garbage' in params:
       supervars, results['clustrel_posterior'], results['clustrel_evidence'], results['clusters'], results['garbage'] = clustermaker.use_pre_existing(
         variants,
         results['mutrel_posterior'],
@@ -143,6 +144,7 @@ def main():
       supervars, results['clustrel_posterior'], results['clustrel_evidence'], results['clusters'], results['garbage'] = clustermaker.cluster_and_discard_garbage(
         variants,
         results['mutrel_posterior'],
+        results['mutrel_evidence'],
         prior,
         parallel,
       )

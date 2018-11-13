@@ -24,6 +24,9 @@ def save(results, resultsfn):
 
 def load(resultsfn):
   results = np.load(resultsfn)
+  # Convert from NpzFile type.
+  results = dict(results)
+
   for reltype in ('mutrel', 'clustrel'):
     for arrtype in ('posterior', 'evidence'):
       _load_mutrel(results, '%s_%s' % (reltype, arrtype))
