@@ -484,8 +484,8 @@ VafMatrix.prototype._configure_toggles = function(container) {
     phi: function() {
       return $(this).find('td.id').text().startsWith('P');
     },
-    cluster_means: function() {
-      return $(this).find('td.id').text().startsWith('C');
+    supervars: function() {
+      return $(this).find('td.id').text().startsWith('S');
     },
     cluster_members: function() {
       return !togglers.garbage.call(this) && $(this).find('td.id').text().startsWith('s');

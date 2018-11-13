@@ -11,24 +11,6 @@ import string
 def make_random_id(K=8):
   return ''.join(random.choices(string.ascii_letters, k=K))
 
-def find_gene_name(chrom, pos, spreadsheet_rows):
-  for row in spreadsheet_rows:
-    assert row['CHR'].startswith('chr')
-    C = row['CHR'][3:].upper()
-    P = int(row['WU_HG19_POS'])
-
-    if chrom == C and pos == P:
-      return row['GENENAME']
-  return 'unknown'
-  raise Exception('Could not find gene name for %s_%s' % (chrom, pos))
-
-def load_spreadsheet(spreadsheetfn):
-  if spreadsheetfn is None:
-    return None
-  with open(spreadsheetfn) as S:
-    reader = csv.DictReader(S)
-    return list(reader)
-
 def munge_samp_names(sampnames):
   return [S.replace('Diagnosis Xeno ', 'DX').replace('Relapse Xeno ', 'RX') for S in sampnames]
 
@@ -74,7 +56,7 @@ def make_phi_pseudovars(phi):
     'cluster': cidx,
     'vaf': omega_v * row,
     'omega_v': omega_v,
-  } for cidx, row in enumerate(phi)]
+  } for cidx, row in enumerate(phi[1:])]
   return V
 
 def print_vaftable_header(sampnames, outf):
@@ -90,7 +72,7 @@ def print_vaftable_header(sampnames, outf):
   print('<p><input type="text" class="filter" placeholder="s0,s1,..."></p>', file=outf)
   print('<div class="vafmatrix_toggles btn-group" data-toggle="buttons">', file=outf)
   print('<label class="btn btn-primary active toggle_phi"><input type="checkbox" autocomplete="off" checked> &phi;</label>', file=outf)
-  print('<label class="btn btn-primary active toggle_cluster_means"><input type="checkbox" autocomplete="off" checked> Cluster means</label>', file=outf)
+  print('<label class="btn btn-primary active toggle_supervars"><input type="checkbox" autocomplete="off" checked> Supervariants</label>', file=outf)
   print('<label class="btn btn-primary active toggle_cluster_members"><input type="checkbox" autocomplete="off" checked> Cluster members</label>', file=outf)
   print('<label class="btn btn-primary active toggle_garbage"><input type="checkbox" autocomplete="off" checked> Garbage</label>', file=outf)
   print('</div>', file=outf)
@@ -127,7 +109,7 @@ def print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, shou
   for cidx, cluster in enumerate(clustered_vars):
     if len(cluster) == 0:
       continue
-    supervar = supervars['C%s' % (cidx - 1)]
+    supervar = supervars['S%s' % cidx]
     garbage = parted_garbage_vars[cidx] if cidx in parted_garbage_vars else []
     phi_pseudovar = phi_pseudovars[cidx]
 
@@ -189,11 +171,6 @@ def get_next_colour():
   return scale[idx]
 get_next_colour._last_idx = -1
 
-def augment_variant(V, spreadsheet):
-  if spreadsheet is None:
-    return
-  V['gene'] = find_gene_name(V['chrom'], V['pos'], spreadsheet)
-
 def print_distances(sampid, supervars, phi):
   def _compute_dist(V1, V2):
     dist = np.sum(np.abs(V1['vaf'] - V2['vaf']))
@@ -216,19 +193,18 @@ def print_distances(sampid, supervars, phi):
     dist, normdist = _compute_dist(supervars[sv], phi_pseudovars[phivid])
     print('phi_dist', int(phivid[1:]), int(sv[1:]) + 1, dist, normdist, sep=',')
 
-def plot_vaf_matrix(sampid, clusters, variants, supervars, garbage_variants, phi, sampnames, spreadsheetfn, should_correct_vaf, outf):
+def plot_vaf_matrix(sampid, clusters, variants, supervars, garbage_vids, phi, sampnames, should_correct_vaf, outf):
   print('<h2>VAFs (%s)</h2>' % ('corrected' if should_correct_vaf else 'uncorrected'), file=outf)
-  spreadsheet = load_spreadsheet(spreadsheetfn)
 
   # Copy variant so we don't modify original dict.
-  variants         = {vid: dict(variants[vid])         for vid in variants.keys()}
-  garbage_variants = {vid: dict(garbage_variants[vid]) for vid in garbage_variants.keys()}
-  for V in list(variants.values()) + list(garbage_variants.values()):
-    augment_variant(V, spreadsheet)
+  variants = {vid: dict(variants[vid]) for vid in variants.keys()}
+  garbage_variants = {vid: dict(garbage_variants[vid]) for vid in garbage_vids}
 
-  clustered_vars = [[variants['s%s' % vid] for vid in C] for C in clusters]
+  clustered_vars = [[variants[vid] for vid in C] for C in clusters]
   for cidx, cluster in enumerate(clustered_vars):
+    supervars['S%s' % cidx]['cluster'] = cidx
     for var in cluster:
       var['cluster'] = cidx
+
   print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, should_correct_vaf, outf)
-  print_distances(sampid, supervars, phi)
+  #print_distances(sampid, supervars, phi)
