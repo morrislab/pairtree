@@ -198,7 +198,7 @@ def plot_vaf_matrix(sampid, clusters, variants, supervars, garbage_vids, phi, sa
 
   # Copy variant so we don't modify original dict.
   variants = {vid: dict(variants[vid]) for vid in variants.keys()}
-  garbage_variants = {vid: dict(garbage_variants[vid]) for vid in garbage_vids}
+  garbage_variants = {vid: dict(variants[vid]) for vid in garbage_vids}
 
   clustered_vars = [[variants[vid] for vid in C] for C in clusters]
   for cidx, cluster in enumerate(clustered_vars):

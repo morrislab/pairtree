@@ -165,9 +165,32 @@ def _sort_clusters_by_vaf(variants, mutrel_posterior, mutrel_evidence, clusters)
 
   return supervars, mutrel_posterior, mutrel_evidence, clusters
 
-def cluster_and_discard_garbage(variants, mutrel_posterior, mutrel_evidence, prior, parallel):
-  supervars, clust_posterior, clust_evidence, clusters = _cluster_variants(variants, mutrel_posterior, mutrel_evidence, prior, parallel)
+def _discard_garbage(mutrel_posterior, mutrel_evidence):
   garbage = []
+
+  with tqdm(desc='Discarding garbage', unit='variant', dynamic_ncols=True, miniters=1, disable=None) as pbar:
+    while True:
+      garbage_pairs = np.argmax(mutrel_posterior.rels, axis=2) == Models.garbage
+      if not np.any(garbage_pairs):
+        break
+      num_garbage = np.sum(garbage_pairs, axis=1)
+      most_garbage = np.argmax(num_garbage)
+      garbage.append(mutrel_posterior.vids[most_garbage])
+      mutrel_posterior = _remove_variants(mutrel_posterior, (most_garbage,))
+      mutrel_evidence = _remove_variants(mutrel_evidence, (most_garbage,))
+      pbar.update()
+
+  return garbage
+
+def cluster_and_discard_garbage(variants, mutrel_posterior, mutrel_evidence, prior, parallel):
+  # Copy mutrels so we don't modify them.
+  mutrel_posterior = Mutrel(vids=list(mutrel_posterior.vids), rels=np.copy(mutrel_posterior.rels))
+  mutrel_evidence = Mutrel(vids=list(mutrel_evidence.vids), rels=np.copy(mutrel_evidence.rels))
+
+  # As a side effect, _discard_garbage() will remove the garbage variants
+  # from the mutrels.
+  garbage = _discard_garbage(mutrel_posterior, mutrel_evidence)
+  supervars, clust_posterior, clust_evidence, clusters = _cluster_variants(variants, mutrel_posterior, mutrel_evidence, prior, parallel)
   return (supervars, clust_posterior, clust_evidence, clusters, garbage)
 
 def _make_supervar(name, variants):
