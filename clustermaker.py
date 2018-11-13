@@ -66,7 +66,7 @@ def _cluster_variants(variants, mutrel_posterior, mutrel_evidence, prior, parall
   # in the copy we create.
   variants = dict(variants)
   # Each variant begins in its own cluster.
-  clusters = [[I] for I in range(len(mutrel_posterior.rels))]
+  clusters = [[vid] for vid in mutrel_posterior.vids]
   # Ensure no name collisions by always increment SV names.
   svidx_max = len(variants)
 
