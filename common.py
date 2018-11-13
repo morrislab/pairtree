@@ -1,11 +1,6 @@
 import numpy as np
 from collections import namedtuple
 
-import warnings
-with warnings.catch_warnings():
-  warnings.simplefilter('ignore', category=DeprecationWarning)
-  import sklearn.cluster
-
 _LOGEPSILON = -400
 _EPSILON    = np.exp(_LOGEPSILON)
 
@@ -137,6 +132,12 @@ def dfs(adjlist, root):
   return np.array(ordered)
 
 def reorder_rows(mat, start=None, end=None):
+  # Avoid importing sklearn unless necessary.
+  import warnings
+  with warnings.catch_warnings():
+    warnings.simplefilter('ignore', category=DeprecationWarning)
+    import sklearn.cluster
+
   N = len(mat)
   if start is None:
     start = 0
