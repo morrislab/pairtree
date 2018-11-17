@@ -45,6 +45,8 @@ def main():
 
   with open(args.out_fn, 'w') as outf:
     write_header(args.sampid, outf)
+    relation_plotter.plot_ml_relations(results['mutrel_posterior'], outf)
+    relation_plotter.plot_separate_relations(results['mutrel_posterior'], outf)
     vaf_plotter.plot_vaf_matrix(
       args.sampid,
       results['clusters'],

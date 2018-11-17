@@ -6,8 +6,11 @@ RESULTSDIR=$PROTDIR/scratch/results
 HANDBUILTDIR=~/work/steph/data/handbuilt_trees
 JOBDIR=$SCRATCH/jobs
 
+STEPH_INDIR=$PROTDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+STEPH_OUTDIR=$RESULTSDIR/steph.xeno.withgarb.pairtree
+
 PARALLEL=40
-TREES_PER_CHAIN=1000
+TREES_PER_CHAIN=10
 PHI_ITERATIONS=10000
 
 function run_sims {
@@ -39,12 +42,10 @@ function run_sims {
 }
 
 function run_steph {
-  INDIR=$PROTDIR/scratch/inputs/steph.xeno.withgarb.pairtree
-  OUTDIR=$RESULTSDIR/steph.xeno.withgarb.pairtree
-  mkdir -p $OUTDIR
-  #rm -f $OUTDIR/SJ*.{html,json,csv,stdout}
+  mkdir -p $STEPH_OUTDIR
+  #rm -f $STEPH_OUTDIR/SJ*.{html,json,csv,stdout}
 
-  for ssmfn in $INDIR/*.ssm; do
+  for ssmfn in $STEPH_INDIR/*.ssm; do
     runid=$(basename $ssmfn | cut -d. -f1)
     jobname="steph_pairtree_${runid}"
     (
@@ -56,22 +57,41 @@ function run_steph {
       echo "#SBATCH --output=$JOBDIR/slurm_${jobname}_%j.txt"
       echo "#SBATCH --mail-type=NONE"
 
-      echo "cd $OUTDIR && " \
+      echo "cd $STEPH_OUTDIR && " \
         "python3 $PROTDIR/basic.py" \
         "--seed 1" \
         "--parallel $PARALLEL" \
         "--tree-chains $PARALLEL" \
         "--trees-per-chain $TREES_PER_CHAIN" \
         "--phi-iterations $PHI_ITERATIONS" \
-        "--params $INDIR/${runid}.params.json" \
-        "$INDIR/$runid.ssm" \
-        "$OUTDIR/$runid.results.npz" \
+        "--params $STEPH_INDIR/${runid}.params.json" \
+        "$STEPH_INDIR/$runid.ssm" \
+        "$STEPH_OUTDIR/$runid.results.npz" \
         ">$runid.stdout" \
         "2>$runid.stderr"
     ) > $JOBDIR/job.sh
     sbatch $JOBDIR/job.sh
     rm $JOBDIR/job.sh
   done
+}
+
+function plot_steph {
+  module load gnu-parallel
+
+  for resultsfn in $STEPH_OUTDIR/*.results.npz; do
+    runid=$(basename $resultsfn | cut -d. -f1)
+    (
+      echo "cd $STEPH_OUTDIR && " \
+        "python3 $PROTDIR/plotter.py" \
+        "$runid" \
+        "$STEPH_INDIR/$runid.ssm" \
+        "$STEPH_INDIR/${runid}.params.json" \
+        "$STEPH_OUTDIR/$runid.results.npz" \
+        "$STEPH_OUTDIR/$runid.results.html" \
+        ">>$runid.stdout" \
+        "2>>$runid.stderr"
+    )
+  done | parallel -j$PARALLEL
 }
 
 function write_indices {
@@ -104,7 +124,8 @@ function write_indices {
 }
 
 function main {
-  run_steph
+  #run_steph
+  plot_steph
   #write_indices
   #run_sims
 }

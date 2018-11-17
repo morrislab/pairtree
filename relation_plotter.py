@@ -3,9 +3,9 @@ import colorlover as cl
 import numpy as np
 import common
 
-def find_ml_relations(model_probs_tensor):
-  M = len(model_probs_tensor)
-  relations = np.argmax(model_probs_tensor, axis=2)
+def find_ml_relations(mutrel_posterior):
+  M = len(mutrel_posterior)
+  relations = np.argmax(mutrel_posterior, axis=2)
   assert relations.shape == (M, M)
   return relations
 
@@ -63,19 +63,19 @@ def write_legend(outf):
     print('<tr><td style="background-color: %s">%s</td></tr>' % (colour, model), file=outf)
   print('</tbody></table>', file=outf)
 
-def plot_ml_relations(model_probs_tensor, outf):
-  ml_relations = find_ml_relations(model_probs_tensor)
-  ml_relations, ssmidxs = common.reorder_square_matrix(ml_relations)
+def plot_ml_relations(mutrel_posterior, outf):
+  ml_relations = find_ml_relations(mutrel_posterior.rels)
+  ml_relations, vidxs = common.reorder_square_matrix(ml_relations)
   colours = make_colour_matrix(ml_relations, make_colour_from_category)
-  write_table('ML relations', ml_relations, ['C%s' % I for I in ssmidxs], colours, outf)
+  write_table('ML relations', ml_relations, [mutrel_posterior.vids[vidx] for vidx in vidxs], colours, outf)
   write_legend(outf)
 
-def plot_relation_probs(model_probs_tensor, outf):
+def plot_separate_relations(mutrel_posterior, outf):
   for midx, model in enumerate(Models._all):
-    mat = model_probs_tensor[:,:,midx]
-    mat, ssmidxs = common.reorder_square_matrix(mat)
+    mat = mutrel_posterior.rels[:,:,midx]
+    mat, vidxs = common.reorder_square_matrix(mat)
     if model in ('cocluster', 'diff_branches'):
       # These should be symmetric.
       assert np.allclose(mat, mat.T)
     colours = make_colour_matrix(mat, make_colour_from_intensity)
-    write_table(model, mat, ['s%s' % I for I in ssmidxs], colours, outf)
+    write_table(model, mat, [mutrel_posterior.vids[vidx] for vidx in vidxs], colours, outf)
