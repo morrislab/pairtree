@@ -108,7 +108,8 @@ def _cluster_variants(variants, mutrel_posterior, mutrel_evidence, prior, parall
       debug(mutrel_posterior.rels[A] - mutrel_posterior.rels[B])
       # Since row_dist is upper triangular, we should have A < B.
       assert A < B
-      assert mutrel_posterior.rels[A,B,Models.cocluster] >= 1 / len(Models._all)
+      if mutrel_posterior.rels[A,B,Models.cocluster] < 1 / len(Models._all):
+        break
 
       # 1. Update the clustering
       clusters.append(clusters[A] + clusters[B])
