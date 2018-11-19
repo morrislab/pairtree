@@ -53,7 +53,7 @@ def main():
       variants,
       supervars,
       results['garbage'],
-      results['phi'][-1],
+      results['phi'][-1] if 'phi' in results else None,
       params['samples'],
       should_correct_vaf=True,
       outf=outf,
