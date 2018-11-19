@@ -38,7 +38,6 @@ def write_results(data, posterior, evidence, datafn, pairwisefn, resultsfn):
     supervars = common.make_cluster_supervars(data['clusters'], data['variants_good'])
     garbage = {}
     vaf_plotter.plot_vaf_matrix(
-      sampid,
       data['clusters'],
       data['variants_good'],
       supervars,

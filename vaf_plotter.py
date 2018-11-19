@@ -33,19 +33,24 @@ def find_closest(vec, mat):
   assert best_idx is not None
   return best_idx
 
-def partition_garbage_variants(cluster_supervars, garbage_variants):
-  supervars = list(cluster_supervars.values())
+def partition_garbage_variants(supervars, garbage_variants):
+  for gvar in garbage_variants.values():
+    gvar['cluster'] = None
+  if supervars is None:
+    return {0: list(garbage_variants.values())}
+
   supervafs = [C['vaf'] for C in supervars]
   parted = defaultdict(list)
 
   for gvar in sorted(garbage_variants.values(), key = lambda V: int(V['id'][1:])):
-    gvar['cluster'] = None
     closest_idx = find_closest(gvar['vaf'], supervafs)
     cidx = supervars[closest_idx]['cluster']
     parted[cidx].append(gvar)
   return parted
 
 def make_phi_pseudovars(phi):
+  if phi is None:
+    return {}
   omega_v = 0.5
   V = [{
     'gene': None,
@@ -107,13 +112,14 @@ def print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, shou
   print_vaftable_header(sampnames, outf)
 
   for cidx, cluster in enumerate(clustered_vars):
-    if len(cluster) == 0:
-      continue
-    supervar = supervars['S%s' % cidx]
+    assert len(cluster) > 0
     garbage = parted_garbage_vars[cidx] if cidx in parted_garbage_vars else []
-    phi_pseudovar = phi_pseudovars[cidx]
 
-    cluster_rows = [phi_pseudovar, supervar]
+    cluster_rows = []
+    if cidx in phi_pseudovars:
+      cluster_rows.append(phi_pseudovars[cidx])
+    if supervars is not None:
+      cluster_rows.append(supervars[cidx])
     cluster_rows += cluster
     cluster_rows += garbage
     for V in cluster_rows:
@@ -193,7 +199,8 @@ def print_distances(sampid, supervars, phi):
     dist, normdist = _compute_dist(supervars[sv], phi_pseudovars[phivid])
     print('phi_dist', int(phivid[1:]), int(sv[1:]) + 1, dist, normdist, sep=',')
 
-def plot_vaf_matrix(sampid, clusters, variants, supervars, garbage_vids, phi, sampnames, should_correct_vaf, outf):
+def plot_vaf_matrix(clusters, variants, supervars, garbage_vids, phi, sampnames, should_correct_vaf, outf):
+  assert len(supervars) == len(clusters)
   print('<h2>VAFs (%s)</h2>' % ('corrected' if should_correct_vaf else 'uncorrected'), file=outf)
 
   # Copy variant so we don't modify original dict.
@@ -202,7 +209,8 @@ def plot_vaf_matrix(sampid, clusters, variants, supervars, garbage_vids, phi, sa
 
   clustered_vars = [[variants[vid] for vid in C] for C in clusters]
   for cidx, cluster in enumerate(clustered_vars):
-    supervars['S%s' % cidx]['cluster'] = cidx
+    if supervars is not None:
+      supervars[cidx]['cluster'] = cidx
     for var in cluster:
       var['cluster'] = cidx
 
