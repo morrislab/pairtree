@@ -148,18 +148,23 @@ def calc_posterior(variants, prior, rel_type, parallel=1):
     parallel = parallel,
   )
 
-def add_variant(vid, variants, mutrel_posterior, mutrel_evidence, prior, parallel):
-  assert vid in variants
-  new_vids = mutrel_posterior.vids + [vid]
+def add_variants(vids_to_add, variants, mutrel_posterior, mutrel_evidence, prior, parallel):
+  for vid in vids_to_add:
+    assert vid in variants
+
+  new_vids = mutrel_posterior.vids + vids_to_add
+  # M: number of variants we have now
+  # A: number of variants we added
   M = len(new_vids)
-  assert len(mutrel_posterior.vids) == len(mutrel_evidence.vids) == M - 1
+  A = len(vids_to_add)
+  assert len(mutrel_posterior.vids) == len(mutrel_evidence.vids) == M - A
   variants = [common.convert_variant_dict_to_tuple(variants[V]) for V in new_vids]
 
   new_posterior, new_evidence = _init_posterior(new_vids)
-  new_posterior.rels[:-1,:-1] = mutrel_posterior.rels
-  new_evidence.rels[:-1,:-1] = mutrel_evidence.rels
+  new_posterior.rels[:-A,:-A] = mutrel_posterior.rels
+  new_evidence.rels[:-A,:-A] = mutrel_evidence.rels
 
-  pairs = [(vidx, M - 1) for vidx in range(M)]
+  pairs = [(I, J) for I in range(M) for J in range(M - A, M)]
 
   return _compute_pairs(
     pairs,
@@ -205,3 +210,19 @@ def calc_lh_and_posterior(V1, V2, logprior, _calc_lh=_DEFAULT_CALC_LH):
   evidence, evidence_per_sample = calc_lh(V1, V2, _calc_lh)
   posterior = _calc_posterior(evidence, logprior)
   return (evidence, posterior)
+
+def _examine(V1, V2, variants, _calc_lh=_DEFAULT_CALC_LH):
+  E, Es = calc_lh(*[common.convert_variant_dict_to_tuple(V) for V in (variants[V1], variants[V2])], _calc_lh=_calc_lh)
+  sep = np.nan * np.ones(len(variants[V1]['var_reads']))[:,None]
+  blah = np.hstack((
+    variants[V1]['var_reads'][:,None],
+    variants[V1]['total_reads'][:,None],
+    variants[V1]['vaf'][:,None],
+    sep,
+    variants[V2]['var_reads'][:,None],
+    variants[V2]['total_reads'][:,None],
+    variants[V2]['vaf'][:,None],
+    sep,
+    Es - np.max(Es, axis=1)[:,None]
+  ))
+  return blah
