@@ -42,13 +42,13 @@ def main():
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.params_fn)
   supervars = clustermaker.make_cluster_supervars(results['clusters'], variants)
+  supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
 
   with open(args.out_fn, 'w') as outf:
     write_header(args.sampid, outf)
     relation_plotter.plot_ml_relations(results['mutrel_posterior'], outf)
     relation_plotter.plot_separate_relations(results['mutrel_posterior'], outf)
     vaf_plotter.plot_vaf_matrix(
-      args.sampid,
       results['clusters'],
       variants,
       supervars,
