@@ -188,9 +188,15 @@ def add_variants(vids_to_add, variants, mutrel_posterior, mutrel_evidence, prior
 #
 # See this discussion on Slack for more details:
 # https://morrislab.slack.com/archives/CCE5HNVSP/p1540392641000100
+#
+# This also seems to apply to cases where both variants have only a couple
+# reads, meaning most of their 2D binomial mass is close to the origin. To
+# reudce the garbage model's tendency to win in these cases, don't allow them
+# to contribute to the posterior, either.
 def _fix_zero_var_read_samples(V1, V2, evidence):
-  zero_indices = np.logical_and(V1.var_reads == 0, V2.var_reads == 0)
-  evidence[zero_indices,:] = 0
+  threshold = 3
+  too_few_reads = np.logical_and(V1.var_reads < threshold, V2.var_reads < threshold)
+  evidence[too_few_reads,:] = 0
 
 _DEFAULT_CALC_LH = lh.calc_lh_quad
 def calc_lh(V1, V2, _calc_lh=_DEFAULT_CALC_LH):
