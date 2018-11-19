@@ -61,76 +61,62 @@ def _remove_variants(mutrel, vidxs):
     rels = _remove_rowcol(mutrel.rels, vidxs),
   )
 
-def _cluster_variants(variants, mutrel_posterior, mutrel_evidence, prior, parallel):
-  # Don't change original variants. We store all our intermediate supervariants
-  # in the copy we create.
-  variants = dict(variants)
-  # Each variant begins in its own cluster.
-  clusters = [[vid] for vid in mutrel_posterior.vids]
-  # Ensure no name collisions by always increment SV names.
+def _collapse_clusters(clusters, variants, mutrel_posterior, mutrel_evidence, prior, parallel):
+  ml_rels = np.argmax(mutrel_posterior.rels, axis=2)
+  row_dist = _calc_row_dist(ml_rels)
+  # Distances on diagonal will always be zero. Plus, we want A < B, so fill
+  # the lower triangular portion as well.
+  row_dist[np.tril_indices(len(row_dist))] = np.inf
+  if not np.any(np.isclose(0, row_dist)):
+    return (clusters, mutrel_posterior, mutrel_evidence)
+
+  # We have four tasks:
+  #
+  # 0. Pick variants to merge into new clusters
+  # 1. Update the clustering
+  # 2. Create a new supervariant
+  # 3. Compute the mutrels for that supervariant relative to other variants
+
+  # 0. Pick variants to merge into new clusters
+  to_merge = []
+  used_cidxs = set()
+  for I in range(len(row_dist)):
+    J = np.where(np.isclose(0, row_dist[I]))[0]
+    group = set([I] + J.tolist())
+    group -= used_cidxs
+    if len(group) == 0:
+      continue
+    to_merge.append(group)
+    used_cidxs |= set(group)
+
+  debug('to_merge', [[mutrel_posterior.vids[I] for I in C] for C in to_merge])
+  # 1. Update the clustering
+  to_remove = []
+  for group in to_merge:
+    new_cluster = [member for C in group for member in clusters[C]]
+    clusters.append(new_cluster)
+    to_remove += group
+  # Remove only after cluster addition complete to avoid changing indices.
+  for C in sorted(to_remove, reverse=True):
+    del clusters[C]
+
+  # 2. Create new supervariants
+  new_svids = []
   svidx_max = len(variants)
+  for group in to_merge:
+    svid = 'S%s' % svidx_max
+    svidx_max += 1
+    new_svids.append(svid)
+    supervar = _make_supervar(svid, [variants[mutrel_posterior.vids[I]] for I in group])
+    assert svid not in variants
+    variants[svid] = supervar
 
-  with tqdm(desc='Clustering variants', unit='iteration', dynamic_ncols=True, miniters=1, disable=None) as pbar:
-    while True:
-      pbar.update()
-      M = len(mutrel_posterior.rels)
-      cocluster_rel = np.argmax(mutrel_posterior.rels, axis=2) == Models.cocluster
-      # Must ignore diagonal, which will always want to cocluster.
-      cocluster_rel[np.tril_indices(M)] = False
-      if not np.any(cocluster_rel):
-        break
+  # 3. Compute the mutrels for the new supervars
+  mutrel_posterior = _remove_variants(mutrel_posterior, to_remove)
+  mutrel_evidence = _remove_variants(mutrel_evidence, to_remove)
+  mutrel_posterior, mutrel_evidence = pairwise.add_variants(new_svids, variants, mutrel_posterior, mutrel_evidence, prior=prior, parallel=parallel)
 
-      debug('')
-      debug('cocluster argmax = ', np.sum(np.argmax(mutrel_posterior.rels, axis=2) == Models.cocluster) / mutrel_posterior.rels.size)
-      debug(np.argmax(mutrel_posterior.rels, axis=2))
-      assert np.array_equal(mutrel_posterior.vids, mutrel_evidence.vids)
-      assert mutrel_posterior.rels.shape == mutrel_evidence.rels.shape
-      # We have four tasks:
-      #
-      # 0. Pick variants to merge into new cluster
-      # 1. Update the clustering
-      # 2. Create a new supervariant
-      # 3. Compute the mutrels for that supervariant relative to other variants
-
-      # 0. Pick variants to merge into new cluster
-      cocluster_prob = mutrel_posterior.rels[:,:,Models.cocluster]
-      row_dist = _calc_row_dist(cocluster_prob)
-      # Distances on diagonal will always be zero. Plus, we want A < B, so fill
-      # the lower triangular portion as well.
-      row_dist[np.tril_indices(M)] = np.inf
-      # A, B: indices such that row_dist[A,B] is the smallest
-      # element in the array.
-      #debug('row_dist', row_dist)
-      A, B = np.unravel_index(np.argmin(row_dist, axis=None), row_dist.shape)
-      debug('A =', A, 'B =', B, 'dist =', row_dist[A,B], 'post =', mutrel_posterior.rels[A,B])
-      debug(np.vstack((mutrel_posterior.rels[A,:,Models.cocluster], mutrel_posterior.rels[B,:,Models.cocluster])))
-      debug((np.sort(np.abs(variants[mutrel_posterior.vids[A]]['vaf'] - variants[mutrel_posterior.vids[B]]['vaf']))))
-      debug(mutrel_posterior.rels[A] - mutrel_posterior.rels[B])
-      # Since row_dist is upper triangular, we should have A < B.
-      assert A < B
-      if mutrel_posterior.rels[A,B,Models.cocluster] < 1 / len(Models._all):
-        break
-
-      # 1. Update the clustering
-      clusters.append(clusters[A] + clusters[B])
-      # Delete in reverse order, since B > A, and this will change indices.
-      del clusters[B]
-      del clusters[A]
-
-      # 2. Create a new supervariant
-      svid = 'S%s' % svidx_max
-      svidx_max += 1
-      supervar = _make_supervar(svid, (variants[mutrel_posterior.vids[A]], variants[mutrel_posterior.vids[B]]))
-      assert svid not in variants
-      variants[svid] = supervar
-
-      # 3. Compute the mutrels for that supervariant relative to other variants
-      mutrel_posterior = _remove_variants(mutrel_posterior, (A, B))
-      mutrel_evidence = _remove_variants(mutrel_evidence, (A, B))
-      mutrel_posterior, mutrel_evidence = pairwise.add_variant(svid, variants, mutrel_posterior, mutrel_evidence, prior=prior, parallel=parallel)
-
-  supervars, mutrel_posterior, mutrel_evidence, clusters = _sort_clusters_by_vaf(variants, mutrel_posterior, mutrel_evidence, clusters)
-  return (supervars, mutrel_posterior, mutrel_evidence, clusters)
+  return (clusters, mutrel_posterior, mutrel_evidence)
 
 def _sort_clusters_by_vaf(variants, mutrel_posterior, mutrel_evidence, clusters):
   supervars = [variants[svid] for svid in mutrel_posterior.vids]
@@ -166,32 +152,77 @@ def _sort_clusters_by_vaf(variants, mutrel_posterior, mutrel_evidence, clusters)
 
   return supervars, mutrel_posterior, mutrel_evidence, clusters
 
-def _discard_garbage(mutrel_posterior, mutrel_evidence):
+def _discard_garbage(clusters, mutrel_posterior, mutrel_evidence):
   garbage = []
 
-  with tqdm(desc='Discarding garbage', unit='variant', dynamic_ncols=True, miniters=1, disable=None) as pbar:
-    while True:
-      garbage_pairs = np.argmax(mutrel_posterior.rels, axis=2) == Models.garbage
-      if not np.any(garbage_pairs):
-        break
-      num_garbage = np.sum(garbage_pairs, axis=1)
-      most_garbage = np.argmax(num_garbage)
-      garbage.append(mutrel_posterior.vids[most_garbage])
-      mutrel_posterior = _remove_variants(mutrel_posterior, (most_garbage,))
-      mutrel_evidence = _remove_variants(mutrel_evidence, (most_garbage,))
-      pbar.update()
+  while True:
+    M = len(clusters)
+    assert len(mutrel_posterior.vids) == len(mutrel_evidence.vids) == M
+    assert mutrel_posterior.rels.shape == mutrel_evidence.rels.shape == (M, M, len(Models._all))
 
-  return garbage
+    garbage_pairs = np.argmax(mutrel_posterior.rels, axis=2) == Models.garbage
+    if not np.any(garbage_pairs):
+      break
+    num_garbage = np.sum(garbage_pairs, axis=1)
+    most_garbage = np.argmax(num_garbage)
+    debug('most_garbage', mutrel_posterior.vids[most_garbage], clusters[most_garbage])
+
+    garbage += clusters[most_garbage]
+    del clusters[most_garbage]
+    mutrel_posterior = _remove_variants(mutrel_posterior, (most_garbage,))
+    mutrel_evidence = _remove_variants(mutrel_evidence, (most_garbage,))
+
+  return (clusters, mutrel_posterior, mutrel_evidence, garbage)
+
+def _plot(mutrel_posterior, clusters, variants, garbage):
+  import plotter
+  import relation_plotter
+  import vaf_plotter
+  with open('%s.html' % _plot.idx, 'w') as outf:
+    plotter.write_header(_plot.idx, outf)
+    _plot.idx += 1
+    relation_plotter.plot_ml_relations(mutrel_posterior, outf)
+    relation_plotter.plot_separate_relations(mutrel_posterior, outf)
+    samps = ['Samp %s' % (sidx + 1) for sidx in range(len(next(iter(variants.values()))['var_reads']))]
+    supervars = [variants[S] for S in mutrel_posterior.vids]
+    vaf_plotter.plot_vaf_matrix(
+      clusters,
+      variants,
+      supervars,
+      garbage,
+      None,
+      samps,
+      should_correct_vaf=True,
+      outf=outf,
+    )
+_plot.idx = 1
 
 def cluster_and_discard_garbage(variants, mutrel_posterior, mutrel_evidence, prior, parallel):
   # Copy mutrels so we don't modify them.
-  mutrel_posterior = Mutrel(vids=list(mutrel_posterior.vids), rels=np.copy(mutrel_posterior.rels))
-  mutrel_evidence = Mutrel(vids=list(mutrel_evidence.vids), rels=np.copy(mutrel_evidence.rels))
+  clust_posterior = Mutrel(vids=list(mutrel_posterior.vids), rels=np.copy(mutrel_posterior.rels))
+  clust_evidence = Mutrel(vids=list(mutrel_evidence.vids), rels=np.copy(mutrel_evidence.rels))
+  # Don't change original variants. We store all our intermediate supervariants
+  # in the copy we create.
+  variants = dict(variants)
 
-  # As a side effect, _discard_garbage() will remove the garbage variants
-  # from the mutrels.
-  garbage = _discard_garbage(mutrel_posterior, mutrel_evidence)
-  supervars, clust_posterior, clust_evidence, clusters = _cluster_variants(variants, mutrel_posterior, mutrel_evidence, prior, parallel)
+  # Each variant begins in its own cluster.
+  clusters = [[vid] for vid in mutrel_posterior.vids]
+  garbage = []
+
+  with tqdm(desc='Clustering and discarding garbage', unit='cluster', dynamic_ncols=True, miniters=1, disable=True) as pbar:
+    while True:
+      pbar.update()
+      M_old = len(clusters)
+      _plot(clust_posterior, clusters, variants, garbage)
+      clusters, clust_posterior, clust_evidence, garb_vids = _discard_garbage(clusters, clust_posterior, clust_evidence)
+      garbage += garb_vids
+      _plot(clust_posterior, clusters, variants, garbage)
+      clusters, clust_posterior, clust_evidence = _collapse_clusters(clusters, variants, clust_posterior, clust_evidence, prior, parallel)
+      if len(clusters) == M_old:
+        break
+
+  #supervars, clust_posterior, clust_evidence, clusters = _sort_clusters_by_vaf(variants, clust_posterior, clust_evidence, clusters)
+  supervars = [variants[S] for S in clust_posterior.vids]
   return (supervars, clust_posterior, clust_evidence, clusters, garbage)
 
 def _make_supervar(name, variants):

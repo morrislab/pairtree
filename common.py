@@ -201,4 +201,4 @@ def extract_patient_samples(variants, sampnames):
 def debug(*args, **kwargs):
   if debug.DEBUG:
     print(*args, **kwargs)
-debug.DEBUG = False
+debug.DEBUG = True
