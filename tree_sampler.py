@@ -178,7 +178,7 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, nchains
     # so that child processes can signal when they've sampled a tree, allowing
     # the main process to update the progress bar.
     progress_queue = manager.Queue()
-    with tqdm(total=total, desc='Sampling trees', unit='tree', dynamic_ncols=True) as progress_bar:
+    with tqdm(total=total, desc='Sampling trees', unit='tree', dynamic_ncols=True, disable=None) as progress_bar:
       with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
         for C in range(nchains):
           jobs.append(ex.submit(run_chain, data_mutrel, supervars, superclusters, trees_per_chain, progress_queue))
