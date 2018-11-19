@@ -4,8 +4,8 @@ import argparse
 import json
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-import common
 import inputparser
+import clustermaker
 
 def write_ssms(variants, outfn):
   mu_r = 0.999
@@ -33,6 +33,7 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('--use-supervars', dest='use_supervars', action='store_true')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
   parser.add_argument('pwgs_ssm_fn')
@@ -41,9 +42,10 @@ def main():
 
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.params_fn)
-  supervars = common.make_cluster_supervars(params['clusters'], variants)
 
-  write_ssms(supervars, args.pwgs_ssm_fn)
+  if args.use_supervars:
+    variants = clustermaker.make_cluster_supervars(params['clusters'], variants)
+  write_ssms(variants, args.pwgs_ssm_fn)
   write_params(params['samples'], args.pwgs_params_fn)
 
 if __name__ == '__main__':

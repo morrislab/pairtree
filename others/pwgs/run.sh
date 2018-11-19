@@ -4,13 +4,14 @@ module load gnu-parallel
 
 BASEDIR=~/work/pairtree
 JOBDIR=$SCRATCH/jobs
-INDIR=$BASEDIR/scratch/inputs/steph.xeno.nogarb.pwgs
-OUTBASE=$BASEDIR/scratch/results/steph.xeno.nogarb.pwgs
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.nogarb.pairtree
+INDIR=$BASEDIR/scratch/inputs/steph.xeno.unclust.pwgs
+OUTBASE=$BASEDIR/scratch/results/steph.xeno.unclust.pwgs
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 PARALLEL=40
 
 function convert_inputs {
   mkdir -p $INDIR
+  cp -a $BASEDIR/others/pwgs/empty.cnv $INDIR/
 
   for ssmfn in $PAIRTREE_INPUTS_DIR/*.ssm; do
     sampid=$(basename $ssmfn | cut -d. -f1)
@@ -28,6 +29,7 @@ function run_steph {
     jobname="steph_pwgs_${runid}"
     OUTDIR=$OUTBASE/$runid
 
+    jobfn=$(mktemp)
     (
       echo "#!/bin/bash"
       echo "#SBATCH --nodes=1"
@@ -50,9 +52,9 @@ function run_steph {
         "--params $INDIR/${runid}.params.json" \
         ">$runid.stdout" \
         "2>$runid.stderr"
-    ) #> $JOBDIR/job.sh
-    #sbatch $JOBDIR/job.sh
-    #rm $JOBDIR/job.sh
+    ) > $jobfn
+    sbatch $jobfn
+    rm $jobfn
   done
 }
 
@@ -71,8 +73,8 @@ function create_mutrels {
 
 function main {
   #convert_inputs
-  #run_steph
-  create_mutrels
+  run_steph
+  #create_mutrels
 }
 
 main
