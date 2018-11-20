@@ -8,6 +8,7 @@ import inputparser
 
 import vaf_plotter
 import relation_plotter
+import json_writer
 
 def read_file(fn):
   basedir = os.path.abspath(os.path.dirname(__file__))
@@ -25,6 +26,37 @@ def write_header(sampid, outf):
   print('<style type="text/css">%s</style>' % read_file('tree.css'), file=outf)
   print('<style type="text/css">%s</style>' % read_file('matrix.css'), file=outf)
   print('<style type="text/css">td, th, table { padding: 5px; margin: 0; border-collapse: collapse; font-weight: normal; } span { visibility: hidden; } td:hover > span { visibility: visible; } .highlighted { background-color: black !important; color: white; }</style>', file=outf)
+
+# TODO: eliminate the phi.json file, and instead make the JS extract it from
+# the tree summ.
+def write_phi_json(phi, sampnames, phifn):
+  import json
+  with open(phifn, 'w') as outf:
+    json.dump({
+      'samples': sampnames,
+      'phi': phi.tolist()
+    }, outf)
+
+def write_phi_matrix(sampid, outf):
+  print('''<script type="text/javascript">$(document).ready(function() {
+  (new PhiMatrix()).plot('%s', '%s.phi.json', '#phi_matrix');
+  });</script>''' % (sampid, sampid), file=outf)
+  print('<div id="phi_matrix" style="margin: 30px"></div>', file=outf)
+
+def write_trees(sampid, tidx, outf):
+  colourings = [{'left': 'D', 'right': 'R1'}]
+
+  print('''<div id="trees"></div>''', file=outf)
+  print('''<script type="text/javascript">$(document).ready(function() {''', file=outf)
+  for colouring in colourings:
+    print('''(new TreePlotter()).plot('%s.summ.json', %s, '%s', '%s', '%s', '#trees');''' % (
+      sampid,
+      tidx,
+      'sampled',
+      colouring['left'],
+      colouring['right'],
+    ), file=outf)
+  print('});</script>', file=outf)
 
 def main():
   parser = argparse.ArgumentParser(
@@ -44,8 +76,26 @@ def main():
   supervars = clustermaker.make_cluster_supervars(results['clusters'], variants)
   supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
 
+  if 'phi' in results:
+    json_writer.write_json(
+      args.sampid,
+      params['samples'],
+      variants,
+      results['clusters'],
+      results['adjm'],
+      results['llh'],
+      results['phi'],
+      '%s.summ.json' % args.sampid,
+      '%s.muts.json' % args.sampid,
+    )
+    write_phi_json(results['phi'][-1], params['samples'], '%s.phi.json' % args.sampid)
+
   with open(args.out_fn, 'w') as outf:
     write_header(args.sampid, outf)
+    if 'adjm' in results:
+      write_trees(args.sampid, len(results['adjm']) - 1, outf)
+    if 'phi' in results:
+      write_phi_matrix(args.sampid, outf)
     relation_plotter.plot_ml_relations(results['mutrel_posterior'], outf)
     relation_plotter.plot_separate_relations(results['mutrel_posterior'], outf)
     vaf_plotter.plot_vaf_matrix(

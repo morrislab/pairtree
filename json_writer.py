@@ -1,5 +1,6 @@
 import json
 import numpy as np
+import common
 
 def convert_adj_matrix_to_adj_list(adjm):
   adjm = np.copy(adjm)
@@ -18,13 +19,19 @@ def convert_adj_matrix_to_adj_list(adjm):
   return adjl
 
 def generate_treesumm(sampnames, clusters, adjmats, llh, phi):
+  clusters = [[]] + clusters.tolist()
+  assert len(adjmats) == len(llh) == len(phi)
+
   result = {
     'params': {'samples': sampnames},
     'trees': {},
   }
 
-  assert len(adjmats) == len(llh)
   for tidx, adjmat, L in zip(range(len(llh)), adjmats, llh):
+    C, S = phi[tidx].shape
+    assert C == len(adjmat) == len(clusters)
+    assert S == len(sampnames)
+
     pops = { str(pidx): {
       'num_ssms': len(ssms),
       'num_cnvs': 0,
@@ -43,8 +50,7 @@ def generate_treesumm(sampnames, clusters, adjmats, llh, phi):
 def generate_mutlist(variants):
   mutlist = {'cnvs': {}, 'ssms': {}}
 
-  varids = sorted(variants.keys(), key = lambda S: int(S[1:]))
-  for varid in varids:
+  for varid in common.extract_vids(variants):
     var = variants[varid]
     mutlist['ssms'][varid] = {
       'name': var['name'],

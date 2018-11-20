@@ -50,7 +50,7 @@ def partition_garbage_variants(supervars, garbage_variants):
 
 def make_phi_pseudovars(phi):
   if phi is None:
-    return {}
+    return []
   omega_v = 0.5
   V = [{
     'gene': None,
@@ -116,7 +116,7 @@ def print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, shou
     garbage = parted_garbage_vars[cidx] if cidx in parted_garbage_vars else []
 
     cluster_rows = []
-    if cidx in phi_pseudovars:
+    if phi_pseudovars is not None:
       cluster_rows.append(phi_pseudovars[cidx])
     if supervars is not None:
       cluster_rows.append(supervars[cidx])
