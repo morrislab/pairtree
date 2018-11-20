@@ -23,7 +23,7 @@ function run_sims {
       echo "#!/bin/bash"
       echo "#SBATCH --nodes=1"
       echo "#SBATCH --ntasks=$PARALLEL"
-      echo "#SBATCH --time=24:00:00"
+      echo "#SBATCH --time=23:59:00"
       echo "#SBATCH --job-name $runid"
       echo "#SBATCH --output=$JOBDIR/slurm_${runid}_%j.txt"
       echo "#SBATCH --mail-type=NONE"
@@ -53,7 +53,7 @@ function run_steph {
       echo "#!/bin/bash"
       echo "#SBATCH --nodes=1"
       echo "#SBATCH --ntasks=$PARALLEL"
-      echo "#SBATCH --time=24:00:00"
+      echo "#SBATCH --time=23:59:00"
       echo "#SBATCH --job-name $jobname"
       echo "#SBATCH --output=$JOBDIR/slurm_${jobname}_%j.txt"
       echo "#SBATCH --mail-type=NONE"
@@ -70,8 +70,8 @@ function run_steph {
         "$STEPH_OUTDIR/$runid.results.npz" \
         ">$runid.stdout" \
         "2>$runid.stderr"
-    ) #> $jobfn
-    #sbatch $jobfn
+    ) > $jobfn
+    sbatch $jobfn
     rm $jobfn
   done
 }

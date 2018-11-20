@@ -118,6 +118,18 @@ def _collapse_clusters(clusters, variants, mutrel_posterior, mutrel_evidence, pr
 
   return (clusters, mutrel_posterior, mutrel_evidence)
 
+def _reorder_matrix(mat, order):
+  # common.reorder_square_matrix does hierarchical clustering to determine
+  # order. This is a much simpler and more elegant function that uses a
+  # user-defined order.
+  M = len(mat)
+  assert mat.shape[:2] == (M, M)
+  assert set(order) == set(range(M))
+
+  mat = mat[order,:]
+  mat = mat[:,order]
+  return mat
+
 def _sort_clusters_by_vaf(variants, mutrel_posterior, mutrel_evidence, clusters):
   supervars = [variants[svid] for svid in mutrel_posterior.vids]
   sv_vaf = np.array([S['vaf'] for S in supervars])
@@ -127,8 +139,15 @@ def _sort_clusters_by_vaf(variants, mutrel_posterior, mutrel_evidence, clusters)
 
   clusters = [clusters[idx] for idx in order]
   new_vids = [mutrel_posterior.vids[idx] for idx in order]
-  mutrel_posterior = mutrel_posterior._replace(vids=new_vids)
-  mutrel_evidence = mutrel_evidence._replace(vids=new_vids)
+
+  mutrel_posterior = Mutrel(
+    vids = new_vids,
+    rels = _reorder_matrix(mutrel_posterior.rels, order),
+  )
+  mutrel_evidence = Mutrel(
+    vids = new_vids,
+    rels = _reorder_matrix(mutrel_evidence.rels, order),
+  )
 
   # Collect supervars into single dict. Supervar `S<i>` should correspond to
   # cluster `i`.
@@ -175,10 +194,12 @@ def _discard_garbage(clusters, mutrel_posterior, mutrel_evidence):
   return (clusters, mutrel_posterior, mutrel_evidence, garbage)
 
 def _plot(mutrel_posterior, clusters, variants, garbage):
+  if _plot.prefix is None:
+    return
   import plotter
   import relation_plotter
   import vaf_plotter
-  with open('%s.html' % _plot.idx, 'w') as outf:
+  with open('%s_%s.html' % (_plot.prefix, _plot.idx), 'w') as outf:
     plotter.write_header(_plot.idx, outf)
     _plot.idx += 1
     relation_plotter.plot_ml_relations(mutrel_posterior, outf)
@@ -196,6 +217,7 @@ def _plot(mutrel_posterior, clusters, variants, garbage):
       outf=outf,
     )
 _plot.idx = 1
+_plot.prefix = None
 
 def cluster_and_discard_garbage(variants, mutrel_posterior, mutrel_evidence, prior, parallel):
   # Copy mutrels so we don't modify them.
@@ -221,8 +243,7 @@ def cluster_and_discard_garbage(variants, mutrel_posterior, mutrel_evidence, pri
       if len(clusters) == M_old:
         break
 
-  #supervars, clust_posterior, clust_evidence, clusters = _sort_clusters_by_vaf(variants, clust_posterior, clust_evidence, clusters)
-  supervars = [variants[S] for S in clust_posterior.vids]
+  supervars, clust_posterior, clust_evidence, clusters = _sort_clusters_by_vaf(variants, clust_posterior, clust_evidence, clusters)
   return (supervars, clust_posterior, clust_evidence, clusters, garbage)
 
 def _make_supervar(name, variants):

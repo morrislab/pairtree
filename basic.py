@@ -9,7 +9,6 @@ import multiprocessing
 import common
 import pairwise
 import inputparser
-import json_writer
 import tree_sampler
 import phi_fitter
 import clustermaker
@@ -88,6 +87,7 @@ def main():
         params['garbage'],
       )
     else:
+      clustermaker._plot.prefix = os.path.basename(args.ssm_fn).split('.')[0]
       supervars, results['clustrel_posterior'], results['clustrel_evidence'], results['clusters'], results['garbage'] = clustermaker.cluster_and_discard_garbage(
         variants,
         results['mutrel_posterior'],
@@ -124,18 +124,6 @@ def main():
       parallel = parallel,
     )
     resultserializer.save(results, args.results_fn)
-
-  #json_writer.write_json(
-  #  args.sampid,
-  #  sampnames,
-  #  variants,
-  #  clusters,
-  #  results['adjm'],
-  #  results['llh'],
-  #  results['phi'],
-  #  '%s.summ.json' % args.sampid,
-  #  '%s.muts.json' % args.sampid,
-  #)
 
 if __name__ == '__main__':
   main()

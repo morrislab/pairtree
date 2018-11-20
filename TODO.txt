@@ -16,6 +16,10 @@ Cleanup:
     Store variant reads instead of ref reads
     Remove files not used by Pairtree
 
+  Remove ability for phi fitter, tree samples, etc. to take clusters of variants -- they should just take single supervariant
+  Remove .phi.json files, make JS extract freqs from tree summary
+  Rejig the left/right node colouring in tree plotter -- make left/right samples user-configurable when plotting
+
 Instead of just including garbage variants where *every* sample is drawn from uniform, have some garbage where only some samples are drawn from uniform
 Change my grad desc to use Adam instead
 
