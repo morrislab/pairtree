@@ -250,22 +250,23 @@ def _make_supervar(name, variants):
   cluster_total_reads = np.array([V['total_reads'] for V in variants])
   cluster_var_reads = np.array([V['var_reads'] for V in variants])
   # Correct for sex variants.
-  omega_v = np.array([V['omega_v'] for V in variants])[:,np.newaxis]
+  omega_v = np.array([V['omega_v'] for V in variants])
+  M, S = omega_v.shape
   cluster_var_reads = np.round(cluster_var_reads / (2*omega_v))
 
-  S = {
+  svar = {
     'id': name,
     'name': name,
     'chrom': None,
     'pos': None,
-    'omega_v': 0.5,
+    'omega_v': 0.5 * np.ones(S),
     'var_reads': np.sum(cluster_var_reads, axis=0, dtype=np.int),
     'total_reads': np.sum(cluster_total_reads, axis=0, dtype=np.int),
   }
-  S['ref_reads'] = S['total_reads'] - S['var_reads']
-  S['vaf'] = S['var_reads'] / S['total_reads']
+  svar['ref_reads'] = svar['total_reads'] - svar['var_reads']
+  svar['vaf'] = svar['var_reads'] / svar['total_reads']
 
-  return S
+  return svar
 
 def make_cluster_supervars(clusters, variants):
   supervars = {}

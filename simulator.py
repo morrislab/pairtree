@@ -68,7 +68,7 @@ def generate_read_counts(phi, omega_v, T):
   # T: total reads. Broadcast operation ensures V and T are same shape.
   T = np.broadcast_to(T, (M,S))
   # V: variant reads
-  V = scipy.stats.binom.rvs(n=T, p=omega_v[:,np.newaxis]*phi)
+  V = scipy.stats.binom.rvs(n=T, p=omega_v*phi)
   return (V, T)
 
 def add_noise(mat, sigma=0.09):
@@ -131,7 +131,7 @@ def generate_data(K, S, T, M, G):
   phi_garbage = np.random.uniform(size=(G,S))
   phi_mutations = np.vstack((phi_good_mutations, phi_garbage))
 
-  omega_v = np.broadcast_to(0.5, M + G)
+  omega_v = np.broadcast_to(0.5, (M + G, S))
   V, T = generate_read_counts(phi_mutations, omega_v, T)
 
   variants_all = make_variants(V, T, omega_v)

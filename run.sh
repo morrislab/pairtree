@@ -70,8 +70,8 @@ function run_steph {
         "$STEPH_OUTDIR/$runid.results.npz" \
         ">$runid.stdout" \
         "2>$runid.stderr"
-    ) > $jobfn
-    sbatch $jobfn
+    ) #> $jobfn
+    #sbatch $jobfn
     rm $jobfn
   done
 }
@@ -122,9 +122,9 @@ function write_indices {
 }
 
 function main {
-  #run_steph
-  plot_steph
-  write_indices
+  run_steph
+  #plot_steph
+  #write_indices
   #run_sims
 }
 

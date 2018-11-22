@@ -46,7 +46,7 @@ def calc_lh_grid(var1, var2):
 
   for s in range(S):
     for modelidx in logprob_phi.keys():
-      pv1, pv2 = [scipy.stats.binom.logpmf(V.var_reads[s], V.total_reads[s], V.omega_v*G) for V in (var1, var2)] # Nx1
+      pv1, pv2 = [scipy.stats.binom.logpmf(V.var_reads[s], V.total_reads[s], V.omega_v[s]*G) for V in (var1, var2)] # Nx1
       p1 = np.tile(pv1, N)   # pv1 vector tiled as columns
       p2 = np.tile(pv2, N).T # pv2 vector tiled as rows
       P = p1 + p2 + logprob_phi[modelidx]
@@ -86,7 +86,7 @@ def calc_lh_mc_2D(var1, var2):
 
       logP = []
       for V, phi in ((var1, phi1), (var2, phi2)):
-        logP.append(scipy.stats.binom.logpmf(V.var_reads[s], V.total_reads[s], V.omega_v*phi))
+        logP.append(scipy.stats.binom.logpmf(V.var_reads[s], V.total_reads[s], V.omega_v[s]*phi))
       logprob_models[s,modelidx] = scipy.special.logsumexp(logP[0] + logP[1]) - np.log(mcsamps)
 
   return logprob_models
@@ -118,7 +118,7 @@ def calc_lh_mc_2D_dumb(var1, var2):
 
       logP = []
       for V, phi in ((var1, phi1), (var2, phi2)):
-        logP.append(scipy.stats.binom.logpmf(V.var_reads[s], V.total_reads[s], V.omega_v*phi))
+        logP.append(scipy.stats.binom.logpmf(V.var_reads[s], V.total_reads[s], V.omega_v[s]*phi))
       logprob_models[s,modelidx] = scipy.special.logsumexp((logP[0] + logP[1] - np.log(area))[prior]) - np.log(mcsamps)
 
   return logprob_models
@@ -128,11 +128,11 @@ def _calc_garbage_smart(V1, V2):
   evidence = np.nan * np.ones(S)
 
   for sidx in range(S):
-    logP = [-np.log(V1.omega_v), -np.log(V2.omega_v)]
+    logP = [-np.log(V1.omega_v[sidx]), -np.log(V2.omega_v[sidx])]
     for V in (V1, V2):
       A, B = V.var_reads[sidx] + 1, V.ref_reads[sidx] + 1
       logP.append(util.log_N_choose_K(V.total_reads[sidx], V.var_reads[sidx]))
-      logP.append(np.log(scipy.special.betainc(A, B, V.omega_v)))
+      logP.append(np.log(scipy.special.betainc(A, B, V.omega_v[sidx])))
       logP.append(scipy.special.betaln(A, B)) # Denormalization factor for beta
     evidence[sidx] = np.sum(logP)
 
@@ -147,7 +147,7 @@ def _calc_garbage_dumb(V1, V2):
     logP = []
     for V in (V1, V2):
       phi = scipy.stats.uniform.rvs(loc=0, scale=1, size=mcsamps)
-      binom = scipy.stats.binom.logpmf(V.var_reads[sidx], V.total_reads[sidx], V.omega_v*phi)
+      binom = scipy.stats.binom.logpmf(V.var_reads[sidx], V.total_reads[sidx], V.omega_v[sidx]*phi)
       logP.append(scipy.special.logsumexp(binom) - np.log(mcsamps))
     evidence[sidx] = np.sum(logP)
 
@@ -167,17 +167,17 @@ def calc_lh_mc_1D(V1, V2):
       if modelidx == Models.cocluster:
         logP = []
         for V in (V1, V2):
-          logP.append(scipy.stats.binom.logpmf(V.var_reads[sidx], V.total_reads[sidx], V.omega_v*phi1))
+          logP.append(scipy.stats.binom.logpmf(V.var_reads[sidx], V.total_reads[sidx], V.omega_v[sidx]*phi1))
         logprob_models[sidx,modelidx] = scipy.special.logsumexp(logP[0] + logP[1]) - np.log(mcsamps)
       else:
-        logP = scipy.stats.binom.logpmf(V1.var_reads[sidx], V1.total_reads[sidx], V1.omega_v*phi1)
+        logP = scipy.stats.binom.logpmf(V1.var_reads[sidx], V1.total_reads[sidx], V1.omega_v[sidx]*phi1)
 
         lower = _make_lower(phi1, modelidx)
         upper = _make_upper(phi1, modelidx)
         A = V2.var_reads[sidx] + 1
         B = V2.ref_reads[sidx] + 1
 
-        betainc = [scipy.special.betainc(A, B, V2.omega_v*limit) for limit in (upper, lower)]
+        betainc = [scipy.special.betainc(A, B, V2.omega_v[sidx]*limit) for limit in (upper, lower)]
         logdenorm = scipy.special.betaln(A, B)
         # Add epsilon to ensure we don't take log of zero.
         logP += np.log(betainc[0] - betainc[1] + _EPSILON) + logdenorm
@@ -185,7 +185,7 @@ def calc_lh_mc_1D(V1, V2):
         logP = scipy.special.logsumexp(logP) - np.log(mcsamps)
         logP += np.log(2)
         logP += util.log_N_choose_K(V2.total_reads[sidx], V2.var_reads[sidx])
-        logP -= np.log(V2.omega_v)
+        logP -= np.log(V2.omega_v[sidx])
         logprob_models[sidx,modelidx] = logP
 
   return logprob_models
@@ -226,15 +226,15 @@ def _integral_separate_clusters(phi1, V1, V2, sidx, midx, logsub=0):
   logP = binom_logpmf(
     V1.var_reads[sidx],
     V1.total_reads[sidx],
-    V1.omega_v*phi1
+    V1.omega_v[sidx]*phi1
   )
   lower = _make_lower(phi1, midx)
   upper = _make_upper(phi1, midx)
 
   A = V2.var_reads[sidx] + 1
   B = V2.ref_reads[sidx] + 1
-  betainc_upper = scipy.special.betainc(A, B, V2.omega_v * upper)
-  betainc_lower = scipy.special.betainc(A, B, V2.omega_v * lower)
+  betainc_upper = scipy.special.betainc(A, B, V2.omega_v[sidx]* upper)
+  betainc_lower = scipy.special.betainc(A, B, V2.omega_v[sidx] * lower)
   # Add epsilon to ensure we don't take log of zero.
   logP += np.log(betainc_upper - betainc_lower + _EPSILON)
   logP -= logsub
@@ -242,7 +242,7 @@ def _integral_separate_clusters(phi1, V1, V2, sidx, midx, logsub=0):
   return np.exp(logP)
 
 def _integral_same_cluster(phi1, V1, V2, sidx, logsub=0):
-  binom = [binom_logpmf(V.var_reads[sidx], V.total_reads[sidx], V.omega_v*phi1) for V in (V1, V2)]
+  binom = [binom_logpmf(V.var_reads[sidx], V.total_reads[sidx], V.omega_v[sidx]*phi1) for V in (V1, V2)]
   logP = binom[0] + binom[1]
   logP -= logsub
   return np.exp(logP)
@@ -258,7 +258,7 @@ def calc_lh_quad(V1, V2):
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
 
   for sidx in range(S):
-    V1_phi_mle = V1.vaf[sidx] / V1.omega_v
+    V1_phi_mle = V1.vaf[sidx] / V1.omega_v[sidx]
     V1_phi_mle = np.minimum(1, V1_phi_mle)
     V1_phi_mle = np.maximum(0, V1_phi_mle)
 
@@ -273,6 +273,6 @@ def calc_lh_quad(V1, V2):
         P, P_error = quad(_integral_separate_clusters, 0, 1, args=(V1, V2, sidx, modelidx, logmaxP), limit=max_splits)
         logdenorm = scipy.special.betaln(V2.var_reads[sidx] + 1, V2.ref_reads[sidx] + 1)
         P = np.maximum(_EPSILON, P)
-        logP = np.log(P) + logmaxP + logdenorm + np.log(2) + util.log_N_choose_K(V2.total_reads[sidx], V2.var_reads[sidx]) - np.log(V2.omega_v)
+        logP = np.log(P) + logmaxP + logdenorm + np.log(2) + util.log_N_choose_K(V2.total_reads[sidx], V2.var_reads[sidx]) - np.log(V2.omega_v[sidx])
       logprob_models[sidx,modelidx] = logP
   return logprob_models

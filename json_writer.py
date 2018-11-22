@@ -56,7 +56,7 @@ def generate_mutlist(variants):
       'name': var['name'],
       'ref_reads': var['ref_reads'].tolist(),
       'total_reads': var['total_reads'].tolist(),
-      'var_read_prob': int(var['omega_v']),
+      'var_read_prob': var['omega_v'].tolist(),
     }
 
   return mutlist

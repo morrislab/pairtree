@@ -2,6 +2,9 @@ import csv
 import json
 import numpy as np
 
+def _extract_nums(S, dtype):
+  return np.array(S.split(','), dtype=dtype)
+
 def load_ssms(ssmfn, max_ssms=None):
   variants = {}
 
@@ -13,13 +16,13 @@ def load_ssms(ssmfn, max_ssms=None):
       variant = {
         'id': row['id'],
         'name': row['name'],
-        'var_reads': np.array([int(V) for V in row['var_reads'].split(',')], dtype=np.int),
-        'total_reads': np.array([int(V) for V in row['total_reads'].split(',')], dtype=np.int),
-        'omega_v': float(row['var_read_prob']),
+        'var_reads': _extract_nums(row['var_reads'], np.int),
+        'total_reads': _extract_nums(row['total_reads'], np.int),
+        'omega_v': _extract_nums(row['var_read_prob'], np.float),
       }
 
       assert np.all(variant['total_reads'] >= variant['var_reads'])
-      assert 0 <= variant['omega_v'] <= 1
+      assert np.all(0 <= variant['omega_v']) and np.all(variant['omega_v'] <= 1)
 
       variant['ref_reads'] = variant['total_reads'] - variant['var_reads']
       variant['vaf'] = variant['var_reads'] / variant['total_reads']
@@ -28,6 +31,11 @@ def load_ssms(ssmfn, max_ssms=None):
 
       assert variant['id'] not in variants
       variants[variant['id']] = variant
+
+  S = len(next(iter(variants.values()))['var_reads'])
+  for vid, V in variants.items():
+    for K in ('var_reads', 'total_reads', 'omega_v'):
+      assert len(V[K]) == S, '%s for %s is of length %s, but %s expected' % (K, vid, len(V[K]), S)
 
   vids = set([int(vid[1:]) for vid in variants.keys()])
   assert vids == set(range(len(variants)))
@@ -46,7 +54,7 @@ def write_ssms(variants, ssm_fn):
     print(*keys, sep='\t', file=outf)
     for V in variants.values():
       V = dict(V) # Don't modify original variant.
-      for K in ('var_reads', 'total_reads'):
+      for K in ('var_reads', 'total_reads', 'omega_v'):
         V[K] = ','.join([str(R) for R in V[K]])
       V['var_read_prob'] = V['omega_v']
       print(*[V[K] for K in keys], sep='\t', file=outf)

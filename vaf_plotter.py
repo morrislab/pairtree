@@ -49,9 +49,8 @@ def partition_garbage_variants(supervars, garbage_variants):
   return parted
 
 def make_phi_pseudovars(phi):
-  if phi is None:
-    return []
-  omega_v = 0.5
+  M, S = phi.shape
+  omega_v = 0.5 * np.ones(S)
   V = [{
     'gene': None,
     'id': 'P%s' % cidx,
@@ -107,7 +106,8 @@ def print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, shou
   nclusters = len(clustered_vars)
   cluster_colours = assign_colours(nclusters)
   parted_garbage_vars = partition_garbage_variants(supervars, garbage_variants)
-  phi_pseudovars = make_phi_pseudovars(phi)
+  if phi is not None:
+    phi_pseudovars = make_phi_pseudovars(phi)
 
   print_vaftable_header(sampnames, outf)
 
@@ -116,7 +116,7 @@ def print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, shou
     garbage = parted_garbage_vars[cidx] if cidx in parted_garbage_vars else []
 
     cluster_rows = []
-    if phi_pseudovars is not None:
+    if phi is not None:
       cluster_rows.append(phi_pseudovars[cidx])
     if supervars is not None:
       cluster_rows.append(supervars[cidx])

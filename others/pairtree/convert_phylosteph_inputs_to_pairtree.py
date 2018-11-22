@@ -22,11 +22,12 @@ def load_phylowgs(pwgs_fn):
       row['name'] = row['gene']
       row['ref_reads'] = np.array([float(V) for V in row['a'].split(',')], dtype=np.int)
       row['total_reads'] = np.array([float(V) for V in row['d'].split(',')], dtype=np.int)
-      row['omega_v'] = 1 - float(row['mu_v'])
+      S = len(row['total_reads'])
+      row['omega_v'] = (1 - float(row['mu_v'])) * np.ones(S)
 
       assert np.all(row['total_reads'] >= row['ref_reads'])
       row['var_reads'] = row['total_reads'] - row['ref_reads']
-      assert 0 <= row['omega_v'] <= 1
+      assert np.all(0 <= row['omega_v']) and np.all(row['omega_v'] <= 1)
       variants[row['id']] = row
 
   return variants

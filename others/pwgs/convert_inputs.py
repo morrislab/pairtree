@@ -14,13 +14,16 @@ def write_ssms(variants, outfn):
   with open(outfn, 'w') as outf:
     print(*cols, sep='\t', file=outf)
     for V in variants.values():
+      assert len(set(V['omega_v'])) == 1
+      omega_v = V['omega_v'][0]
+
       variant = {
         'id': 's%s' % int(V['id'][1:]),
         'gene': V['name'],
         'a':  ','.join([str(int(R)) for R in V['ref_reads']]),
         'd': ','.join([str(int(T)) for T in V['total_reads']]),
         'mu_r': mu_r,
-        'mu_v': 1 - V['omega_v'],
+        'mu_v': 1 - omega_v,
       }
       print(*[variant[K] for K in cols], sep='\t', file=outf)
 
