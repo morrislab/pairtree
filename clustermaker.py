@@ -2,7 +2,7 @@ import numpy as np
 import pairwise
 import common
 from common import Models, Mutrel, debug
-from tqdm import tqdm
+from progressbar import progressbar
 
 def _check_clusters(variants, clusters, garbage):
   for C in clusters:
@@ -231,7 +231,7 @@ def cluster_and_discard_garbage(variants, mutrel_posterior, mutrel_evidence, pri
   clusters = [[vid] for vid in mutrel_posterior.vids]
   garbage = []
 
-  with tqdm(desc='Clustering and discarding garbage', unit='cluster', dynamic_ncols=True, miniters=1, disable=None) as pbar:
+  with progressbar(desc='Clustering and discarding garbage', unit='cluster', dynamic_ncols=True, miniters=1) as pbar:
     while True:
       pbar.update()
       M_old = len(clusters)

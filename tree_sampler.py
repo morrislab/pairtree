@@ -1,7 +1,7 @@
 import common
 import numpy as np
 import scipy.stats
-from tqdm import tqdm
+from progressbar import progressbar
 import phi_fitter
 Models = common.Models
 debug = common.debug
@@ -178,7 +178,7 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, nchains
     # so that child processes can signal when they've sampled a tree, allowing
     # the main process to update the progress bar.
     progress_queue = manager.Queue()
-    with tqdm(total=total, desc='Sampling trees', unit='tree', dynamic_ncols=True, disable=None) as progress_bar:
+    with progressbar(total=total, desc='Sampling trees', unit='tree', dynamic_ncols=True) as pbar:
       with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
         for C in range(nchains):
           jobs.append(ex.submit(run_chain, data_mutrel, supervars, superclusters, trees_per_chain, progress_queue))
@@ -190,7 +190,7 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, nchains
           # Block until there's something in the queue for us to retrieve,
           # indicating a child process has sampled a tree.
           progress_queue.get()
-          progress_bar.update()
+          pbar.update()
 
     results = [J.result() for J in jobs]
   else:

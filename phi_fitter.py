@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.stats
 import common
-from tqdm import tqdm
+from progressbar import progressbar
 
 # Matrices: M mutations, K clusters, S samples
 #   adj: KxK, adjacency matrix -- adj[a,b]=1 iff a is parent of b (with 1 on diagonal)
@@ -72,8 +72,9 @@ def fit_all_phis(adj, A, ref_reads, var_reads, iterations, parallel):
         if np.any(eta[s] < 0):
           modified_samples.append(s)
           futures.append(ex.submit(fit_phi_S, eta[s], var_reads[:,s], ref_reads[:,s], A, Z, iterations))
-      for F in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc='Fitting phis', unit=' samples', dynamic_ncols=True, disable=None):
-        pass
+      with progressbar(total=len(futures), desc='Fitting phis', unit='sample', dynamic_ncols=True) as pbar:
+        for F in concurrent.futures.as_completed(futures):
+          pbar.update()
     for s, F in zip(modified_samples, futures):
       eta[s] = F.result()
   else:

@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.special
 import concurrent.futures
-from tqdm import tqdm
+from progressbar import progressbar
 import itertools
 
 from common import Models, Mutrel
@@ -103,15 +103,9 @@ def _compute_pairs(pairs, variants, prior, posterior, evidence, rel_type=None, p
     with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
       for A, B in pairs:
         futures.append(ex.submit(calc_lh_and_posterior, variants[A], variants[B], logprior))
-      for F in tqdm(
-        concurrent.futures.as_completed(futures),
-        total=len(futures),
-        desc='Computing %s relations' % rel_type,
-        unit='pair',
-        dynamic_ncols=True,
-        disable=disable_pbar
-      ):
-        pass
+      with progressbar(total=len(futures), desc='Computing %s relations' % rel_type, unit='pair', dynamic_ncols=True) as pbar:
+        for F in concurrent.futures.as_completed(futures):
+          pbar.update()
     for (A, B), F in zip(pairs, futures):
       evidence.rels[A,B], posterior.rels[A,B] = F.result()
   else:
