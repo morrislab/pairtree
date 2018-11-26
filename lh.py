@@ -180,6 +180,8 @@ def calc_lh_mc_1D(V1, V2):
         betainc = [scipy.special.betainc(A, B, V2.omega_v[sidx]*limit) for limit in (upper, lower)]
         logdenorm = scipy.special.betaln(A, B)
         # Add epsilon to ensure we don't take log of zero.
+        # TODO: check if betainc[0] is close to betainc[1]. If so, the log will
+        # likely produce -inf, so we can just set the LLH to -inf.
         logP += np.log(betainc[0] - betainc[1] + _EPSILON) + logdenorm
 
         logP = scipy.special.logsumexp(logP) - np.log(mcsamps)
@@ -233,10 +235,11 @@ def _integral_separate_clusters(phi1, V1, V2, sidx, midx, logsub=0):
 
   A = V2.var_reads[sidx] + 1
   B = V2.ref_reads[sidx] + 1
-  betainc_upper = scipy.special.betainc(A, B, V2.omega_v[sidx]* upper)
+  betainc_upper = scipy.special.betainc(A, B, V2.omega_v[sidx] * upper)
   betainc_lower = scipy.special.betainc(A, B, V2.omega_v[sidx] * lower)
-  # Add epsilon to ensure we don't take log of zero.
-  logP += np.log(betainc_upper - betainc_lower + _EPSILON)
+  if np.isclose(betainc_upper, betainc_lower):
+    return 0
+  logP += np.log(betainc_upper - betainc_lower)
   logP -= logsub
 
   return np.exp(logP)
