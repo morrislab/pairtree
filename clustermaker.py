@@ -231,14 +231,15 @@ def cluster_and_discard_garbage(variants, mutrel_posterior, mutrel_evidence, pri
   clusters = [[vid] for vid in mutrel_posterior.vids]
   garbage = []
 
-  with tqdm(desc='Clustering and discarding garbage', unit='cluster', dynamic_ncols=True, miniters=1, disable=True) as pbar:
+  with tqdm(desc='Clustering and discarding garbage', unit='cluster', dynamic_ncols=True, miniters=1, disable=None) as pbar:
     while True:
       pbar.update()
       M_old = len(clusters)
-      _plot(clust_posterior, clusters, variants, garbage)
+      #_plot(clust_posterior, clusters, variants, garbage)
       clusters, clust_posterior, clust_evidence, garb_vids = _discard_garbage(clusters, clust_posterior, clust_evidence)
       garbage += garb_vids
-      _plot(clust_posterior, clusters, variants, garbage)
+      pbar.update()
+      #_plot(clust_posterior, clusters, variants, garbage)
       clusters, clust_posterior, clust_evidence = _collapse_clusters(clusters, variants, clust_posterior, clust_evidence, prior, parallel)
       if len(clusters) == M_old:
         break
