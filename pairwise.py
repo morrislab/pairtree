@@ -219,16 +219,24 @@ def calc_lh_and_posterior(V1, V2, logprior, _calc_lh=_DEFAULT_CALC_LH):
 
 def _examine(V1, V2, variants, _calc_lh=_DEFAULT_CALC_LH):
   E, Es = calc_lh(*[common.convert_variant_dict_to_tuple(V) for V in (variants[V1], variants[V2])], _calc_lh=_calc_lh)
+  Es -= np.max(Es, axis=1)[:,None]
   sep = np.nan * np.ones(len(variants[V1]['var_reads']))[:,None]
   blah = np.hstack((
     variants[V1]['var_reads'][:,None],
     variants[V1]['total_reads'][:,None],
     variants[V1]['vaf'][:,None],
+    variants[V1]['omega_v'][:,None],
+    variants[V1]['vaf'][:,None] / variants[V1]['omega_v'][:,None],
     sep,
     variants[V2]['var_reads'][:,None],
     variants[V2]['total_reads'][:,None],
     variants[V2]['vaf'][:,None],
+    variants[V2]['omega_v'][:,None],
+    variants[V2]['vaf'][:,None] / variants[V2]['omega_v'][:,None],
     sep,
-    Es - np.max(Es, axis=1)[:,None]
+    Es,
   ))
-  return blah
+  prior = {'garbage': 0.001}
+  post1 = _calc_posterior(E, complete_prior(None))
+  post2 = _calc_posterior(E, complete_prior({'garbage': 0.001}))
+  return blah, post1, post2
