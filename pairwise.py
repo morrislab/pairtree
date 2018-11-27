@@ -81,20 +81,13 @@ def _init_posterior(vids):
   posterior = Mutrel(vids=list(vids), rels=np.copy(evidence.rels))
   return (posterior, evidence)
 
-def _compute_pairs(pairs, variants, prior, posterior, evidence, rel_type=None, parallel=1):
+def _compute_pairs(pairs, variants, prior, posterior, evidence, pbar=None, parallel=1):
   logprior = complete_prior(prior)
   # TODO: change ordering of pairs based on what will provide optimal
   # integration accuracy according to Quaid's advice.
   pairs = [sorted(C) for C in pairs]
   # Don't bother starting more workers than jobs.
   parallel = min(parallel, len(pairs))
-
-  if rel_type is None:
-    disable_pbar = True
-  else:
-    # By setting to None, the progress bar will be enabled if writing to a TTY,
-    # and disabled otherwise.
-    disable_pbar = None
 
   # If you set parallel = 0, we don't invoke the parallelism machinery. This
   # makes debugging easier.
@@ -103,7 +96,7 @@ def _compute_pairs(pairs, variants, prior, posterior, evidence, rel_type=None, p
     with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
       for A, B in pairs:
         futures.append(ex.submit(calc_lh_and_posterior, variants[A], variants[B], logprior))
-      with progressbar(total=len(futures), desc='Computing %s relations' % rel_type, unit='pair', dynamic_ncols=True) as pbar:
+      if pbar is not None:
         for F in concurrent.futures.as_completed(futures):
           pbar.update()
     for (A, B), F in zip(pairs, futures):
@@ -132,17 +125,19 @@ def calc_posterior(variants, prior, rel_type, parallel=1):
 
   posterior, evidence = _init_posterior(vids)
   pairs = list(itertools.combinations(range(M), 2)) + [(V, V) for V in range(M)]
-  return _compute_pairs(
-    pairs,
-    variants,
-    prior,
-    posterior,
-    evidence,
-    rel_type = rel_type,
-    parallel = parallel,
-  )
 
-def add_variants(vids_to_add, variants, mutrel_posterior, mutrel_evidence, prior, parallel):
+  with progressbar(total=len(pairs), desc='Computing %s relations' % rel_type, unit='pair', dynamic_ncols=True) as pbar:
+    return _compute_pairs(
+      pairs,
+      variants,
+      prior,
+      posterior,
+      evidence,
+      pbar = pbar,
+      parallel = parallel,
+    )
+
+def add_variants(vids_to_add, variants, mutrel_posterior, mutrel_evidence, prior, pbar, parallel):
   for vid in vids_to_add:
     assert vid in variants
 
@@ -166,7 +161,7 @@ def add_variants(vids_to_add, variants, mutrel_posterior, mutrel_evidence, prior
     prior,
     new_posterior,
     new_evidence,
-    rel_type = None,
+    pbar = pbar,
     parallel = parallel,
   )
 
@@ -187,8 +182,7 @@ def add_variants(vids_to_add, variants, mutrel_posterior, mutrel_evidence, prior
 # reads, meaning most of their 2D binomial mass is close to the origin. To
 # reudce the garbage model's tendency to win in these cases, don't allow them
 # to contribute to the posterior, either.
-def _fix_zero_var_read_samples(V1, V2, evidence):
-  threshold = 3
+def _fix_too_few_var_read_samples(V1, V2, evidence, threshold=3):
   too_few_reads = np.logical_and(V1.var_reads < threshold, V2.var_reads < threshold)
   evidence[too_few_reads,:] = 0
 
@@ -202,7 +196,7 @@ def calc_lh(V1, V2, _calc_lh=_DEFAULT_CALC_LH):
 
   evidence_per_sample = _calc_lh(V1, V2) # SxM
   evidence_per_sample[:,Models.garbage] = lh.calc_garbage(V1, V2)
-  _fix_zero_var_read_samples(V1, V2, evidence_per_sample)
+  _fix_too_few_var_read_samples(V1, V2, evidence_per_sample)
   evidence = np.sum(evidence_per_sample, axis=0)
   return (evidence, evidence_per_sample)
 

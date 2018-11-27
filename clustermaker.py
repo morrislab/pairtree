@@ -61,14 +61,14 @@ def _remove_variants(mutrel, vidxs):
     rels = _remove_rowcol(mutrel.rels, vidxs),
   )
 
-def _collapse_clusters(clusters, variants, mutrel_posterior, mutrel_evidence, prior, parallel):
+def _find_identical_mle(mutrel_posterior):
   ml_rels = np.argmax(mutrel_posterior.rels, axis=2)
   row_dist = _calc_row_dist(ml_rels)
   # Distances on diagonal will always be zero. Plus, we want A < B, so fill
   # the lower triangular portion as well.
   row_dist[np.tril_indices(len(row_dist))] = np.inf
   if not np.any(np.isclose(0, row_dist)):
-    return (clusters, mutrel_posterior, mutrel_evidence)
+    return []
 
   # We have four tasks:
   #
@@ -89,6 +89,9 @@ def _collapse_clusters(clusters, variants, mutrel_posterior, mutrel_evidence, pr
     to_merge.append(group)
     used_cidxs |= set(group)
 
+  return to_merge
+
+def _merge_clusters(to_merge, clusters, variants, mutrel_posterior, mutrel_evidence, prior, pbar, parallel):
   debug('to_merge', [[mutrel_posterior.vids[I] for I in C] for C in to_merge])
   # 1. Update the clustering
   to_remove = []
@@ -114,7 +117,7 @@ def _collapse_clusters(clusters, variants, mutrel_posterior, mutrel_evidence, pr
   # 3. Compute the mutrels for the new supervars
   mutrel_posterior = _remove_variants(mutrel_posterior, to_remove)
   mutrel_evidence = _remove_variants(mutrel_evidence, to_remove)
-  mutrel_posterior, mutrel_evidence = pairwise.add_variants(new_svids, variants, mutrel_posterior, mutrel_evidence, prior=prior, parallel=parallel)
+  mutrel_posterior, mutrel_evidence = pairwise.add_variants(new_svids, variants, mutrel_posterior, mutrel_evidence, prior=prior, pbar=pbar, parallel=parallel)
 
   return (clusters, mutrel_posterior, mutrel_evidence)
 
@@ -203,7 +206,7 @@ def _plot(mutrel_posterior, clusters, variants, garbage):
     plotter.write_header(_plot.idx, outf)
     _plot.idx += 1
     relation_plotter.plot_ml_relations(mutrel_posterior, outf)
-    relation_plotter.plot_separate_relations(mutrel_posterior, outf)
+    #relation_plotter.plot_separate_relations(mutrel_posterior, outf)
     samps = ['Samp %s' % (sidx + 1) for sidx in range(len(next(iter(variants.values()))['var_reads']))]
     supervars = [variants[S] for S in mutrel_posterior.vids]
     vaf_plotter.plot_vaf_matrix(
@@ -231,18 +234,19 @@ def cluster_and_discard_garbage(variants, mutrel_posterior, mutrel_evidence, pri
   clusters = [[vid] for vid in mutrel_posterior.vids]
   garbage = []
 
-  with progressbar(desc='Clustering and discarding garbage', unit='cluster', dynamic_ncols=True, miniters=1) as pbar:
+  with progressbar(desc='Clustering and discarding garbage', unit='pair', dynamic_ncols=True, miniters=1) as pbar:
     while True:
-      pbar.update()
-      M_old = len(clusters)
       #_plot(clust_posterior, clusters, variants, garbage)
+      pbar.update()
+      to_merge = _find_identical_mle(clust_posterior)
+      if len(to_merge) == 0:
+        break
+      clusters, clust_posterior, clust_evidence = _merge_clusters(to_merge, clusters, variants, clust_posterior, clust_evidence, prior, pbar, parallel)
+
+      #_plot(clust_posterior, clusters, variants, garbage)
+      pbar.update()
       clusters, clust_posterior, clust_evidence, garb_vids = _discard_garbage(clusters, clust_posterior, clust_evidence)
       garbage += garb_vids
-      pbar.update()
-      #_plot(clust_posterior, clusters, variants, garbage)
-      clusters, clust_posterior, clust_evidence = _collapse_clusters(clusters, variants, clust_posterior, clust_evidence, prior, parallel)
-      if len(clusters) == M_old:
-        break
 
   supervars, clust_posterior, clust_evidence, clusters = _sort_clusters_by_vaf(variants, clust_posterior, clust_evidence, clusters)
   return (supervars, clust_posterior, clust_evidence, clusters, garbage)

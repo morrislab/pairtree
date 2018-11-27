@@ -9,7 +9,7 @@ from contextlib import contextmanager
 def progressbar(**kwargs):
   fd = kwargs.get('file', sys.stderr)
 
-  if fd.isatty() and False:
+  if fd.isatty():
     pbar = tqdm(**kwargs)
   else:
     pbar = progressbar_file(
