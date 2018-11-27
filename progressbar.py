@@ -55,6 +55,7 @@ class progressbar_file:
       'started_at': str(self._started_at),
       'timestamp': str(self._last_printed),
     }), file=self._fd)
+    self._fd.flush()
 
   def close(self):
     pass
