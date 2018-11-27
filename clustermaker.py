@@ -84,12 +84,32 @@ def _find_identical_mle(mutrel_posterior):
     J = np.where(np.isclose(0, row_dist[I]))[0]
     group = set([I] + J.tolist())
     group -= used_cidxs
-    if len(group) == 0:
+    if len(group) <= 1:
       continue
     to_merge.append(group)
     used_cidxs |= set(group)
 
   return to_merge
+
+def _find_closest_rels(mutrel_posterior):
+  row_dist = _calc_row_dist(mutrel_posterior.rels)
+  row_dist[np.tril_indices(len(row_dist))] = np.inf
+
+  # A, B: indices such that row_dist[A,B] is the smallest
+  # element in the array.
+  A, B = np.unravel_index(np.argmin(row_dist, axis=None), row_dist.shape)
+  debug('row_dist', row_dist)
+  debug('A =', A, 'B =', B, 'dist =', row_dist[A,B], 'post =', mutrel_posterior.rels[A,B])
+  debug(np.vstack((mutrel_posterior.rels[A,:,Models.cocluster], mutrel_posterior.rels[B,:,Models.cocluster])))
+  debug(mutrel_posterior.rels[A] - mutrel_posterior.rels[B])
+
+  # Since row_dist is upper triangular, we should have A < B.
+  assert A < B
+  threshold = 1 / len(Models._all)
+  if mutrel_posterior.rels[A,B,Models.cocluster] >= threshold:
+    return [(A, B)]
+  else:
+    return []
 
 def _merge_clusters(to_merge, clusters, variants, mutrel_posterior, mutrel_evidence, prior, pbar, parallel):
   debug('to_merge', [[mutrel_posterior.vids[I] for I in C] for C in to_merge])
@@ -222,6 +242,26 @@ def _plot(mutrel_posterior, clusters, variants, garbage):
 _plot.idx = 1
 _plot.prefix = None
 
+def _iterate_clustering(selector, desc, variants, clusters, clust_posterior, clust_evidence, prior, parallel):
+  # Do initial round of garbage rejection.
+  clusters, clust_posterior, clust_evidence, garbage = _discard_garbage(clusters, clust_posterior, clust_evidence)
+
+  with progressbar(desc=desc, unit='pair', dynamic_ncols=True, miniters=1) as pbar:
+    while True:
+      #_plot(clust_posterior, clusters, variants, garbage)
+      pbar.update()
+      to_merge = selector(clust_posterior)
+      if len(to_merge) == 0:
+        break
+      clusters, clust_posterior, clust_evidence = _merge_clusters(to_merge, clusters, variants, clust_posterior, clust_evidence, prior, pbar, parallel)
+
+      #_plot(clust_posterior, clusters, variants, garbage)
+      pbar.update()
+      clusters, clust_posterior, clust_evidence, garb_vids = _discard_garbage(clusters, clust_posterior, clust_evidence)
+      garbage += garb_vids
+
+  return (clusters, garbage, clust_posterior, clust_evidence)
+
 def cluster_and_discard_garbage(variants, mutrel_posterior, mutrel_evidence, prior, parallel):
   # Copy mutrels so we don't modify them.
   clust_posterior = Mutrel(vids=list(mutrel_posterior.vids), rels=np.copy(mutrel_posterior.rels))
@@ -233,20 +273,18 @@ def cluster_and_discard_garbage(variants, mutrel_posterior, mutrel_evidence, pri
   # Each variant begins in its own cluster.
   clusters = [[vid] for vid in mutrel_posterior.vids]
   garbage = []
-
-  with progressbar(desc='Clustering and discarding garbage', unit='pair', dynamic_ncols=True, miniters=1) as pbar:
-    while True:
-      #_plot(clust_posterior, clusters, variants, garbage)
-      pbar.update()
-      to_merge = _find_identical_mle(clust_posterior)
-      if len(to_merge) == 0:
-        break
-      clusters, clust_posterior, clust_evidence = _merge_clusters(to_merge, clusters, variants, clust_posterior, clust_evidence, prior, pbar, parallel)
-
-      #_plot(clust_posterior, clusters, variants, garbage)
-      pbar.update()
-      clusters, clust_posterior, clust_evidence, garb_vids = _discard_garbage(clusters, clust_posterior, clust_evidence)
-      garbage += garb_vids
+  for selector, desc in ((_find_identical_mle, 'Merging identical relations'), (_find_closest_rels, 'Merging similar relations')):
+    clusters, G, clust_posterior, clust_evidence = _iterate_clustering(
+      selector,
+      desc,
+      variants,
+      clusters,
+      clust_posterior,
+      clust_evidence,
+      prior,
+      parallel
+    )
+    garbage += G
 
   supervars, clust_posterior, clust_evidence, clusters = _sort_clusters_by_vaf(variants, clust_posterior, clust_evidence, clusters)
   return (supervars, clust_posterior, clust_evidence, clusters, garbage)
