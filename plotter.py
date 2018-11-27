@@ -71,6 +71,9 @@ def main():
   args = parser.parse_args()
 
   results = resultserializer.load(args.results_fn)
+  if 'clusters' not in results:
+    return
+
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.params_fn)
   supervars = clustermaker.make_cluster_supervars(results['clusters'], variants)
