@@ -25,7 +25,6 @@ def load_ssms(ssmfn, max_ssms=None):
 
       assert np.all(0 <= variant['omega_v']) and np.all(variant['omega_v'] <= 1)
       variant['omega_v'] = np.maximum(variant['omega_v'], 1e-5)
-      variant['omega_v'] = np.minimum(variant['omega_v'], 1 - 1e-5)
 
       variant['ref_reads'] = variant['total_reads'] - variant['var_reads']
       variant['vaf'] = variant['var_reads'] / variant['total_reads']
