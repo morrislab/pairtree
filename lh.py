@@ -211,7 +211,7 @@ def _make_upper(phi1, midx):
 # SciPy's implementation is really slow. This is called hundreds of thousands
 # of times, so I need something fast.
 def binom_logpmf(X, N, P):
-  assert 0 <= X <= N and 0 <= P <= 1
+  assert 0 <= X <= N and 0 <= P <= 1, ('bad_binom X=%s N=%s P=%s' % (X, N, P))
   if np.isclose(0, P):
     if X == 0:
       return 0
