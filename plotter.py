@@ -5,6 +5,7 @@ import common
 import resultserializer
 import clustermaker
 import inputparser
+import numpy as np
 
 import vaf_plotter
 import relation_plotter
@@ -57,6 +58,21 @@ def write_trees(sampid, tidx, colourings, outf):
     ), file=outf)
   print('});</script>', file=outf)
 
+def write_cluster_stats(clusters, supervars, variants, outf):
+  cluster_dev = []
+  for C, S in zip(clusters, supervars):
+    S_freq = S['vaf'] / (2*S['omega_v'])[None,:] # 1xS
+    cluster_freq = np.array([variants[V]['vaf'] / (2*variants[V]['omega_v']) for V in C]) # |C|xS
+    absdev = np.abs(cluster_freq - S_freq)
+    cluster_dev.append(np.median(absdev))
+
+  print('<h2>Cluster stats</h2>', file=outf)
+  print('<table class="table table-striped table-hover">', file=outf)
+  print('<thead><tr><th>Cluster</th><th>Members</th><th>Deviation</th></tr></thead><tbody>', file=outf)
+  for cidx, (C, cdev) in enumerate(zip(clusters, cluster_dev)):
+    print('<tr><td>%s</td><td>%s</td><td>%.4f</td></tr>' % (cidx + 1, len(C), cdev), file=outf)
+  print('</tbody></table>', file=outf)
+
 def main():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
@@ -95,6 +111,7 @@ def main():
 
   with open(args.out_fn, 'w') as outf:
     write_header(args.sampid, outf)
+
     if 'adjm' in results:
       if 'colourings' in params:
         colourings = params['colourings']
@@ -104,13 +121,18 @@ def main():
           'right': params['samples'][0],
         }]
       write_trees(args.sampid, len(results['adjm']) - 1, colourings, outf)
+
     if 'phi' in results:
       write_phi_matrix(args.sampid, outf)
+
     for K in ('mutrel_posterior', 'clustrel_posterior'):
       if K not in results:
         continue
       relation_plotter.plot_ml_relations(results[K], outf)
       relation_plotter.plot_separate_relations(results[K], outf)
+
+    write_cluster_stats(results['clusters'], supervars, variants, outf)
+
     vaf_plotter.plot_vaf_matrix(
       results['clusters'],
       variants,
