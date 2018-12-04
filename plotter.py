@@ -43,9 +43,7 @@ def write_phi_matrix(sampid, outf):
   });</script>''' % (sampid, sampid), file=outf)
   print('<div id="phi_matrix" style="margin: 30px"></div>', file=outf)
 
-def write_trees(sampid, tidx, sampnames, outf):
-  colourings = [{'left': sampnames[0], 'right': sampnames[0]}]
-
+def write_trees(sampid, tidx, colourings, outf):
   print('''<div id="trees"></div>''', file=outf)
   print('''<script type="text/javascript">$(document).ready(function() {''', file=outf)
   for colouring in colourings:
@@ -97,7 +95,14 @@ def main():
   with open(args.out_fn, 'w') as outf:
     write_header(args.sampid, outf)
     if 'adjm' in results:
-      write_trees(args.sampid, len(results['adjm']) - 1, params['samples'], outf)
+      if 'colourings' in params:
+        colourings = params['colourings']
+      else:
+        colourings = [{
+          'left': params['samples'][0],
+          'right': params['samples'][0],
+        }]
+      write_trees(args.sampid, len(results['adjm']) - 1, colourings, outf)
     if 'phi' in results:
       write_phi_matrix(args.sampid, outf)
     for K in ('mutrel_posterior', 'clustrel_posterior'):

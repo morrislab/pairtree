@@ -144,7 +144,13 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops, left_samp
         if(side === 'left') {
           var base_colour = (left_sample.indexOf('X') > -1)  ? TreePlotter.colours.other : TreePlotter.colours.diag;
         } else {
-          var base_colour = (right_sample.indexOf('X') > -1) ? TreePlotter.colours.other : TreePlotter.colours.relapse;
+          if(right_sample.indexOf('X') > -1) {
+            var base_colour = TreePlotter.colours.other;
+          } else if(left_sample !== right_sample) {
+            var base_colour = TreePlotter.colours.relapse;
+          } else {
+            var base_colour = TreePlotter.colours.diag;
+          }
         }
         return Util.rgba2hex(base_colour, d.data.opacities[side], TreePlotter.colours.node_bg);
       });
