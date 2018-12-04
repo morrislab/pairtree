@@ -15,7 +15,7 @@ def _check_clusters(variants, clusters, garbage):
   assert len(clustered & garbage) == 0
   assert set(vids) == (clustered | garbage)
 
-def use_pre_existing(variants, mutrel, prior, parallel, clusters, garbage):
+def use_pre_existing(variants, prior, parallel, clusters, garbage):
   supervars = make_cluster_supervars(clusters, variants)
   clust_posterior, clust_evidence = pairwise.calc_posterior(supervars, prior, rel_type='supervariant', parallel=parallel)
   _check_clusters(variants, clusters, garbage)
@@ -242,12 +242,14 @@ def _plot(mutrel_posterior, clusters, variants, garbage):
   import relation_plotter
   import vaf_plotter
   with open('%s_%s.html' % (_plot.prefix, _plot.idx), 'w') as outf:
-    plotter.write_header(_plot.idx, outf)
+    plotter.write_header(_plot.prefix, outf)
     _plot.idx += 1
     relation_plotter.plot_ml_relations(mutrel_posterior, outf)
-    #relation_plotter.plot_separate_relations(mutrel_posterior, outf)
+    relation_plotter.plot_separate_relations(mutrel_posterior, outf)
     samps = ['Samp %s' % (sidx + 1) for sidx in range(len(next(iter(variants.values()))['var_reads']))]
     supervars = [variants[S] for S in mutrel_posterior.vids]
+    for V in variants.values():
+      V['chrom'] = V['pos'] = None
     vaf_plotter.plot_vaf_matrix(
       clusters,
       variants,
@@ -316,7 +318,11 @@ def _make_supervar(name, variants):
   # Correct for sex variants.
   omega_v = np.array([V['omega_v'] for V in variants])
   M, S = omega_v.shape
+
   cluster_var_reads = np.round(cluster_var_reads / (2*omega_v))
+  # Don't allow var read count to exceed total read count, which can happen
+  # when `omega_v` is small.
+  cluster_var_reads = np.minimum(cluster_var_reads, cluster_total_reads)
 
   svar = {
     'id': name,

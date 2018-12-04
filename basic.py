@@ -77,10 +77,9 @@ def main():
     resultserializer.save(results, args.results_fn)
 
   if 'clustrel_posterior' not in results:
-    if False and 'clusters' in params and 'garbage' in params:
+    if 'clusters' in params and 'garbage' in params:
       supervars, results['clustrel_posterior'], results['clustrel_evidence'], results['clusters'], results['garbage'] = clustermaker.use_pre_existing(
         variants,
-        results['mutrel_posterior'],
         prior,
         parallel,
         params['clusters'],
