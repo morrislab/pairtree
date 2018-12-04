@@ -88,10 +88,18 @@ def print_vaftable_header(sampnames, outf):
   print('</tr></thead><tbody>', file=outf)
 
 def print_vaftable_row(V, bgcolour, should_correct_vaf, outf):
+  # Duplicate variant so we don't modify it.
+  V = dict(V)
+
   if should_correct_vaf:
     vaf = V['vaf'] / V['omega_v']
   else:
     vaf = V['vaf']
+
+  V['chrom'] = V['pos'] = None
+  # Increment cluster number to correct off-by-one error relative to tree nodes.
+  V['cluster'] += 1
+
   td = ['<td class="%s">%s</td>' % (K, V[K] if K in V and V[K] is not None else '&mdash;') for K in ('gene', 'id', 'chrom', 'pos', 'cluster')]
   td += ['<td style="background-color: %s"><span>%s</span></td>' % (make_colour(v), make_vaf_label(v)) for v in vaf]
   print('<tr style="background-color: %s">%s</tr>' % (
