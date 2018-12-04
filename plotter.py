@@ -16,16 +16,17 @@ def read_file(fn):
     return F.read()
 
 def write_header(sampid, outf):
+  print('<meta charset="utf-8">', file=outf)
   print('<script type="text/javascript" src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>', file=outf)
   print('<script src="https://d3js.org/d3.v4.min.js"></script>', file=outf)
   print('<script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>', file=outf)
   print('<script type="text/javascript">%s</script>' % read_file('highlight_table_labels.js'), file=outf)
   print('<script type="text/javascript">%s</script>' % read_file('tree_plotter.js'), file=outf)
   print('<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">', file=outf)
-  print('<h1>%s</h1>' % sampid, file=outf)
   print('<style type="text/css">%s</style>' % read_file('tree.css'), file=outf)
   print('<style type="text/css">%s</style>' % read_file('matrix.css'), file=outf)
   print('<style type="text/css">td, th, table { padding: 5px; margin: 0; border-collapse: collapse; font-weight: normal; } span { visibility: hidden; } td:hover > span { visibility: visible; } .highlighted { background-color: black !important; color: white; }</style>', file=outf)
+  print('<h1>%s</h1>' % sampid, file=outf)
 
 # TODO: eliminate the phi.json file, and instead make the JS extract it from
 # the tree summ.
@@ -41,7 +42,7 @@ def write_phi_matrix(sampid, outf):
   print('''<script type="text/javascript">$(document).ready(function() {
   (new PhiMatrix()).plot('%s', '%s.phi.json', '#phi_matrix');
   });</script>''' % (sampid, sampid), file=outf)
-  print('<div id="phi_matrix" style="margin: 30px"></div>', file=outf)
+  print('<div id="phi_matrix" style="margin: 30px"><h2>Tree-constrained lineage frequencies</h2></div>', file=outf)
 
 def write_trees(sampid, tidx, colourings, outf):
   print('''<div id="trees"></div>''', file=outf)

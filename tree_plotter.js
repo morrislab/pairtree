@@ -243,15 +243,29 @@ TreePlotter.prototype._generate_tree_struct = function(sampnames, adjlist, pops,
   return root;
 }
 
+TreePlotter.prototype._calc_nlglh = function(tree) {
+  var K = Object.keys(tree.populations).length;
+  var S = tree.populations[tree.root]['cellular_prevalence'].length;
+  // Normalize LLH by casting into base 2 log (so we can think in bits), making
+  // positive, and normalizing to number of factors in LH (i.e., number of
+  // terms in LLH).
+  // (K - 1)xS: size of phi matrix used for scoring how well phis allowed by tree fit data VAFs
+  // K^2: size of cluster relation matrix
+  return -tree.llh / Math.log(2) / ((K - 1)*S*K*K);
+}
+
 TreePlotter.prototype.plot = function(summ_path, tidx, tname, left_sample, right_sample, container) {
   container = d3.select(container).append('div');
-  container.append('h2').text(tname + ' tidx=' + tidx + ' left=' + left_sample + ' right=' + right_sample);
 
   var self = this;
   d3.json(summ_path, function(summary) {
     var pops = summary.trees[tidx].populations;
     var struct = summary.trees[tidx].structure;
     var root = summary.trees[tidx].root;
+    var nlglh = self._calc_nlglh(summary.trees[tidx]);
+
+    container.append('h2').text(tname + ' tidx=' + tidx + ' nlglh=' + nlglh.toFixed(3) + ' left=' + left_sample + ' right=' + right_sample); 
+
     if(struct[root].length !== 1) {
       // Uncomment this if you want to disallow polyclonal trees.
       //throw "Unexpected children from root " + summary.trees[tidx].root + ": " + struct[root];
@@ -394,7 +408,7 @@ MatrixBar.prototype.plot = function(mat, row_labels, row_colours, col_labels, co
     throw "Wrong number of col labels";
   }
 
-  var svg = d3.select(container).html('').append('svg:svg')
+  var svg = d3.select(container).append('svg:svg')
     .attr('width', row_label_width + num_cols * cell_size)
     .attr('height', col_label_height + num_rows * cell_size);
   var cl = svg.append('svg:g')
