@@ -43,8 +43,8 @@ def write_phi_matrix(sampid, outf):
   });</script>''' % (sampid, sampid), file=outf)
   print('<div id="phi_matrix" style="margin: 30px"></div>', file=outf)
 
-def write_trees(sampid, tidx, outf):
-  colourings = [{'left': 'D', 'right': 'R1'}]
+def write_trees(sampid, tidx, sampnames, outf):
+  colourings = [{'left': sampnames[0], 'right': sampnames[0]}]
 
   print('''<div id="trees"></div>''', file=outf)
   print('''<script type="text/javascript">$(document).ready(function() {''', file=outf)
@@ -73,6 +73,7 @@ def main():
   results = resultserializer.load(args.results_fn)
   if 'clusters' not in results:
     return
+  print('C=%s' % len(results['clusters']))
 
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.params_fn)
@@ -96,11 +97,14 @@ def main():
   with open(args.out_fn, 'w') as outf:
     write_header(args.sampid, outf)
     if 'adjm' in results:
-      write_trees(args.sampid, len(results['adjm']) - 1, outf)
+      write_trees(args.sampid, len(results['adjm']) - 1, params['samples'], outf)
     if 'phi' in results:
       write_phi_matrix(args.sampid, outf)
-    relation_plotter.plot_ml_relations(results['mutrel_posterior'], outf)
-    relation_plotter.plot_separate_relations(results['mutrel_posterior'], outf)
+    for K in ('mutrel_posterior', 'clustrel_posterior'):
+      if K not in results:
+        continue
+      relation_plotter.plot_ml_relations(results[K], outf)
+      relation_plotter.plot_separate_relations(results[K], outf)
     vaf_plotter.plot_vaf_matrix(
       results['clusters'],
       variants,
