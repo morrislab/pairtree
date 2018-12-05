@@ -134,7 +134,7 @@ p(\phi_{1}|M_{i})= & \frac{p(\phi_{1},\phi_{2}|M_{i})}{p(\phi_{2}|\phi_{1},M_{i}
 = & 1\\
 p(V_{1},R_{1},V_{2,}R_{2}|M_{i})= & \int d\phi_{1}p(V_{1},R_{1}|\phi_{1})p(\phi_{1}|M_{i})\int d\phi_{2}p(V_{2},R_{2}|\phi_{2})p(\phi_{2}|\phi_{1},M_{i})\\
 = & \int d\phi_{1}p(V_{1},R_{1}|\phi_{1})p(V_{2},R_{2}|\phi_{1})\\
-= & \int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\omega_{v_{1}}\phi_{1})Binom(V_{2}|V_{2}+R_{2},\omega_{v_{2}}\phi_{2})
+= & \int d\phi_{1}Binom(V_{1}|V_{1}+R_{1},\omega_{v_{1}}\phi_{1})Binom(V_{2}|V_{2}+R_{2},\omega_{v_{2}}\phi_{1})
 \end{align*}
 
 \end_inset
