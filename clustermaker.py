@@ -91,31 +91,12 @@ def _find_identical_mle(mutrel_posterior):
 
   return to_merge
 
-def _find_closest_rels(mutrel_posterior):
-  row_dist = _calc_row_dist(mutrel_posterior.rels)
-  row_dist[np.tril_indices(len(row_dist))] = np.inf
-
-  # A, B: indices such that row_dist[A,B] is the smallest
-  # element in the array.
-  A, B = np.unravel_index(np.argmin(row_dist, axis=None), row_dist.shape)
-  debug('row_dist', row_dist)
-  debug('A =', A, 'B =', B, 'dist =', row_dist[A,B], 'post =', mutrel_posterior.rels[A,B])
-  debug(np.vstack((mutrel_posterior.rels[A,:,Models.cocluster], mutrel_posterior.rels[B,:,Models.cocluster])))
-  debug(mutrel_posterior.rels[A] - mutrel_posterior.rels[B])
-
-  # Since row_dist is upper triangular, we should have A < B.
-  assert A < B
-  threshold = 1 / len(Models._all)
-  if mutrel_posterior.rels[A,B,Models.cocluster] >= threshold:
-    return [(A, B)]
-  else:
-    return []
-
 def _merge_until_no_pairwise_mle_remain(mutrel_posterior):
   row_dist = _calc_row_dist(mutrel_posterior.rels)
   row_dist[np.tril_indices(len(row_dist))] = np.inf
 
   threshold = 1 / len(Models._all)
+  # Only want to merge pairs whose cluster probability exceeds threshold.
   noncoclustered = mutrel_posterior.rels[:,:,Models.cocluster] < threshold
   row_dist[noncoclustered] = np.inf
   if np.all(np.isinf(row_dist)):
@@ -123,8 +104,8 @@ def _merge_until_no_pairwise_mle_remain(mutrel_posterior):
 
   A, B = np.unravel_index(np.argmin(row_dist, axis=None), row_dist.shape)
   #debug('row_dist', row_dist)
-  debug('A =', A, 'B =', B, 'dist =', row_dist[A,B], 'post =', mutrel_posterior.rels[A,B])
-  debug(np.vstack((mutrel_posterior.rels[A,:,Models.cocluster], mutrel_posterior.rels[B,:,Models.cocluster])))
+  #debug('A =', A, 'B =', B, 'dist =', row_dist[A,B], 'post =', mutrel_posterior.rels[A,B])
+  #debug(np.vstack((mutrel_posterior.rels[A,:,Models.cocluster], mutrel_posterior.rels[B,:,Models.cocluster])))
   #debug(mutrel_posterior.rels[A] - mutrel_posterior.rels[B])
 
   assert A < B
@@ -294,7 +275,6 @@ def cluster_and_discard_garbage(variants, mutrel_posterior, mutrel_evidence, pri
   # Each variant begins in its own cluster.
   clusters = [[vid] for vid in mutrel_posterior.vids]
   garbage = []
-  #for selector, desc in ((_find_identical_mle, 'Merging identical relations'), (_find_closest_rels, 'Merging similar relations')):
   for selector, desc in ((_find_identical_mle, 'Merging identical relations'), (_merge_until_no_pairwise_mle_remain, 'Merging similar relations')):
     clusters, G, clust_posterior, clust_evidence = _iterate_clustering(
       selector,
