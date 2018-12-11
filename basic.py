@@ -43,6 +43,7 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('--verbose', action='store_true')
   parser.add_argument('--seed', dest='seed', type=int)
   parser.add_argument('--parallel', dest='parallel', type=int, default=None)
   parser.add_argument('--params', dest='params_fn')
@@ -52,6 +53,8 @@ def main():
   parser.add_argument('ssm_fn')
   parser.add_argument('results_fn')
   args = parser.parse_args()
+
+  common.debug.DEBUG = args.verbose
 
   # Note that multiprocessing.cpu_count() returns number of logical cores, so
   # if you're using a hyperthreaded CPU, this will be more than the number of

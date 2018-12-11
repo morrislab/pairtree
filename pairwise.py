@@ -39,7 +39,26 @@ def _calc_posterior(evidence, logprior):
   posterior = np.exp(joint) / np.sum(np.exp(joint))
   return posterior
 
-def complete_prior(prior):
+def _calc_posterior_full(evidence, prior):
+  logprior = _complete_prior(prior)
+  # This function is currently unused.
+  joint = evidence + logprior[None,None,:]
+  B = np.max(joint, axis=2)
+  joint -= B[:,:,None]
+  expjoint = np.exp(joint)
+  posterior = expjoint / np.sum(expjoint, axis=2)[:,:,None]
+
+  # Regardless of what the prior is on coclustering (even if it's zero), if
+  # we're dealing with a pair consisting of variant `i` and variant `i`, we
+  # want the posterior to indicate coclustering certainty.
+  M = range(len(posterior))
+  posterior[M,M,:] = 0
+  posterior[M,M,Models.cocluster] = 1
+  _sanity_check_tensor(posterior)
+
+  return posterior
+
+def _complete_prior(prior):
   '''
   If you don't want to include a certain model in the posterior (e.g., perhaps
   you're computing pairwise probabilities for supervariants, and so don't want
@@ -75,14 +94,13 @@ def _sanity_check_tensor(tensor):
     mat = tensor[:,:,midx]
     assert np.allclose(mat, mat.T)
 
-def _init_posterior(vids):
+def _init_mutrel(vids):
   M = len(vids)
-  evidence = Mutrel(vids=list(vids), rels=np.nan*np.ones((M, M, len(Models._all))))
-  posterior = Mutrel(vids=list(vids), rels=np.copy(evidence.rels))
-  return (posterior, evidence)
+  mutrel = Mutrel(vids=list(vids), rels=np.nan*np.ones((M, M, len(Models._all))))
+  return mutrel
 
 def _compute_pairs(pairs, variants, prior, posterior, evidence, pbar=None, parallel=1):
-  logprior = complete_prior(prior)
+  logprior = _complete_prior(prior)
   # TODO: change ordering of pairs based on what will provide optimal
   # integration accuracy according to Quaid's advice.
   pairs = [sorted(C) for C in pairs]
@@ -95,7 +113,7 @@ def _compute_pairs(pairs, variants, prior, posterior, evidence, pbar=None, paral
     futures = []
     with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
       for A, B in pairs:
-        futures.append(ex.submit(calc_lh_and_posterior, variants[A], variants[B], logprior))
+        futures.append(ex.submit(_calc_lh_and_posterior, variants[A], variants[B], logprior))
       if pbar is not None:
         for F in concurrent.futures.as_completed(futures):
           pbar.update()
@@ -103,7 +121,7 @@ def _compute_pairs(pairs, variants, prior, posterior, evidence, pbar=None, paral
       evidence.rels[A,B], posterior.rels[A,B] = F.result()
   else:
     for A, B in pairs:
-      evidence.rels[A,B], posterior.rels[A,B] = calc_lh_and_posterior(variants[A], variants[B], logprior)
+      evidence.rels[A,B], posterior.rels[A,B] = _calc_lh_and_posterior(variants[A], variants[B], logprior)
 
   # Duplicate evidence's keys, since we'll be modifying dictionary.
   for A, B in pairs:
@@ -115,6 +133,10 @@ def _compute_pairs(pairs, variants, prior, posterior, evidence, pbar=None, paral
   _sanity_check_tensor(evidence.rels)
   _sanity_check_tensor(posterior.rels)
   assert np.all(np.isclose(1, np.sum(posterior.rels, axis=2)))
+
+  # TODO: only calculate posterior once here, instead of computing it within
+  # each worker separately for a given variant pair.
+  assert np.allclose(posterior.rels, _calc_posterior_full(evidence.rels, prior))
   return (posterior, evidence)
 
 def calc_posterior(variants, prior, rel_type, parallel=1):
@@ -123,7 +145,8 @@ def calc_posterior(variants, prior, rel_type, parallel=1):
   vids = common.extract_vids(variants)
   variants = [common.convert_variant_dict_to_tuple(variants[V]) for V in vids]
 
-  posterior, evidence = _init_posterior(vids)
+  posterior = _init_mutrel(vids)
+  evidence = _init_mutrel(vids)
   pairs = list(itertools.combinations(range(M), 2)) + [(V, V) for V in range(M)]
 
   with progressbar(total=len(pairs), desc='Computing %s relations' % rel_type, unit='pair', dynamic_ncols=True) as pbar:
@@ -137,6 +160,42 @@ def calc_posterior(variants, prior, rel_type, parallel=1):
       parallel = parallel,
     )
 
+def merge_variants(to_merge, evidence, prior):
+  assert np.all(np.array([V for group in to_merge for V in group]) < len(evidence.vids))
+  already_merged = set()
+
+  for vidxs in to_merge:
+    vidxs = set(vidxs)
+    assert len(vidxs & already_merged) == 0
+
+    M_old = len(evidence.vids)
+    merged_vid = ','.join([evidence.vids[V] for V in vidxs])
+    new_vids = evidence.vids + [merged_vid]
+
+    new_evidence = _init_mutrel(new_vids)
+    new_evidence.rels[:-1,:-1] = evidence.rels
+
+    merged_row = np.sum(np.array([evidence.rels[V] for V in vidxs]), axis=0)
+    assert merged_row.shape == (M_old, len(Models._all))
+    merged_col = np.copy(merged_row)
+    merged_col[:,Models.A_B] = merged_row[:,Models.B_A]
+    merged_col[:,Models.B_A] = merged_row[:,Models.A_B]
+
+    new_evidence.rels[-1,:-1] = merged_row
+    new_evidence.rels[:-1,-1] = merged_col
+    new_evidence.rels[-1,-1,:] = -np.inf
+    new_evidence.rels[-1,-1,Models.cocluster] = 0
+
+    already_merged |= vidxs
+    evidence = new_evidence
+
+  evidence = remove_variants(evidence, already_merged)
+  posterior = Mutrel(
+    vids = evidence.vids,
+    rels = _calc_posterior_full(evidence.rels, prior),
+  )
+  return (posterior, evidence)
+
 def add_variants(vids_to_add, variants, mutrel_posterior, mutrel_evidence, prior, pbar, parallel):
   for vid in vids_to_add:
     assert vid in variants
@@ -149,7 +208,8 @@ def add_variants(vids_to_add, variants, mutrel_posterior, mutrel_evidence, prior
   assert len(mutrel_posterior.vids) == len(mutrel_evidence.vids) == M - A
   variants = [common.convert_variant_dict_to_tuple(variants[V]) for V in new_vids]
 
-  new_posterior, new_evidence = _init_posterior(new_vids)
+  new_posterior = _init_mutrel(new_vids)
+  new_evidence = _init_mutrel(new_vids)
   new_posterior.rels[:-A,:-A] = mutrel_posterior.rels
   new_evidence.rels[:-A,:-A] = mutrel_evidence.rels
 
@@ -200,7 +260,7 @@ def calc_lh(V1, V2, _calc_lh=_DEFAULT_CALC_LH):
   evidence = np.sum(evidence_per_sample, axis=0)
   return (evidence, evidence_per_sample)
 
-def calc_lh_and_posterior(V1, V2, logprior, _calc_lh=_DEFAULT_CALC_LH):
+def _calc_lh_and_posterior(V1, V2, logprior, _calc_lh=_DEFAULT_CALC_LH):
   evidence, evidence_per_sample = calc_lh(V1, V2, _calc_lh)
   posterior = _calc_posterior(evidence, logprior)
   return (evidence, posterior)
@@ -225,6 +285,34 @@ def _examine(V1, V2, variants, _calc_lh=_DEFAULT_CALC_LH):
     Es,
   ))
   prior = {'garbage': 0.001}
-  post1 = _calc_posterior(E, complete_prior(None))
-  post2 = _calc_posterior(E, complete_prior({'garbage': 0.001}))
+  post1 = _calc_posterior(E, _complete_prior(None))
+  post2 = _calc_posterior(E, _complete_prior({'garbage': 0.001}))
   return blah, post1, post2
+
+def _remove_rowcol(arr, indices):
+  '''Remove rows and columns at `indices`.'''
+  # Using a mask requires only creating a new array once (and then presumably
+  # another array to apply the mask). Calling np.delete() multiple times would
+  # creat separate arrays for every element in `indices`.
+  shape = list(arr.shape)
+  # Must convert to list *before* array, as indices is often a set, and
+  # converting a set directly to an array yields a dtype of `object` that
+  # contains the set. It's really weird.
+  indices = np.array(list(indices))
+  # Only check the first two dimensions, as we ignore all others.
+  assert np.all(0 <= indices) and np.all(indices < min(shape[:2]))
+
+  for axis in (0, 1):
+    arr = np.delete(arr, indices, axis=axis)
+    shape[axis] -= len(indices)
+
+  assert np.array_equal(arr.shape, shape)
+  return arr
+
+def remove_variants(mutrel, vidxs):
+  # Make set for efficient `in`.
+  vidxs = set(vidxs)
+  return Mutrel(
+    vids = [vid for vidx, vid in enumerate(mutrel.vids) if vidx not in vidxs],
+    rels = _remove_rowcol(mutrel.rels, vidxs),
+  )

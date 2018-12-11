@@ -199,6 +199,5 @@ def extract_patient_samples(variants, sampnames):
   return (variants, sampnames)
 
 def debug(*args, **kwargs):
-  if debug.DEBUG:
+  if hasattr(debug, 'DEBUG') and debug.DEBUG:
     print(*args, **kwargs)
-debug.DEBUG = False
