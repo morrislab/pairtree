@@ -1,4 +1,4 @@
-from common import Models, _EPSILON, _LOGEPSILON
+from common import Models, Variant, _EPSILON, _LOGEPSILON
 import scipy.stats
 import scipy.special
 import scipy.integrate
@@ -153,9 +153,6 @@ def _calc_garbage_dumb(V1, V2):
 
   return evidence
 
-calc_garbage = _calc_garbage_smart
-#calc_garbage = _calc_garbage_dumb
-
 def calc_lh_mc_1D(V1, V2):
   S = len(V1.total_reads) # S
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
@@ -279,3 +276,73 @@ def calc_lh_quad(V1, V2):
         logP = np.log(P) + logmaxP + logdenorm + np.log(2) + util.log_N_choose_K(V2.total_reads[sidx], V2.var_reads[sidx]) - np.log(V2.omega_v[sidx])
       logprob_models[sidx,modelidx] = logP
   return logprob_models
+
+def _find_bad_samples(V1, V2):
+  read_threshold = 3
+  omega_threshold = 1e-5
+
+  # In cases where we have zero variant reads for both variants, the garbage
+  # models ends up taking considerable posterior mass, but we have no information
+  # to judge whether the pair should be garbage. The contribution from lots of
+  # samples with zero variant reads on both variants can end up overwhelming
+  # informative samples with non-zero variant reads, such that the pair across
+  # samples jointly is deemed garbage. This is undesireable behaviour, clearly,
+  # and so ignore such (0, 0) cases by zeroing out their evidence. This
+  # effectively states that we have a uniform posterior over the relations of
+  # those mutations in that sample, which is the sensible thing to do.
+  #
+  # See this discussion on Slack for more details:
+  # https://morrislab.slack.com/archives/CCE5HNVSP/p1540392641000100
+  #
+  # This also seems to apply to cases where both variants have only a couple
+  # reads, meaning most of their 2D binomial mass is close to the origin. To
+  # reudce the garbage model's tendency to win in these cases, don't allow them
+  # to contribute to the posterior, either.
+  too_few_var_reads = np.logical_and(V1.var_reads < read_threshold, V2.var_reads < read_threshold)
+
+  # If omega_v is below threhsold, we conclude that all variant reads are
+  # noise, and that this variant thus confers no evidence concerning its
+  # relationship with other variants within the sample in question. In such
+  # instances, set uniform evidence for this relationship.
+  uninformative_omega = np.logical_or(V1.omega_v < omega_threshold, V2.omega_v < omega_threshold)
+
+  bad_samples = np.logical_and(too_few_var_reads, uninformative_omega)
+  return bad_samples
+
+def _filter_samples(V, samp_filter):
+  return Variant(
+    id = V.id,
+    ref_reads = V.ref_reads[samp_filter],
+    var_reads = V.var_reads[samp_filter],
+    total_reads = V.total_reads[samp_filter],
+    vaf = V.vaf[samp_filter],
+    omega_v = V.omega_v[samp_filter],
+  )
+
+calc_garbage = _calc_garbage_smart
+#calc_garbage = _calc_garbage_dumb
+
+def calc_lh(V1, V2, _calc_lh=None):
+  if _calc_lh is None:
+    _calc_lh = calc_lh_quad
+
+  S = len(V1.omega_v)
+  evidence_per_sample = np.zeros((S, len(Models._all)))
+
+  if V1.id == V2.id:
+    # If they're the same variant, they should cocluster with certainty.
+    evidence_per_sample += -np.inf
+    evidence_per_sample[:,Models.cocluster] = 0
+    evidence = evidence_per_sample[0]
+    return (evidence, evidence_per_sample)
+
+  bad_samples = _find_bad_samples(V1, V2)
+  good_samples = np.logical_not(bad_samples)
+  V1 = _filter_samples(V1, good_samples)
+  V2 = _filter_samples(V2, good_samples)
+
+  evidence_per_sample[good_samples] = _calc_lh(V1, V2)
+  evidence_per_sample[good_samples,Models.garbage] = calc_garbage(V1, V2)
+
+  evidence = np.sum(evidence_per_sample, axis=0)
+  return (evidence, evidence_per_sample)

@@ -225,48 +225,13 @@ def add_variants(vids_to_add, variants, mutrel_posterior, mutrel_evidence, prior
     parallel = parallel,
   )
 
-# In cases where we have zero variant reads for both variants, the garbage
-# models ends up taking considerable posterior mass, but we have no information
-# to judge whether the pair should be garbage. The contribution from lots of
-# samples with zero variant reads on both variants can end up overwhelming
-# informative samples with non-zero variant reads, such that the pair across
-# samples jointly is deemed garbage. This is undesireable behaviour, clearly,
-# and so ignore such (0, 0) cases by zeroing out their evidence. This
-# effectively states that we have a uniform posterior over the relations of
-# those mutations in that sample, which is the sensible thing to do.
-#
-# See this discussion on Slack for more details:
-# https://morrislab.slack.com/archives/CCE5HNVSP/p1540392641000100
-#
-# This also seems to apply to cases where both variants have only a couple
-# reads, meaning most of their 2D binomial mass is close to the origin. To
-# reudce the garbage model's tendency to win in these cases, don't allow them
-# to contribute to the posterior, either.
-def _fix_too_few_var_read_samples(V1, V2, evidence, threshold=3):
-  too_few_reads = np.logical_and(V1.var_reads < threshold, V2.var_reads < threshold)
-  evidence[too_few_reads,:] = 0
-
-_DEFAULT_CALC_LH = lh.calc_lh_quad
-def calc_lh(V1, V2, _calc_lh=_DEFAULT_CALC_LH):
-  if V1.id == V2.id:
-    # If they're the same variant, they should cocluster with certainty.
-    evidence = -np.inf * np.ones(len(Models._all))
-    evidence[Models.cocluster] = 0
-    return (evidence, evidence)
-
-  evidence_per_sample = _calc_lh(V1, V2) # SxM
-  evidence_per_sample[:,Models.garbage] = lh.calc_garbage(V1, V2)
-  _fix_too_few_var_read_samples(V1, V2, evidence_per_sample)
-  evidence = np.sum(evidence_per_sample, axis=0)
-  return (evidence, evidence_per_sample)
-
-def _calc_lh_and_posterior(V1, V2, logprior, _calc_lh=_DEFAULT_CALC_LH):
-  evidence, evidence_per_sample = calc_lh(V1, V2, _calc_lh)
+def _calc_lh_and_posterior(V1, V2, logprior):
+  evidence, evidence_per_sample = lh.calc_lh(V1, V2)
   posterior = _calc_posterior(evidence, logprior)
   return (evidence, posterior)
 
-def _examine(V1, V2, variants, _calc_lh=_DEFAULT_CALC_LH):
-  E, Es = calc_lh(*[common.convert_variant_dict_to_tuple(V) for V in (variants[V1], variants[V2])], _calc_lh=_calc_lh)
+def _examine(V1, V2, variants, _calc_lh=None):
+  E, Es = lh.calc_lh(*[common.convert_variant_dict_to_tuple(V) for V in (variants[V1], variants[V2])], _calc_lh)
   Es -= np.max(Es, axis=1)[:,None]
   sep = np.nan * np.ones(len(variants[V1]['var_reads']))[:,None]
   blah = np.hstack((
