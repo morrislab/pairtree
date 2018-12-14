@@ -240,25 +240,46 @@ def cluster_and_discard_garbage(variants, mutrel_posterior, mutrel_evidence, pri
   return (supervars, clust_posterior, clust_evidence, clusters, garbage)
 
 def _make_supervar(name, variants):
-  cluster_total_reads = np.array([V['total_reads'] for V in variants])
-  cluster_var_reads = np.array([V['var_reads'] for V in variants])
-  # Correct for sex variants.
-  omega_v = np.array([V['omega_v'] for V in variants])
-  M, S = omega_v.shape
+  N = np.array([var['total_reads'] for var in variants])
+  M, S = N.shape
+  V = np.array([var['var_reads'] for var in variants])
+  omega_v = np.array([var['omega_v'] for var in variants])
 
-  cluster_var_reads = np.round(cluster_var_reads / (2*omega_v))
-  # Don't allow var read count to exceed total read count, which can happen
-  # when `omega_v` is small.
-  cluster_var_reads = np.minimum(cluster_var_reads, cluster_total_reads)
+  # In creating a supervariant, we must rescale either `V` or `N` (the variant
+  # or total read counts, respectively), as we're fixing the supervariant's
+  # `omega_v`. We want the ratio `V / N*omega_v` to remain constant, as this
+  # represents the "fraction of informative reads that are variant reads". That
+  # is, `N * omega_v` indicates the number of reads that *could* be variant,
+  # given what we know of the locus' copy-number state.
+  #
+  # As we will fix `omega_v` at 0.5 for the rescaled variant, and we want `V /
+  # N*omega_v` to remain constant, we can either change `V` or `N` to maintain
+  # the relationship `V / N*omega_v = V_hat / N_hat*omega_v`. We can solve this
+  # equation two ways, depending on whether we modify `V` or `N`:
+  #
+  # 1. V_hat = V / 2*omega_v
+  # 2. N_hat = 2*N*omega_v
+  #
+  # The advantage to approach 2 is that, when `omega_v` is small, it preserves
+  # the binomial variance. We have `var = np(1 - p) =~ np = E[X]` when `p` is
+  # small, meaning the variance scales with the mean when `p` is small. To
+  # maintain the variance, we should try to maintain `np`, and so since we're
+  # making `p` bigger, we should make `N` smaller, rather than changing `V`.
+  #
+  # Also, this means we can avoid any weird hackery when `omega_v = 0`, since
+  # we don't have to add edge case checks to avoid division by zero.
+  N_hat = 2*N*omega_v
+  V_hat = np.minimum(V, N_hat)
+  omega_v_hat = 0.5 * np.ones(S)
 
   svar = {
     'id': name,
     'name': name,
     'chrom': None,
     'pos': None,
-    'omega_v': 0.5 * np.ones(S),
-    'var_reads': np.sum(cluster_var_reads, axis=0, dtype=np.int),
-    'total_reads': np.sum(cluster_total_reads, axis=0, dtype=np.int),
+    'omega_v': omega_v_hat,
+    'var_reads': np.round(np.sum(V_hat, axis=0)).astype(np.int),
+    'total_reads': np.round(np.sum(N_hat, axis=0)).astype(np.int),
   }
   svar['ref_reads'] = svar['total_reads'] - svar['var_reads']
   svar['vaf'] = svar['var_reads'] / svar['total_reads']

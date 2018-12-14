@@ -279,7 +279,7 @@ def calc_lh_quad(V1, V2):
 
 def _find_bad_samples(V1, V2):
   read_threshold = 3
-  omega_threshold = 1e-5
+  omega_threshold = 1e-3
 
   # In cases where we have zero variant reads for both variants, the garbage
   # models ends up taking considerable posterior mass, but we have no information
