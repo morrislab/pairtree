@@ -8,31 +8,29 @@ debug = common.debug
 
 MIN_FLOAT = np.finfo(np.float).min
 
-def calc_llh(data_mutrel, supervars, superclusters, cluster_adj, fit_phis=True):
+def calc_llh_phi(data_mutrel, supervars, superclusters, cluster_adj, fit_phis=True):
+  phi, eta = phi_fitter.fit_phis(cluster_adj, superclusters, supervars, iterations=100, parallel=0)
+  K, S = phi.shape
+  alpha, beta = calc_beta_params(supervars)
+  assert alpha.shape == beta.shape == (K-1, S)
+  assert np.allclose(1, phi[0])
+  phi_llh = scipy.stats.beta.logpdf(phi[1:,:], alpha, beta)
+  phi_llh = np.sum(phi_llh)
+
+  # I had NaNs creep into my LLH when my alpha and beta params were invalid
+  # (i.e., when I had elements of beta that were <= 0).
+  assert not np.isnan(phi_llh)
+  # Prevent LLH of -inf.
+  phi_llh = np.maximum(phi_llh, MIN_FLOAT)
+  return phi_llh
+
+def calc_llh_mutrel(data_mutrel, supervars, superclusters, cluster_adj):
   tree_mutrel = common.make_mutrel_tensor_from_cluster_adj(cluster_adj, superclusters)
   mutrel_fit = 1 - np.abs(data_mutrel.rels - tree_mutrel.rels)
   # Prevent log of zero.
-  mutrel_fit = np.maximum(common._EPSILON, mutrel_fit)
-  mutrel_fit = np.sum(np.log(mutrel_fit))
-
-  if fit_phis:
-    phi, eta = phi_fitter.fit_phis(cluster_adj, superclusters, supervars, iterations=100, parallel=0)
-    K, S = phi.shape
-    alpha, beta = calc_beta_params(supervars)
-    assert alpha.shape == beta.shape == (K-1, S)
-    assert np.allclose(1, phi[0])
-    phi_fit = scipy.stats.beta.logpdf(phi[1:,:], alpha, beta)
-    phi_fit = np.sum(phi_fit)
-  else:
-    phi_fit = 0
-
-  llh = mutrel_fit + phi_fit
-  # I had NaNs creep into my LLH when my alpha and beta params were invalid
-  # (i.e., when I had elements of beta that were <= 0).
-  assert not np.isnan(llh)
-  # Prevent LLH of -inf.
-  llh = np.maximum(llh, MIN_FLOAT)
-  return llh
+  mutrel_fit = np.maximum(common._EPSILON, mutrel_llh)
+  mutrel_llh = np.sum(np.log(mutrel_fit))
+  return mutrel_llh
 
 def init_cluster_adj_linear(K):
   cluster_adj = np.eye(K)
@@ -110,6 +108,9 @@ def calc_beta_params(supervars):
   svids = common.extract_vids(supervars)
   V = np.array([supervars[svid]['var_reads'] for svid in svids])
   R = np.array([supervars[svid]['ref_reads'] for svid in svids])
+  omega_v = np.array([supervars[svid]['omega_v'] for svid in svids])
+  assert np.all(omega_v == 0.5)
+
   # Since these are supervars, we can just take 2*V and disregard omega_v, since
   # supervariants are always diploid (i.e., omega_v = 0.5).
   alpha = 2*V + 1
@@ -135,14 +136,14 @@ def run_chain(data_mutrel, supervars, superclusters, nsamples, progress_queue=No
   init_choices = (init_cluster_adj_branching,)
   init_cluster_adj = init_choices[np.random.choice(len(init_choices))]
   cluster_adj = [init_cluster_adj(K)]
-  llh = [calc_llh(data_mutrel, supervars, superclusters, cluster_adj[0])]
+  llh = [calc_llh_phi(data_mutrel, supervars, superclusters, cluster_adj[0])]
 
   for I in range(1, nsamples):
     if progress_queue is not None:
       progress_queue.put(I)
     old_llh, old_adj = llh[-1], cluster_adj[-1]
     new_adj = permute_adj(old_adj)
-    new_llh = calc_llh(data_mutrel, supervars, superclusters, new_adj)
+    new_llh = calc_llh_phi(data_mutrel, supervars, superclusters, new_adj)
     if new_llh - old_llh >= np.log(np.random.uniform()):
       # Accept.
       cluster_adj.append(new_adj)
