@@ -268,6 +268,12 @@ def _make_supervar(name, variants):
   #
   # Also, this means we can avoid any weird hackery when `omega_v = 0`, since
   # we don't have to add edge case checks to avoid division by zero.
+  #
+  # Another argument: since we don't have a proper sequencing noise model, a
+  # small number of variant reads can be assumed to be noise regardless of what
+  # `omega_v` is. If `omega_v` is small and we observe a couple variant reads,
+  # we can assume those are solely noise. So, we shouldn't rescale `V` to be
+  # really large, which is what we formerly did under solution 1.
   N_hat = 2*N*omega_v
   V_hat = np.minimum(V, N_hat)
   omega_v_hat = 0.5 * np.ones(S)
