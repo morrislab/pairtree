@@ -196,7 +196,7 @@ def merge_variants(to_merge, evidence, prior):
   )
   return (posterior, evidence)
 
-def add_variants(vids_to_add, variants, mutrel_posterior, mutrel_evidence, prior, pbar, parallel):
+def add_variants(vids_to_add, variants, mutrel_posterior, mutrel_evidence, prior, parallel):
   for vid in vids_to_add:
     assert vid in variants
 
@@ -221,7 +221,7 @@ def add_variants(vids_to_add, variants, mutrel_posterior, mutrel_evidence, prior
     prior,
     new_posterior,
     new_evidence,
-    pbar = pbar,
+    pbar = None,
     parallel = parallel,
   )
 

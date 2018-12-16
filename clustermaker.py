@@ -83,7 +83,7 @@ def _merge_until_no_pairwise_mle_remain(mutrel_posterior):
   assert A < B
   return [(A, B)]
 
-def _merge_clusters(to_merge, clusters, mutrel_evidence, prior):
+def _merge_clusters(to_merge, clusters, variants, mutrel_posterior, mutrel_evidence, prior, parallel):
   debug('to_merge', [[mutrel_evidence.vids[I] for I in C] for C in to_merge])
   # 1. Update the clustering
   to_remove = []
@@ -95,8 +95,25 @@ def _merge_clusters(to_merge, clusters, mutrel_evidence, prior):
   for C in sorted(to_remove, reverse=True):
     del clusters[C]
 
+  svids = []
+  vids = mutrel_posterior.vids
+  A = len(to_merge) # A: number of new clusters
+  for new_cluster in clusters[-A:]:
+    svid = 'S%s' % len(variants)
+    variants[svid] = _make_supervar(svid, [variants[V] for V in new_cluster])
+    svids.append(svid)
+  mutrel_posterior = pairwise.remove_variants(mutrel_posterior, to_remove)
+  mutrel_evidence = pairwise.remove_variants(mutrel_evidence, to_remove)
+
   # 2. Update the mutrels
-  mutrel_posterior, mutrel_evidence = pairwise.merge_variants(to_merge, mutrel_evidence, prior)
+  mutrel_posterior, mutrel_evidence = pairwise.add_variants(
+    svids,
+    variants,
+    mutrel_posterior,
+    mutrel_evidence,
+    prior,
+    parallel
+  )
 
   M = len(clusters)
   assert mutrel_posterior.rels.shape == mutrel_evidence.rels.shape == (M, M, len(Models._all))
@@ -138,7 +155,6 @@ def _sort_clusters_by_vaf(clusters, variants, mutrel_posterior, mutrel_evidence)
     vids = svids,
     rels = _reorder_matrix(mutrel_evidence.rels, order),
   )
-
   return (clusters, supervars, mutrel_posterior, mutrel_evidence)
 
 def _discard_garbage(clusters, mutrel_posterior, mutrel_evidence):
@@ -191,7 +207,7 @@ def _plot(mutrel_posterior, clusters, variants, garbage):
 _plot.idx = 1
 _plot.prefix = None
 
-def _iterate_clustering(selector, desc, clusters, clust_posterior, clust_evidence, prior):
+def _iterate_clustering(selector, desc, variants, clusters, clust_posterior, clust_evidence, prior, parallel):
   # Do initial round of garbage rejection.
   clusters, garbage, clust_posterior, clust_evidence = _discard_garbage(clusters, clust_posterior, clust_evidence)
 
@@ -202,7 +218,15 @@ def _iterate_clustering(selector, desc, clusters, clust_posterior, clust_evidenc
       to_merge = selector(clust_posterior)
       if len(to_merge) == 0:
         break
-      clusters, clust_posterior, clust_evidence = _merge_clusters(to_merge, clusters, clust_evidence, prior)
+      clusters, clust_posterior, clust_evidence = _merge_clusters(
+        to_merge,
+        clusters,
+        variants,
+        clust_posterior,
+        clust_evidence,
+        prior,
+        parallel
+      )
 
       #_plot(clust_posterior, clusters, variants, garbage)
       pbar.update()
@@ -213,33 +237,47 @@ def _iterate_clustering(selector, desc, clusters, clust_posterior, clust_evidenc
 
 def cluster_and_discard_garbage(variants, mutrel_posterior, mutrel_evidence, prior, parallel):
   assert np.all(mutrel_posterior.vids == mutrel_evidence.vids)
+
   # Copy mutrels so we don't modify them.
   clust_posterior = Mutrel(vids=list(mutrel_posterior.vids), rels=np.copy(mutrel_posterior.rels))
   clust_evidence = Mutrel(vids=list(mutrel_evidence.vids), rels=np.copy(mutrel_evidence.rels))
 
+  # Copy variants so the caller doesn't see our intermediate supervars.
+  variants = dict(variants)
   # Each variant begins in its own cluster.
   clusters = [[vid] for vid in clust_posterior.vids]
   garbage = []
+
   for selector, desc in ((_find_identical_mle, 'Merging identical relations'), (_merge_until_no_pairwise_mle_remain, 'Merging similar relations')):
     clusters, G, clust_posterior, clust_evidence = _iterate_clustering(
       selector,
       desc,
+      variants,
       clusters,
       clust_posterior,
       clust_evidence,
-      prior
+      prior,
+      parallel
     )
     garbage += G
     debug('selector=%s V=%s C=%s' % (selector.__name__, len(variants), len(clusters)))
 
+  # Note that single-variant clusters have, to this point, not received an
+  # associated supervariant. However, we want every cluster to be represented
+  # by a supervariant, even if it has only a single member, as this ensures
+  # that every supervariant has a fixed `omega_v`, which makes fitting phis
+  # easier. Replacing single variants by supervariants will, however, slightly
+  # change the evidence, given the shift in `omega_v`. As such, we must
+  # recompute the evidence (and posterior) after getting the new supervariants.
+  # Evidence between clusters with >1 member (and which have thus already been
+  # replaced by a supervariant) shouldn't change, but evidence between
+  # single-variant clusters and other supervariants will likely shift slighty.
   clusters, supervars, clust_posterior, clust_evidence = _sort_clusters_by_vaf(clusters, variants, clust_posterior, clust_evidence)
-  # Note that the posterior and evidence for clusters *won't* be the same as if
-  # we had computed them on the supervariants, since the evidence was just
-  # computed by summing cluster members' evidences. Thus, recompute those now.
   clust_posterior, clust_evidence = pairwise.calc_posterior(supervars, prior, 'cluster', parallel)
   return (supervars, clust_posterior, clust_evidence, clusters, garbage)
 
 def _make_supervar(name, variants):
+  assert len(variants) > 0
   N = np.array([var['total_reads'] for var in variants])
   M, S = N.shape
   V = np.array([var['var_reads'] for var in variants])
