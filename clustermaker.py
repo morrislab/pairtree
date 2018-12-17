@@ -67,7 +67,9 @@ def _merge_until_no_pairwise_mle_remain(mutrel_posterior):
   row_dist = _calc_row_dist(mutrel_posterior.rels)
   row_dist[np.tril_indices(len(row_dist))] = np.inf
 
-  threshold = 1 / len(Models._all)
+  # If `threshold < 0.5`, should also ensure that it's the highest-probability
+  # relation.
+  threshold = 0.8
   # Only want to merge pairs whose cluster probability exceeds threshold.
   noncoclustered = mutrel_posterior.rels[:,:,Models.cocluster] < threshold
   row_dist[noncoclustered] = np.inf
@@ -76,7 +78,7 @@ def _merge_until_no_pairwise_mle_remain(mutrel_posterior):
 
   A, B = np.unravel_index(np.argmin(row_dist, axis=None), row_dist.shape)
   #debug('row_dist', row_dist)
-  #debug('A =', A, 'B =', B, 'dist =', row_dist[A,B], 'post =', mutrel_posterior.rels[A,B])
+  debug('A=', A, ' B=', B, ' dist=', row_dist[A,B], ' post=', mutrel_posterior.rels[A,B], sep='')
   #debug(np.vstack((mutrel_posterior.rels[A,:,Models.cocluster], mutrel_posterior.rels[B,:,Models.cocluster])))
   #debug(mutrel_posterior.rels[A] - mutrel_posterior.rels[B])
 
@@ -170,7 +172,7 @@ def _discard_garbage(clusters, mutrel_posterior, mutrel_evidence):
       break
     num_garbage = np.sum(garbage_pairs, axis=1)
     most_garbage = np.argmax(num_garbage)
-    debug('most_garbage', mutrel_posterior.vids[most_garbage], clusters[most_garbage])
+    debug('most_garbage=', mutrel_posterior.vids[most_garbage], 'cluster=', clusters[most_garbage], 'garb_post=', max(mutrel_posterior.rels[most_garbage,:,Models.garbage]))
 
     garbage += clusters[most_garbage]
     del clusters[most_garbage]
