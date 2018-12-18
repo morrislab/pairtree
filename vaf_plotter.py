@@ -63,7 +63,15 @@ def make_phi_pseudovars(phi):
   } for cidx, row in enumerate(phi[1:])]
   return V
 
-def print_vaftable_header(sampnames, outf):
+def _make_checkbox(cls, label, active=True):
+  return '<label class="btn btn-primary %s toggle_%s"><input type="checkbox" autocomplete="off" %s> %s</label>' % (
+    'active' if active else '',
+    cls,
+    'checked' if active else '',
+    label,
+  )
+
+def print_vaftable_header(sampnames, show_cluster_members, outf):
   container_id = 'vafmatrix_' + make_random_id()
   container = f'#{container_id}'
 
@@ -75,10 +83,10 @@ def print_vaftable_header(sampnames, outf):
   print(f'<div id="{container_id}">', file=outf)
   print('<p><input type="text" class="filter" placeholder="s0,s1,..."></p>', file=outf)
   print('<div class="vafmatrix_toggles btn-group" data-toggle="buttons">', file=outf)
-  print('<label class="btn btn-primary active toggle_phi"><input type="checkbox" autocomplete="off" checked> &phi;</label>', file=outf)
-  print('<label class="btn btn-primary active toggle_supervars"><input type="checkbox" autocomplete="off" checked> Supervariants</label>', file=outf)
-  print('<label class="btn btn-primary active toggle_cluster_members"><input type="checkbox" autocomplete="off" checked> Cluster members</label>', file=outf)
-  print('<label class="btn btn-primary active toggle_garbage"><input type="checkbox" autocomplete="off" checked> Garbage</label>', file=outf)
+  print(_make_checkbox('phi', '&phi;'), file=outf)
+  print(_make_checkbox('supervar', 'Supervariants;'), file=outf)
+  print(_make_checkbox('cluster_member', 'Cluster members', active=show_cluster_members), file=outf)
+  print(_make_checkbox('garbage', 'Garbage'), file=outf)
   print('</div>', file=outf)
   print('<br><br><br>', file=outf)
   print('<table class="matrix"><thead><tr>', file=outf)
@@ -87,7 +95,7 @@ def print_vaftable_header(sampnames, outf):
   print(''.join(['<th>%s</th>' % H for H in header]), file=outf)
   print('</tr></thead><tbody>', file=outf)
 
-def print_vaftable_row(V, bgcolour, should_correct_vaf, outf):
+def print_vaftable_row(V, cls, bgcolour, should_correct_vaf, outf, visible=True):
   # Duplicate variant so we don't modify it.
   V = dict(V)
 
@@ -96,14 +104,17 @@ def print_vaftable_row(V, bgcolour, should_correct_vaf, outf):
   else:
     vaf = V['vaf']
 
-  V['chrom'] = V['pos'] = None
-  # Increment cluster number to correct off-by-one error relative to tree nodes.
-  V['cluster'] += 1
+  #V['chrom'] = V['pos'] = None
+  if V['cluster'] is not None:
+    # Increment cluster number to correct off-by-one error relative to tree nodes.
+    V['cluster'] += 1
 
   td = ['<td class="%s">%s</td>' % (K, V[K] if K in V and V[K] is not None else '&mdash;') for K in ('gene', 'id', 'chrom', 'pos', 'cluster')]
   td += ['<td style="background-color: %s"><span>%s</span></td>' % (make_colour(v), make_vaf_label(v)) for v in vaf]
-  print('<tr style="background-color: %s">%s</tr>' % (
+  print('<tr class="%s" style="background-color: %s%s">%s</tr>' % (
+    cls,
     bgcolour,
+    '; display: none' if not visible else '',
     ''.join(td)
   ), file=outf)
 
@@ -117,21 +128,22 @@ def print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, shou
   if phi is not None:
     phi_pseudovars = make_phi_pseudovars(phi)
 
-  print_vaftable_header(sampnames, outf)
+  M = sum([len(C) for C in clustered_vars])
+  show_cluster_members = M < 200
+  print_vaftable_header(sampnames, show_cluster_members, outf=outf)
 
   for cidx, cluster in enumerate(clustered_vars):
     assert len(cluster) > 0
     garbage = parted_garbage_vars[cidx] if cidx in parted_garbage_vars else []
 
-    cluster_rows = []
     if phi is not None:
-      cluster_rows.append(phi_pseudovars[cidx])
+      print_vaftable_row(phi_pseudovars[cidx], 'phi', cluster_colours[cidx], should_correct_vaf, outf)
     if supervars is not None:
-      cluster_rows.append(supervars[cidx])
-    cluster_rows += cluster
-    cluster_rows += garbage
-    for V in cluster_rows:
-      print_vaftable_row(V, cluster_colours[V['cluster']], should_correct_vaf, outf)
+      print_vaftable_row(supervars[cidx], 'supervar', cluster_colours[cidx], should_correct_vaf, outf)
+    for V in cluster:
+      print_vaftable_row(V, 'cluster_member', cluster_colours[cidx], should_correct_vaf, outf, visible=show_cluster_members)
+    for V in garbage:
+      print_vaftable_row(V, 'garbage', cluster_colours[None], should_correct_vaf, outf)
 
   print_vaftable_footer(outf)
 

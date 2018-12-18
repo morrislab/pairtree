@@ -93,7 +93,6 @@ def main():
   results = resultserializer.load(args.results_fn)
   if 'clusters' not in results:
     return
-  print('C=%s' % len(results['clusters']))
 
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.params_fn)

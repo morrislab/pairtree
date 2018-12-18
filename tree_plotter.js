@@ -500,27 +500,11 @@ function VafMatrix(container) {
 }
 
 VafMatrix.prototype._configure_toggles = function(container) {
-  var togglers = {
-    phi: function() {
-      return $(this).find('td.id').text().startsWith('P');
-    },
-    supervars: function() {
-      return $(this).find('td.id').text().startsWith('S');
-    },
-    cluster_members: function() {
-      return !togglers.garbage.call(this) && $(this).find('td.id').text().startsWith('s');
-    },
-    garbage: function() {
-      var cluster = parseInt($(this).find('td.cluster').text(), 10);
-      return isNaN(cluster);
-    }
-  };
-
   $(container).find('.vafmatrix_toggles .btn').change(function() {
     var E = $(this);
     var active = E.hasClass('active');
     var toggle_type = E.attr('class').split(/\s+/).filter(function(cls) { return cls.startsWith('toggle_'); })[0].replace(/^toggle_/, '');
-    var targets = $(container).find('.matrix tr').filter(togglers[toggle_type]);
+    var targets = $(container).find('.matrix tr').filter('.' + toggle_type);
 
     if(active) {
       E.removeClass('active');
