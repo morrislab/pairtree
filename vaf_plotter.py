@@ -136,6 +136,10 @@ def print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, shou
     assert len(cluster) > 0
     garbage = parted_garbage_vars[cidx] if cidx in parted_garbage_vars else []
 
+    K = lambda V: int(V['id'][1:])
+    cluster = sorted(cluster, key=K)
+    garbage = sorted(garbage, key=K)
+
     if phi is not None:
       print_vaftable_row(phi_pseudovars[cidx], 'phi', cluster_colours[cidx], should_correct_vaf, outf)
     if supervars is not None:
