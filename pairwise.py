@@ -234,7 +234,7 @@ def _examine(V1, V2, variants, _calc_lh=None):
   E, Es = lh.calc_lh(*[common.convert_variant_dict_to_tuple(V) for V in (variants[V1], variants[V2])], _calc_lh)
   Es -= np.max(Es, axis=1)[:,None]
   sep = np.nan * np.ones(len(variants[V1]['var_reads']))[:,None]
-  blah = np.hstack((
+  persamp = np.hstack((
     variants[V1]['var_reads'][:,None],
     variants[V1]['total_reads'][:,None],
     variants[V1]['vaf'][:,None],
@@ -249,10 +249,11 @@ def _examine(V1, V2, variants, _calc_lh=None):
     sep,
     Es,
   ))
+
   prior = {'garbage': 0.001}
   post1 = _calc_posterior(E, _complete_prior(None))
   post2 = _calc_posterior(E, _complete_prior({'garbage': 0.001}))
-  return blah, post1, post2
+  return (persamp, E, post1, post2)
 
 def _remove_rowcol(arr, indices):
   '''Remove rows and columns at `indices`.'''
