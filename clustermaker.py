@@ -85,7 +85,7 @@ def _merge_until_no_pairwise_mle_remain(mutrel_posterior):
   assert A < B
   return [(A, B)]
 
-def _merge_clusters(to_merge, clusters, variants, mutrel_posterior, mutrel_evidence, prior, parallel):
+def _merge_clusters(to_merge, clusters, variants, mutrel_posterior, mutrel_evidence, prior, pbar, parallel):
   debug('to_merge', [[mutrel_evidence.vids[I] for I in C] for C in to_merge])
   # 1. Update the clustering
   to_remove = []
@@ -114,6 +114,7 @@ def _merge_clusters(to_merge, clusters, variants, mutrel_posterior, mutrel_evide
     mutrel_posterior,
     mutrel_evidence,
     prior,
+    pbar,
     parallel
   )
 
@@ -216,6 +217,7 @@ def _iterate_clustering(selector, desc, variants, clusters, clust_posterior, clu
   with progressbar(desc=desc, unit='step', dynamic_ncols=True, miniters=1) as pbar:
     while True:
       #_plot(clust_posterior, clusters, variants, garbage)
+      pbar.set_postfix(clusters=len(clusters))
       pbar.update()
       to_merge = selector(clust_posterior)
       if len(to_merge) == 0:
@@ -227,6 +229,7 @@ def _iterate_clustering(selector, desc, variants, clusters, clust_posterior, clu
         clust_posterior,
         clust_evidence,
         prior,
+        pbar,
         parallel
       )
 
