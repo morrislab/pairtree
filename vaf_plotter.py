@@ -84,7 +84,7 @@ def print_vaftable_header(sampnames, show_cluster_members, outf):
   print('<p><input type="text" class="filter" placeholder="s0,s1,..."></p>', file=outf)
   print('<div class="vafmatrix_toggles btn-group" data-toggle="buttons">', file=outf)
   print(_make_checkbox('phi', '&phi;'), file=outf)
-  print(_make_checkbox('supervar', 'Supervariants;'), file=outf)
+  print(_make_checkbox('supervar', 'Supervariants'), file=outf)
   print(_make_checkbox('cluster_member', 'Cluster members', active=show_cluster_members), file=outf)
   print(_make_checkbox('garbage', 'Garbage'), file=outf)
   print('</div>', file=outf)
