@@ -2,28 +2,29 @@ import sys
 import os
 import argparse
 import json
+import numpy as np
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 import inputparser
 import clustermaker
 
 def write_ssms(variants, outfn):
+  _stringify = lambda A: ','.join([str(V) for V in A])
   mu_r = 0.999
   cols = ('id', 'gene', 'a', 'd', 'mu_r', 'mu_v')
 
   with open(outfn, 'w') as outf:
     print(*cols, sep='\t', file=outf)
     for V in variants.values():
-      assert len(set(V['omega_v'])) == 1
-      omega_v = V['omega_v'][0]
+      #assert len(set(V['omega_v'])) == 1
 
       variant = {
         'id': 's%s' % int(V['id'][1:]),
         'gene': V['name'],
-        'a':  ','.join([str(int(R)) for R in V['ref_reads']]),
-        'd': ','.join([str(int(T)) for T in V['total_reads']]),
+        'a': _stringify(V['ref_reads']),
+        'd': _stringify(V['total_reads']),
         'mu_r': mu_r,
-        'mu_v': 1 - omega_v,
+        'mu_v': np.mean(1 - V['omega_v']),
       }
       print(*[variant[K] for K in cols], sep='\t', file=outf)
 
