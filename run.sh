@@ -13,39 +13,14 @@ PARALLEL=40
 TREES_PER_CHAIN=1000
 PHI_ITERATIONS=10000
 
-function run_sims {
-  INDIR=$PROTDIR/scratch/inputs/sims
-  OUTDIR=$RESULTSDIR/sims
-
-  for ssmfn in $INDIR/*.ssm; do
-    runid=$(basename $ssmfn | cut -d. -f1)
-    (
-      echo "#!/bin/bash"
-      echo "#SBATCH --nodes=1"
-      echo "#SBATCH --ntasks=$PARALLEL"
-      echo "#SBATCH --time=23:59:00"
-      echo "#SBATCH --job-name $runid"
-      echo "#SBATCH --output=$JOBDIR/slurm_${runid}_%j.txt"
-      echo "#SBATCH --mail-type=NONE"
-
-      echo "cd $OUTDIR && " \
-        "python3 $PROTDIR/basic.py" \
-        "--parallel $PARALLEL" \
-          "$runid" \
-          "$INDIR/$runid.ssm" \
-          ">$runid.stdout" \
-          "2>$runid.stderr"
-    ) #> $JOBDIR/job.sh
-    #sbatch $JOBDIR/job.sh
-    #rm $JOBDIR/job.sh
-  done
-}
-
 function run_steph {
   mkdir -p $STEPH_OUTDIR
   #rm -f $STEPH_OUTDIR/SJ*.{html,json,csv,stdout}
 
   for ssmfn in $STEPH_INDIR/*.ssm; do
+    if (echo $ssmfn | grep -e SJBALL022610 -e SJETV010 > /dev/null); then
+      continue
+    fi
     runid=$(basename $ssmfn | cut -d. -f1)
     jobname="steph_pairtree_${runid}"
     jobfn=$(mktemp)
@@ -59,7 +34,8 @@ function run_steph {
       echo "#SBATCH --mail-type=NONE"
 
       echo "cd $STEPH_OUTDIR && " \
-        "python3 $PROTDIR/basic.py" \
+        "OMP_NUM_THREADS=1 python3 $PROTDIR/basic.py" \
+        "--verbose" \
         "--seed 1" \
         "--parallel $PARALLEL" \
         "--tree-chains $PARALLEL" \
@@ -92,7 +68,7 @@ function plot_steph {
         ">>$runid.stdout" \
         "2>>$runid.stderr"
     )
-  done | parallel -j$PARALLEL
+  done #| parallel -j$PARALLEL
 }
 
 function write_indices {
@@ -122,9 +98,9 @@ function write_indices {
 }
 
 function main {
-  run_steph
+  #run_steph
   #plot_steph
-  #write_indices
+  write_indices
   #run_sims
 }
 
