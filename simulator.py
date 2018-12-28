@@ -1,31 +1,7 @@
 import numpy as np
 import scipy.stats
 from collections import defaultdict, OrderedDict
-
-def make_ancestral_from_adj(adj):
-  K = len(adj)
-  Z = np.zeros((K,K))
-  adj = np.copy(adj)
-  np.fill_diagonal(adj, 1)
-
-  def _find_desc(I, vec):
-    # Base case: if I have no children, my ancestor vec is just myself.
-    if np.sum(vec) == 1:
-      return vec
-    else:
-      children = np.array([_find_desc(idx, adj[idx]) for (idx, val) in enumerate(vec) if idx != I and val == 1])
-      self_and_child = vec + np.sum(children, axis=0)
-      self_and_child[self_and_child > 1] = 1
-      return self_and_child
-
-  for k in range(K):
-    # If we know `adj` is topologically sorted, we can reduce the complexity of
-    # this -- we would start at leaves and work our way upward, eliminating
-    # need for recursive DFS. But since we don't expect `K` to be large, we can
-    # write more general version that works for non-toposorted trees.
-    Z[k] = _find_desc(k, adj[k])
-
-  return Z
+import common
 
 def make_parents(K):
   # Determine parents of nodes [1, 2, ..., K].
@@ -43,14 +19,14 @@ def make_parents(K):
 def make_adjm(K):
   parents = make_parents(K)
   # Make adjacency matrix from parents vector.
-  adjm = np.zeros((K, K))
+  adjm = np.eye(K)
   adjm[parents, range(1, K)] = 1
   return adjm
 
 def generate_tree(K, S):
   adjm = make_adjm(K) # KxK
   #leaves = np.flatnonzero(np.sum(adjm, axis=1) == 0)
-  Z = make_ancestral_from_adj(adjm) # KXK
+  Z = common.make_ancestral_from_adj(adjm) # KXK
 
   eta = np.random.dirichlet(alpha = K*[1e0], size = S).T # KxS
   # In general, we want etas on leaves to be more "peaked" -- that is, only a
@@ -95,10 +71,10 @@ def choose_mutass(K, M):
 def make_clusters(mutass):
   clusters = defaultdict(list)
   for midx, cidx in enumerate(mutass):
-    clusters[cidx].append(midx)
+    clusters[cidx].append('s%s' % midx)
   assert set(clusters.keys()) == set(range(1, len(clusters) + 1))
 
-  clusters = [[]] + [clusters[cidx] for cidx in sorted(clusters.keys())]
+  clusters = [clusters[cidx] for cidx in sorted(clusters.keys())]
   return clusters
 
 def make_variants(V, T, omega_v):
@@ -134,20 +110,17 @@ def generate_data(K, S, T, M, G):
   omega_v = np.broadcast_to(0.5, (M + G, S))
   V, T = generate_read_counts(phi_mutations, omega_v, T)
 
-  variants_all = make_variants(V, T, omega_v)
-  variants_good, variants_garbage = OrderedDict(), OrderedDict()
-  for vid, variant in variants_all.items():
-    if int(vid[1:]) < M:
-      variants_good[vid] = variant
-    else:
-      variants_garbage[vid] = variant
-  
+  variants = make_variants(V, T, omega_v)
+  vids_good = ['s%s' % vidx for vidx in range(M)]
+  vids_garbage = ['s%s' % vidx for vidx in range(M, M + G)]
+  assert set(vids_good) == set([V for C in clusters for V in C])
+
   return {
     'adjm': adjm,
     'phi': phi,
     'clusters': clusters,
-    'variants_all': variants_all,
-    'variants_good': variants_good,
-    'variants_garbage': variants_garbage,
+    'variants': variants,
+    'vids_good': vids_good,
+    'vids_garbage': vids_garbage,
     'sampnames': ['Sample %s' % (sidx + 1) for sidx in range(S)],
   }
