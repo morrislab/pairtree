@@ -4,9 +4,10 @@ import concurrent.futures
 from progressbar import progressbar
 import itertools
 
-from common import Models, Mutrel
+from common import Models
 import common
 import lh
+import mutrel
 
 def swap_A_B(arr):
   swapped = np.zeros(len(arr)) + np.nan
@@ -94,11 +95,6 @@ def _sanity_check_tensor(tensor):
     mat = tensor[:,:,midx]
     assert np.allclose(mat, mat.T)
 
-def _init_mutrel(vids):
-  M = len(vids)
-  mutrel = Mutrel(vids=list(vids), rels=np.nan*np.ones((M, M, len(Models._all))))
-  return mutrel
-
 def _compute_pairs(pairs, variants, prior, posterior, evidence, pbar=None, parallel=1):
   logprior = _complete_prior(prior)
   # TODO: change ordering of pairs based on what will provide optimal
@@ -145,8 +141,8 @@ def calc_posterior(variants, prior, rel_type, parallel=1):
   vids = common.extract_vids(variants)
   variants = [common.convert_variant_dict_to_tuple(variants[V]) for V in vids]
 
-  posterior = _init_mutrel(vids)
-  evidence = _init_mutrel(vids)
+  posterior = mutrel.init_mutrel(vids)
+  evidence = mutrel.init_mutrel(vids)
   pairs = list(itertools.combinations(range(M), 2)) + [(V, V) for V in range(M)]
 
   with progressbar(total=len(pairs), desc='Computing %s relations' % rel_type, unit='pair', dynamic_ncols=True) as pbar:
@@ -172,7 +168,7 @@ def merge_variants(to_merge, evidence, prior):
     merged_vid = ','.join([evidence.vids[V] for V in vidxs])
     new_vids = evidence.vids + [merged_vid]
 
-    new_evidence = _init_mutrel(new_vids)
+    new_evidence = mutrel.init_mutrel(new_vids)
     new_evidence.rels[:-1,:-1] = evidence.rels
 
     merged_row = np.sum(np.array([evidence.rels[V] for V in vidxs]), axis=0)
@@ -189,8 +185,8 @@ def merge_variants(to_merge, evidence, prior):
     already_merged |= vidxs
     evidence = new_evidence
 
-  evidence = remove_variants(evidence, already_merged)
-  posterior = Mutrel(
+  evidence = mutrel.remove_variants(evidence, already_merged)
+  posterior = mutrel.Mutrel(
     vids = evidence.vids,
     rels = _calc_posterior_full(evidence.rels, prior),
   )
@@ -208,8 +204,8 @@ def add_variants(vids_to_add, variants, mutrel_posterior, mutrel_evidence, prior
   assert len(mutrel_posterior.vids) == len(mutrel_evidence.vids) == M - A
   variants = [common.convert_variant_dict_to_tuple(variants[V]) for V in new_vids]
 
-  new_posterior = _init_mutrel(new_vids)
-  new_evidence = _init_mutrel(new_vids)
+  new_posterior = mutrel.init_mutrel(new_vids)
+  new_evidence = mutrel.init_mutrel(new_vids)
   new_posterior.rels[:-A,:-A] = mutrel_posterior.rels
   new_evidence.rels[:-A,:-A] = mutrel_evidence.rels
 
@@ -254,31 +250,3 @@ def _examine(V1, V2, variants, _calc_lh=None):
   post1 = _calc_posterior(E, _complete_prior(None))
   post2 = _calc_posterior(E, _complete_prior({'garbage': 0.001}))
   return (persamp, E, post1, post2)
-
-def _remove_rowcol(arr, indices):
-  '''Remove rows and columns at `indices`.'''
-  # Using a mask requires only creating a new array once (and then presumably
-  # another array to apply the mask). Calling np.delete() multiple times would
-  # creat separate arrays for every element in `indices`.
-  shape = list(arr.shape)
-  # Must convert to list *before* array, as indices is often a set, and
-  # converting a set directly to an array yields a dtype of `object` that
-  # contains the set. It's really weird.
-  indices = np.array(list(indices))
-  # Only check the first two dimensions, as we ignore all others.
-  assert np.all(0 <= indices) and np.all(indices < min(shape[:2]))
-
-  for axis in (0, 1):
-    arr = np.delete(arr, indices, axis=axis)
-    shape[axis] -= len(indices)
-
-  assert np.array_equal(arr.shape, shape)
-  return arr
-
-def remove_variants(mutrel, vidxs):
-  # Make set for efficient `in`.
-  vidxs = set(vidxs)
-  return Mutrel(
-    vids = [vid for vidx, vid in enumerate(mutrel.vids) if vidx not in vidxs],
-    rels = _remove_rowcol(mutrel.rels, vidxs),
-  )

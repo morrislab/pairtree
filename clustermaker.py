@@ -1,7 +1,8 @@
 import numpy as np
 import pairwise
 import common
-from common import Models, Mutrel, debug
+from common import Models, debug
+from mutrel import Mutrel
 from progressbar import progressbar
 
 def _check_clusters(variants, clusters, garbage):

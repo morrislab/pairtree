@@ -1,6 +1,7 @@
-import common
 import numpy as np
 import scipy.stats
+import common
+import mutrel
 from progressbar import progressbar
 import phi_fitter
 Models = common.Models
@@ -25,7 +26,7 @@ def calc_llh_phi(data_mutrel, supervars, superclusters, cluster_adj, fit_phis=Tr
   return phi_llh
 
 def calc_llh_mutrel(data_mutrel, supervars, superclusters, cluster_adj):
-  tree_mutrel = common.make_mutrel_tensor_from_cluster_adj(cluster_adj, superclusters)
+  tree_mutrel = mutrel.make_mutrel_tensor_from_cluster_adj(cluster_adj, superclusters)
   mutrel_fit = 1 - np.abs(data_mutrel.rels - tree_mutrel.rels)
   # Prevent log of zero.
   mutrel_fit = np.maximum(common._EPSILON, mutrel_llh)
