@@ -5,6 +5,7 @@ import numpy as np
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 import common
+import mutrel
 import resultserializer
 
 def softmax(V):
@@ -15,16 +16,25 @@ def calc_mutrel_from_trees(adjms, llhs, clusters):
   #weights = softmax(llhs)
   weights = np.eye(len(adjms)) / len(adjms)
 
-  soft_mutrel = None
+  vids = None
+
   for adjm, weight in zip(adjms, weights):
-    mutrel = common.make_mutrel_tensor_from_cluster_adj(adjm, clusters)
-    if soft_mutrel is None:
-      soft_mutrel = np.zeros(mutrel.rels.shape)
-    soft_mutrel += weight * mutrel.rels
-  return soft_mutrel
+    mrel = mutrel.make_mutrel_tensor_from_cluster_adj(adjm, clusters)
+    if vids is None:
+      vids = mrel.vids
+      soft_mutrel = np.zeros(mrel.rels.shape)
+    else:
+      assert mrel.vids == vids
+    soft_mutrel += weight * mrel.rels
+
+  return mutrel.Mutrel(
+    vids = vids,
+    rels = soft_mutrel,
+  )
 
 def make_membership_mat(clusters):
-  children = [int(vid[1:]) for C in clusters for vid in C]
+  vids = [vid for C in clusters for vid in C]
+  children = [int(vid[1:]) for vid in vids]
   N = len(children)
   K = len(clusters)
   max_child = max(children)
@@ -37,24 +47,33 @@ def make_membership_mat(clusters):
   for cidx, C in enumerate(clusters):
     members = [int(vid[1:]) for vid in C]
     membership[members,cidx] = 1
-  return membership
+  return (vids, membership)
 
 def calc_mutrel_from_clustrel(clustrel, clusters):
+  mutrel.check_posterior_sanity(clustrel.rels)
   assert np.all(0 <= clustrel.rels) and np.all(clustrel.rels <= 1)
   assert len(clusters[0]) == 0
-  membership = make_membership_mat(clusters[1:])
+  vids, membership = make_membership_mat(clusters[1:])
   # K: number of non-empty clusters
   M, K = membership.shape
 
   num_models = len(common.Models._all)
-  mutrel = np.zeros((M, M, num_models))
+  mrel = np.zeros((M, M, num_models))
   assert clustrel.rels.shape == (K, K, num_models)
 
   for modelidx in range(num_models):
     mut_vs_cluster = np.dot(membership, clustrel.rels[:,:,modelidx]) # MxK
-    mutrel[:,:,modelidx] = np.dot(mut_vs_cluster, membership.T)
-  assert np.all(0 <= mutrel) and np.all(mutrel <= 1)
-  return mutrel
+    mrel[:,:,modelidx] = np.dot(mut_vs_cluster, membership.T)
+  mutrel.check_posterior_sanity(mrel)
+
+  return mutrel.Mutrel(
+    vids = vids,
+    rels = mrel,
+  )
+
+def save_sorted_mutrel(mrel, mrelfn):
+  mrel = mutrel.sort_mutrel_by_vids(mrel)
+  np.savez_compressed(mrelfn, mutrel=mrel.rels)
 
 def main():
   parser = argparse.ArgumentParser(
@@ -70,15 +89,26 @@ def main():
 
   results = resultserializer.load(args.pairtree_results_fn)
   clusters = [[]] + list(results['clusters'])
+  garbage = list(results['garbage'])
+  all_vids = set([V for C in results['clusters'] for V in C] + garbage)
 
   if args.pure_mutrel is not None:
-    np.savez_compressed(args.pure_mutrel, mutrel=results['mutrel_posterior'].rels)
+    pure_mutrel = results['mutrel_posterior']
+    assert set(pure_mutrel.vids) == all_vids
+    save_sorted_mutrel(pure_mutrel, args.pure_mutrel)
+
   if args.trees_mutrel is not None:
     tree_mutrel = calc_mutrel_from_trees(results['adjm'], results['llh'], clusters)
-    np.savez_compressed(args.trees_mutrel, mutrel=tree_mutrel)
+    tree_mutrel = mutrel.add_garbage(tree_mutrel, garbage)
+    assert set(tree_mutrel.vids) == all_vids
+    save_sorted_mutrel(tree_mutrel, args.trees_mutrel)
+
   if args.clustrel_mutrel is not None:
     clustrel_mutrel = calc_mutrel_from_clustrel(results['clustrel_posterior'], clusters)
-    np.savez_compressed(args.clustrel_mutrel, mutrel=tree_mutrel)
+    clustrel_mutrel = mutrel.add_garbage(clustrel_mutrel, garbage)
+    assert set(clustrel_mutrel.vids) == all_vids
+    save_sorted_mutrel(clustrel_mutrel, args.clustrel_mutrel)
+
   if args.phi is not None:
     np.savez_compressed(args.phi, phi=results['phi'])
 
