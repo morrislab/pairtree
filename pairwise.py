@@ -55,7 +55,7 @@ def _calc_posterior_full(evidence, prior):
   M = range(len(posterior))
   posterior[M,M,:] = 0
   posterior[M,M,Models.cocluster] = 1
-  _sanity_check_tensor(posterior)
+  mutrel.check_posterior_sanity(posterior)
 
   return posterior
 
@@ -86,14 +86,6 @@ def _complete_prior(prior):
 
   assert np.isclose(0, scipy.special.logsumexp(logprior))
   return logprior
-
-def _sanity_check_tensor(tensor):
-  assert not np.any(np.isnan(tensor))
-  for model in ('garbage', 'cocluster', 'diff_branches'):
-    # These should be symmetric.
-    midx = getattr(common.Models, model)
-    mat = tensor[:,:,midx]
-    assert np.allclose(mat, mat.T)
 
 def _compute_pairs(pairs, variants, prior, posterior, evidence, pbar=None, parallel=1):
   logprior = _complete_prior(prior)
@@ -126,8 +118,8 @@ def _compute_pairs(pairs, variants, prior, posterior, evidence, pbar=None, paral
     evidence.rels[B,A] = swap_A_B(evidence.rels[A,B])
     posterior.rels[B,A] = swap_A_B(posterior.rels[A,B])
 
-  _sanity_check_tensor(evidence.rels)
-  _sanity_check_tensor(posterior.rels)
+  mutrel.check_mutrel_sanity(evidence.rels)
+  mutrel.check_posterior_sanity(posterior.rels)
   assert np.all(np.isclose(1, np.sum(posterior.rels, axis=2)))
 
   # TODO: only calculate posterior once here, instead of computing it within

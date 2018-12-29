@@ -1,6 +1,7 @@
 from collections import namedtuple
-from common import Models
 import numpy as np
+import common
+from common import Models
 
 Mutrel = namedtuple('Mutrel', ('vids', 'rels'))
 
@@ -37,6 +38,55 @@ def remove_variants(mrel, vidxs):
     rels = _remove_rowcol(mrel.rels, vidxs),
   )
 
+def sort_mutrel_by_vids(mrel):
+  sorted_vids = common.sort_vids(mrel.vids)
+  sort_map = {vid: vidx for vidx, vid in enumerate(sorted_vids)}
+  order = [sort_map[vid] for vid in mrel.vids]
+  return Mutrel(
+    vids = sorted_vids,
+    rels = reorder_array(mrel.rels, order),
+  )
+
+def add_garbage(posterior, garb_svids):
+  assert len(set(posterior.vids) & set(garb_svids)) == 0
+  new_vids = posterior.vids + garb_svids
+  new_posterior = init_mutrel(new_vids)
+  G = len(garb_svids)
+  M = len(new_posterior.vids)
+
+  # Rather than carefully slicing and dicing the array to set it, just use a
+  # series of carefully ordered overwrite operations to put it in the correct
+  # state.
+  new_posterior.rels[:] = 0
+  new_posterior.rels[:,:,Models.garbage] = 1
+  diag = range(M)
+  new_posterior.rels[diag,diag,:] = 0
+  new_posterior.rels[diag,diag,Models.cocluster] = 1
+  new_posterior.rels[:-G,:-G,:] = posterior.rels
+
+  check_posterior_sanity(new_posterior.rels)
+  return new_posterior
+
+def check_mutrel_sanity(mrel):
+  '''Check properties that should be true of all mutrel arrays.'''
+  assert not np.any(np.isnan(mrel))
+  for model in ('garbage', 'cocluster', 'diff_branches'):
+    # These should be symmetric.
+    midx = getattr(Models, model)
+    mat = mrel[:,:,midx]
+    assert np.allclose(mat, mat.T)
+
+def check_posterior_sanity(posterior):
+  check_mutrel_sanity(posterior)
+  assert np.all(0 <= posterior) and np.all(posterior <= 1)
+  assert np.allclose(1, np.sum(posterior, axis=2))
+
+  diag = range(len(posterior))
+  noncocluster = [getattr(Models, M) for M in Models._all if M != 'cocluster']
+  for M in noncocluster:
+    assert np.allclose(0, posterior[diag,diag,M])
+  assert np.allclose(1, posterior[diag,diag,Models.cocluster])
+
 def make_mutrel_tensor_from_cluster_adj(cluster_adj, clusters):
   '''
   * `M` = # of mutations
@@ -54,7 +104,7 @@ def make_mutrel_tensor_from_cluster_adj(cluster_adj, clusters):
   M = sum([len(clus) for clus in clusters])
   assert cluster_adj.shape == (K, K)
 
-  vids = sort_vids([vid for cluster in clusters for vid in cluster])
+  vids = common.sort_vids([vid for cluster in clusters for vid in cluster])
   vidmap = {vid: vidx for vidx, vid in enumerate(vids)}
   clusters = [[vidmap[vid] for vid in cluster] for cluster in clusters]
 
@@ -81,3 +131,20 @@ def make_mutrel_tensor_from_cluster_adj(cluster_adj, clusters):
   assert np.array_equal(np.ones((M,M)), np.sum(mrel, axis=2))
 
   return Mutrel(vids=vids, rels=mrel)
+
+def reorder_array(arr, order):
+  '''Reorder first two dimensions of `arr` according to `order`. This
+  assumes that first two dimensions have same size. Further dimensions are
+  left unmodified.'''
+  # common.reorder_square_matrix does hierarchical clustering to determine
+  # order. This is a much simpler and more elegant function that uses a
+  # user-defined order.
+  #
+  M = len(arr)
+  assert arr.ndim >= 2
+  assert arr.shape[:2] == (M, M)
+  assert set(order) == set(range(M))
+
+  arr = arr[order,:]
+  arr = arr[:,order]
+  return arr

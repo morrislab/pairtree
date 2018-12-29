@@ -124,18 +124,6 @@ def _merge_clusters(to_merge, clusters, variants, mutrel_posterior, mutrel_evide
   assert len(mutrel_posterior.vids) == len(mutrel_evidence.vids) == M
   return (clusters, mutrel_posterior, mutrel_evidence)
 
-def _reorder_matrix(mat, order):
-  # common.reorder_square_matrix does hierarchical clustering to determine
-  # order. This is a much simpler and more elegant function that uses a
-  # user-defined order.
-  M = len(mat)
-  assert mat.shape[:2] == (M, M)
-  assert set(order) == set(range(M))
-
-  mat = mat[order,:]
-  mat = mat[:,order]
-  return mat
-
 def _sort_clusters_by_vaf(clusters, variants, mutrel_posterior, mutrel_evidence):
   supervars = make_cluster_supervars(clusters, variants)
   svids = common.extract_vids(supervars)
@@ -153,11 +141,11 @@ def _sort_clusters_by_vaf(clusters, variants, mutrel_posterior, mutrel_evidence)
 
   mutrel_posterior = Mutrel(
     vids = svids,
-    rels = _reorder_matrix(mutrel_posterior.rels, order),
+    rels = mutrel.reorder_array(mutrel_posterior.rels, order),
   )
   mutrel_evidence = Mutrel(
     vids = svids,
-    rels = _reorder_matrix(mutrel_evidence.rels, order),
+    rels = mutrel.reorder_array(mutrel_evidence.rels, order),
   )
   return (clusters, supervars, mutrel_posterior, mutrel_evidence)
 
