@@ -15,7 +15,7 @@ function convert_inputs {
 
   for ssmfn in $PAIRTREE_INPUTS_DIR/*.ssm; do
     sampid=$(basename $ssmfn | cut -d. -f1)
-    echo "python3 $BASEDIR/others/pastri/convert_inputs.py " \
+    echo "python3 $BASEDIR/comparison/pastri/convert_inputs.py " \
       "$PAIRTREE_INPUTS_DIR/$sampid.ssm" \
       "$PAIRTREE_INPUTS_DIR/$sampid.params.json" \
       "$INDIR/$sampid.counts" \

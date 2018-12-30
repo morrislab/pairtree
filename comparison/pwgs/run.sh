@@ -11,11 +11,11 @@ PARALLEL=40
 
 function convert_inputs {
   mkdir -p $INDIR
-  cp -a $BASEDIR/others/pwgs/empty.cnv $INDIR/
+  cp -a $BASEDIR/comparison/pwgs/empty.cnv $INDIR/
 
   for ssmfn in $PAIRTREE_INPUTS_DIR/*.ssm; do
     sampid=$(basename $ssmfn | cut -d. -f1)
-    echo "python3 $BASEDIR/others/pwgs/convert_inputs.py " \
+    echo "python3 $BASEDIR/comparison/pwgs/convert_inputs.py " \
       "$PAIRTREE_INPUTS_DIR/$sampid.ssm" \
       "$PAIRTREE_INPUTS_DIR/$sampid.params.json" \
       "$INDIR/$sampid.ssm" \
@@ -64,7 +64,7 @@ function create_mutrels {
     OUTDIR=$OUTBASE/$runid
     [[ -f $OUTDIR/$runid.summ.json.gz ]] || continue
     echo "cd $OUTDIR &&" \
-      "python3 $BASEDIR/others/pwgs/convert_outputs.py" \
+      "python3 $BASEDIR/comparison/pwgs/convert_outputs.py" \
       "$PAIRTREE_INPUTS_DIR/$runid.{ssm,params.json}" \
       "$OUTDIR/$runid.{summ.json.gz,muts.json.gz,mutass.zip}" \
       "$OUTDIR/$runid.mutrel.npz"
