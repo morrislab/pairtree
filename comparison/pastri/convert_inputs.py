@@ -25,6 +25,7 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('--uniform-proposal', action='store_true')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
   parser.add_argument('pastri_allele_counts_fn')
@@ -42,8 +43,9 @@ def main():
     'alpha': extract_matrix(supervars, 'var_reads'),
     'beta': extract_matrix(supervars, 'total_reads'),
   }
-  matrices['alpha'][:] = 1
-  matrices['beta'][:] = 2
+  if args.uniform_proposal:
+    matrices['alpha'][:] = 1
+    matrices['beta'][:] = 2
 
   C_max = 10
   matrices['alpha'] = matrices['alpha'][:C_max,]
