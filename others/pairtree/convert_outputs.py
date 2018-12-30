@@ -1,7 +1,7 @@
 import argparse
-import os
 import numpy as np
 
+import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 import common
@@ -33,25 +33,20 @@ def calc_mutrel_from_trees(adjms, llhs, clusters):
   )
 
 def make_membership_mat(clusters):
-  vids = [vid for C in clusters for vid in C]
-  children = [int(vid[1:]) for vid in vids]
-  N = len(children)
+  vids = common.sort_vids([vid for C in clusters for vid in C])
+  vidmap = {vid: vidx for vidx, vid in enumerate(vids)}
+  N = len(vids)
   K = len(clusters)
-  max_child = max(children)
-  children = set(children)
-  assert N == len(children)
-  assert children == set(range(N))
 
   # membership[i,j] = 1 iff mutation `i` is in cluster `j`
   membership = np.zeros((N, K))
   for cidx, C in enumerate(clusters):
-    members = [int(vid[1:]) for vid in C]
+    members = [vidmap[vid] for vid in C]
     membership[members,cidx] = 1
   return (vids, membership)
 
 def calc_mutrel_from_clustrel(clustrel, clusters):
   mutrel.check_posterior_sanity(clustrel.rels)
-  assert np.all(0 <= clustrel.rels) and np.all(clustrel.rels <= 1)
   assert len(clusters[0]) == 0
   vids, membership = make_membership_mat(clusters[1:])
   # K: number of non-empty clusters

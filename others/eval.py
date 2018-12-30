@@ -1,6 +1,11 @@
 import numpy as np
 import argparse
 
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+import mutrel
+
 def load_mutrels(mutrel_args):
   mutrels = {}
   for mutrel_arg in mutrel_args:
@@ -20,14 +25,15 @@ def compare(mutrels):
   scores = {}
 
   for name in names:
-    mutrel = mutrels[name]
-    assert mutrel.shape == (M, M, num_models)
+    mrel = mutrels[name]
+    assert mrel.shape == (M, M, num_models)
+    mutrel.check_posterior_sanity(mrel)
     score = np.nan * np.zeros((M, M))
     for I in range(M):
       for J in range(M):
         # I don't know how to use `correct` in this format to index into
         # `mutrels[name]`, hence the `I` and `J` for loops.
-        score[I,J] = mutrel[I,J,correct[I,J]]
+        score[I,J] = mrel[I,J,correct[I,J]]
     assert not np.any(np.isnan(score))
     if name == 'truth':
       assert np.allclose(1, score)
