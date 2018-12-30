@@ -5,8 +5,11 @@ module load gnu-parallel
 BASEDIR=~/work/pairtree
 JOBDIR=$SCRATCH/jobs
 PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
-INDIR=$BASEDIR/scratch/inputs/sims.pastri
-OUTDIR=$BASEDIR/scratch/results/sims.pastri
+#BATCH=sims.pastri.informative
+#BATCH=sims.pastri.uniform
+BATCH=$1
+INDIR=$BASEDIR/scratch/inputs/$BATCH
+OUTDIR=$BASEDIR/scratch/results/$BATCH
 PARALLEL=40
 NUM_ITERS=10000
 
@@ -16,6 +19,7 @@ function convert_inputs {
   for ssmfn in $PAIRTREE_INPUTS_DIR/*.ssm; do
     sampid=$(basename $ssmfn | cut -d. -f1)
     echo "python3 $BASEDIR/comparison/pastri/convert_inputs.py " \
+      "--uniform-proposal" \
       "$PAIRTREE_INPUTS_DIR/$sampid.ssm" \
       "$PAIRTREE_INPUTS_DIR/$sampid.params.json" \
       "$INDIR/$sampid.counts" \
@@ -43,7 +47,7 @@ function run {
         ">$runid.stdout" \
         "2>$runid.stderr"
     ) 
-  done | parallel -j$PARALLEL --halt 1
+  done #| parallel -j$PARALLEL --halt 1
 }
 
 function main {

@@ -4,39 +4,43 @@ module load gnu-parallel
 
 SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 BASEDIR=~/work/pairtree
-JOBDIR=$SCRATCH/jobs
-HANDBUILTDIR=~/work/steph/data/handbuilt_trees
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
-PHYLOSTEPH_INPUTS_DIR=~/work/steph/data/inputs/steph.xenos.nocns
-PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/steph.xeno.nogarb.pairtree
-TRUTH_DIR=$BASEDIR/scratch/results/steph.xeno.nogarb.truth
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/sims.pairtree.fixedclusters
 PARALLEL=40
 
-function convert_phylosteph_inputs {
-  mkdir -p $PAIRTREE_INPUTS_DIR
-  cd $PAIRTREE_INPUTS_DIR
-
-  for ssmfn in $PHYLOSTEPH_INPUTS_DIR/*.ssm; do
+function run_pairtree {
+  for ssmfn in $PAIRTREE_INPUTS_DIR/*.ssm; do
     runid=$(basename $ssmfn | cut -d. -f1)
-      #"--discard-garbage" \
-    echo "python3 $SCRIPTDIR/convert_phylosteph_inputs_to_pairtree.py " \
-      "--handbuilt $HANDBUILTDIR/$runid.json" \
-      "$PHYLOSTEPH_INPUTS_DIR/$runid.{sampled.ssm,params.json}" \
-      "$PAIRTREE_INPUTS_DIR/$runid.{ssm,params.json}"
-  done | parallel -j$PARALLEL --halt 1
+    jobfn=$(mktemp)
+    (
+      echo "#!/bin/bash"
+      echo "#SBATCH --nodes=1"
+      echo "#SBATCH --ntasks=$PARALLEL"
+      echo "#SBATCH --time=23:59:00"
+      echo "#SBATCH --job-name $runid"
+      echo "#SBATCH --output=$JOBDIR/slurm_${runid}_%j.txt"
+      echo "#SBATCH --mail-type=NONE"
+
+      echo "cd $PAIRTREE_RESULTS_DIR && " \
+        "OMP_NUM_THREADS=1 python3 $PROTDIR/basic.py" \
+        "--seed 1" \
+        "--parallel $PARALLEL" \
+        "--tree-chains $PARALLEL" \
+        "--trees-per-chain $TREES_PER_CHAIN" \
+        "--phi-iterations $PHI_ITERATIONS" \
+        "--params $PAIRTREE_INPUTS_DIR/${runid}.params.json" \
+        "$PAIRTREE_INPUTS_DIR/$runid.ssm" \
+        "$PAIRTREE_RESULTS_DIR/$runid.results.npz" \
+        ">$runid.stdout" \
+        "2>$runid.stderr"
+    ) #> $jobfn
+    #sbatch $jobfn
+    rm $jobfn
+  done
 }
 
-function make_truth_mutrels {
-  mkdir -p $TRUTH_DIR
-  for paramsfn in $PAIRTREE_INPUTS_DIR/*.params.json; do
-    runid=$(basename $paramsfn | cut -d. -f1)
-    echo "python3 $SCRIPTDIR/make_truth_mutrel.py" \
-      "$PAIRTREE_INPUTS_DIR/$runid.params.json" \
-      "$TRUTH_DIR/$runid.mutrel.npz"
-  done | parallel -j$PARALLEL --halt 1
-}
 
-function create_mutrels {
+function convert_outputs {
   for resultsfn in $PAIRTREE_RESULTS_DIR/*.results.npz; do
     runid=$(basename $resultsfn | cut -d. -f1)
     echo "cd $PAIRTREE_RESULTS_DIR &&" \
@@ -48,9 +52,8 @@ function create_mutrels {
 }
 
 function main {
-  convert_phylosteph_inputs
-  #make_truth_mutrels
-  #create_mutrels
+  run_pairtree
+  #convert_outputs
 }
 
 main
