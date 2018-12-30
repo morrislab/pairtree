@@ -4,9 +4,9 @@ module load gnu-parallel
 
 BASEDIR=~/work/pairtree
 JOBDIR=$SCRATCH/jobs
-INDIR=$BASEDIR/scratch/inputs/steph.xeno.nogarb.pastri
-OUTDIR=$BASEDIR/scratch/results/steph.xeno.nogarb.pastri
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.nogarb.pairtree
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+INDIR=$BASEDIR/scratch/inputs/sims.pastri
+OUTDIR=$BASEDIR/scratch/results/sims.pastri
 PARALLEL=40
 NUM_ITERS=10000
 
@@ -23,7 +23,7 @@ function convert_inputs {
   done | parallel -j$PARALLEL --halt 1
 }
 
-function run_steph {
+function run {
   mkdir -p $OUTDIR
 
   for countsfn in $INDIR/*.counts; do
@@ -48,7 +48,7 @@ function run_steph {
 
 function main {
   #convert_inputs
-  run_steph
+  run
 }
 
 main

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-INDIR=~/work/pairtree/scratch/inputs/sims
+INDIR=~/work/pairtree/scratch/inputs/sims.pairtree
 PROTDIR=~/work/pairtree
 JOBDIR=/tmp
 
@@ -83,8 +83,8 @@ function run_pairtree {
 }
 
 function main {
-  #make_simulated_data
-  run_pairtree
+  make_simulated_data
+  #run_pairtree
 }
 
 main
