@@ -10,7 +10,7 @@ PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
 BATCH=$1
 INDIR=$BASEDIR/scratch/inputs/$BATCH
 OUTDIR=$BASEDIR/scratch/results/$BATCH
-PARALLEL=40
+PARALLEL=80
 NUM_ITERS=10000
 
 function convert_inputs {
@@ -47,7 +47,7 @@ function run {
         ">$runid.stdout" \
         "2>$runid.stderr"
     ) 
-  done #| parallel -j$PARALLEL --halt 1
+  done | parallel -j$PARALLEL --joblog $SCRATCH/tmp/$BATCH.log
 }
 
 function main {
