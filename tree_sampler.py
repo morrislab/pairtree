@@ -170,8 +170,7 @@ def _run_chain(data_mutrel, supervars, superclusters, nsamples, progress_queue=N
   if progress_queue is not None:
     progress_queue.put(0)
   adj, llh = _run_metropolis(nsamples, init_cluster_adj, calc_llh_phi, permute_adj_multistep, progress_queue)
-
-  return choose_best_tree(adj, llh)
+  return (adj, llh)
 
 def choose_best_tree(adj, llh):
   best_llh = -np.inf
@@ -216,5 +215,9 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, nchains
     for C in range(nchains):
       results.append(_run_chain(data_mutrel, supervars, superclusters, trees_per_chain))
 
-  adj, llh = choose_best_tree(*zip(*results))
-  return ([adj], [llh])
+  merged_adj = []
+  merged_llh = []
+  for A, L in results:
+    merged_adj += A
+    merged_llh += L
+  return (merged_adj, merged_llh)
