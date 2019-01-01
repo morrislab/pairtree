@@ -101,7 +101,6 @@ function main {
   #run_steph
   #plot_steph
   write_indices
-  #run_sims
 }
 
 main
