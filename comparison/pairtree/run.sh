@@ -2,13 +2,20 @@
 set -euo pipefail
 module load gnu-parallel
 
+PROTDIR=~/work/pairtree
 SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 BASEDIR=~/work/pairtree
+JOBDIR=~/jobs
 PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
 PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/sims.pairtree.fixedclusters
+
 PARALLEL=40
+TREES_PER_CHAIN=1000
+PHI_ITERATIONS=10000
 
 function run_pairtree {
+  mkdir -p $PAIRTREE_RESULTS_DIR
+
   for ssmfn in $PAIRTREE_INPUTS_DIR/*.ssm; do
     runid=$(basename $ssmfn | cut -d. -f1)
     jobfn=$(mktemp)
@@ -38,7 +45,6 @@ function run_pairtree {
     rm $jobfn
   done
 }
-
 
 function convert_outputs {
   for resultsfn in $PAIRTREE_RESULTS_DIR/*.results.npz; do
