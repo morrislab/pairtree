@@ -9,7 +9,7 @@ debug = common.debug
 
 MIN_FLOAT = np.finfo(np.float).min
 
-def calc_llh_phi(data_mutrel, supervars, superclusters, cluster_adj, fit_phis=True):
+def _calc_llh_phi(data_mutrel, supervars, superclusters, cluster_adj):
   phi, eta = phi_fitter.fit_phis(cluster_adj, superclusters, supervars, iterations=100, parallel=0)
   K, S = phi.shape
   alpha, beta = calc_beta_params(supervars)
@@ -25,27 +25,27 @@ def calc_llh_phi(data_mutrel, supervars, superclusters, cluster_adj, fit_phis=Tr
   phi_llh = np.maximum(phi_llh, MIN_FLOAT)
   return phi_llh
 
-def calc_llh_mutrel(data_mutrel, supervars, superclusters, cluster_adj):
+def _calc_llh_mutrel(data_mutrel, superclusters, cluster_adj):
   tree_mutrel = mutrel.make_mutrel_tensor_from_cluster_adj(cluster_adj, superclusters)
   mutrel_fit = 1 - np.abs(data_mutrel.rels - tree_mutrel.rels)
   # Prevent log of zero.
-  mutrel_fit = np.maximum(common._EPSILON, mutrel_llh)
+  mutrel_fit = np.maximum(common._EPSILON, mutrel_fit)
   mutrel_llh = np.sum(np.log(mutrel_fit))
   return mutrel_llh
 
-def init_cluster_adj_linear(K):
+def _init_cluster_adj_linear(K):
   cluster_adj = np.eye(K)
   for k in range(1, K):
     cluster_adj[k-1,k] = 1
   return cluster_adj
 
-def init_cluster_adj_branching(K):
+def _init_cluster_adj_branching(K):
   cluster_adj = np.eye(K)
   cluster_adj[0,1] = 1
   cluster_adj[1,range(2,K)] = 1
   return cluster_adj
 
-def init_cluster_adj_random(K):
+def _init_cluster_adj_random(K):
   # Parents for nodes [1, ..., K-1].
   parents = []
   # Note this isn't truly random, since node i can only choose a parent <i.
@@ -56,7 +56,7 @@ def init_cluster_adj_random(K):
   cluster_adj[parents, range(1,K)] = 1
   return cluster_adj
 
-def permute_adj(adj):
+def _permute_adj(adj):
   adj = np.copy(adj)
   K = len(adj)
 
@@ -70,11 +70,11 @@ def permute_adj(adj):
   anc = common.make_ancestral_from_adj(adj)
   A, B = np.random.choice(K, size=2, replace=False)
   #debug(adj)
-  debug((A,B))
+  #debug((A,B))
   if B == 0 and anc[B,A]:
     # Don't permit cluster 0 to become non-root node, since it corresponds to
     # normal cell population.
-    debug('do nothing')
+    #debug('do nothing')
     return adj
   np.fill_diagonal(adj, 0)
 
@@ -93,17 +93,15 @@ def permute_adj(adj):
 
     if adj_BA:
       adj[A,B] = 1
-    debug('swapping', A, B)
+    #debug('swapping', A, B)
   else:
     # Move B so it becomes child of A. I don't need to modify the A column.
     adj[:,B] = 0
     adj[A,B] = 1
-    debug('moving', B, 'under', A)
+    #debug('moving', B, 'under', A)
 
   np.fill_diagonal(adj, 1)
-  permute_adj.blah.add((A, B, np.array2string(adj)))
   return adj
-permute_adj.blah = set()
 
 def calc_beta_params(supervars):
   svids = common.extract_vids(supervars)
@@ -120,43 +118,60 @@ def calc_beta_params(supervars):
   assert np.all(alpha > 0) and np.all(beta > 0)
   return (alpha, beta)
 
-def run_chain(data_mutrel, supervars, superclusters, nsamples, progress_queue=None):
-  # Ensure each chain gets a new random state.
-  np.random.seed()
-  assert nsamples > 0
-  K = len(superclusters)
-
-  if progress_queue is not None:
-    progress_queue.put(0)
-  init_choices = (init_cluster_adj_linear, init_cluster_adj_branching, init_cluster_adj_random)
-  # Particularly since clusters may not be ordered by mean VAF, a branching
-  # tree in which every node comes off the root is the least biased
-  # initialization, as it doesn't require any steps that "undo" bad choices, as
-  # in the linear or random (which is partly linear, given that later clusters
-  # aren't allowed to be parents of earlier ones) cases.
-  init_choices = (init_cluster_adj_branching,)
-  init_cluster_adj = init_choices[np.random.choice(len(init_choices))]
-  cluster_adj = [init_cluster_adj(K)]
-  llh = [calc_llh_phi(data_mutrel, supervars, superclusters, cluster_adj[0])]
+def _run_metropolis(nsamples, init_cluster_adj, _calc_llh, _sample_adj, progress_queue=None):
+  cluster_adj = [init_cluster_adj]
+  llh = [_calc_llh(init_cluster_adj)]
 
   for I in range(1, nsamples):
     if progress_queue is not None:
       progress_queue.put(I)
     old_llh, old_adj = llh[-1], cluster_adj[-1]
-    new_adj = permute_adj(old_adj)
-    new_llh = calc_llh_phi(data_mutrel, supervars, superclusters, new_adj)
-    if new_llh - old_llh >= np.log(np.random.uniform()):
+    new_adj = _sample_adj(old_adj)
+    new_llh = _calc_llh(new_adj)
+
+    U = np.random.uniform()
+    if new_llh - old_llh >= np.log(U):
       # Accept.
       cluster_adj.append(new_adj)
       llh.append(new_llh)
-      debug(I, llh[-1], 'accept', sep='\t')
+      action = 'accept'
     else:
       # Reject.
       cluster_adj.append(old_adj)
       llh.append(old_llh)
-      debug(I, llh[-1], 'reject', sep='\t')
+      action = 'reject'
+    debug(_calc_llh.__name__, I, action, old_llh, new_llh, new_llh - old_llh, U, sep='\t')
 
-  return choose_best_tree(cluster_adj, llh)
+  return (cluster_adj, llh)
+
+def _run_chain(data_mutrel, supervars, superclusters, nsamples, progress_queue=None):
+  # Ensure each chain gets a new random state.
+  # NOTE: this will break reproducibility.
+  np.random.seed()
+  assert nsamples > 0
+  K = len(superclusters)
+
+  def calc_llh_phi(adj):
+    return _calc_llh_phi(data_mutrel, supervars, superclusters, adj)
+  def calc_llh_mutrel(adj):
+    return _calc_llh_mutrel(data_mutrel, superclusters, adj)
+  def permute_adj_multistep(oldadj, nsteps=100):
+    A, L = _run_metropolis(nsteps, oldadj, calc_llh_mutrel, _permute_adj)
+    best_adj, best_llh = choose_best_tree(A, L)
+    debug('best_proposal', best_llh)
+    return best_adj
+  # Particularly since clusters may not be ordered by mean VAF, a branching
+  # tree in which every node comes off the root is the least biased
+  # initialization, as it doesn't require any steps that "undo" bad choices, as
+  # in the linear or random (which is partly linear, given that later clusters
+  # aren't allowed to be parents of earlier ones) cases.
+  init_cluster_adj = _init_cluster_adj_branching(K)
+
+  if progress_queue is not None:
+    progress_queue.put(0)
+  adj, llh = _run_metropolis(nsamples, init_cluster_adj, calc_llh_phi, permute_adj_multistep, progress_queue)
+
+  return choose_best_tree(adj, llh)
 
 def choose_best_tree(adj, llh):
   best_llh = -np.inf
@@ -168,6 +183,7 @@ def choose_best_tree(adj, llh):
   return (best_adj, best_llh)
 
 def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, nchains, parallel):
+  assert nchains > 0
   jobs = []
   total = nchains * trees_per_chain
 
@@ -183,7 +199,7 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, nchains
     with progressbar(total=total, desc='Sampling trees', unit='tree', dynamic_ncols=True) as pbar:
       with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
         for C in range(nchains):
-          jobs.append(ex.submit(run_chain, data_mutrel, supervars, superclusters, trees_per_chain, progress_queue))
+          jobs.append(ex.submit(_run_chain, data_mutrel, supervars, superclusters, trees_per_chain, progress_queue))
 
         # Exactly `total` items will be added to the queue. Once we've
         # retrieved that many items from the queue, we can assume that our
@@ -198,7 +214,7 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, nchains
   else:
     results = []
     for C in range(nchains):
-      results.append(run_chain(data_mutrel, supervars, superclusters, trees_per_chain))
+      results.append(_run_chain(data_mutrel, supervars, superclusters, trees_per_chain))
 
   adj, llh = choose_best_tree(*zip(*results))
   return ([adj], [llh])
