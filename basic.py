@@ -75,10 +75,6 @@ def main():
   else:
     results = {}
 
-  if 'mutrel_posterior' not in results:
-    results['mutrel_posterior'], results['mutrel_evidence'] = pairwise.calc_posterior(variants, prior=prior, rel_type='variant', parallel=parallel)
-    resultserializer.save(results, args.results_fn)
-
   if 'clustrel_posterior' not in results:
     if 'clusters' in params and 'garbage' in params:
       supervars, results['clustrel_posterior'], results['clustrel_evidence'], results['clusters'], results['garbage'] = clustermaker.use_pre_existing(
@@ -89,6 +85,9 @@ def main():
         params['garbage'],
       )
     else:
+      if 'mutrel_posterior' not in results:
+        results['mutrel_posterior'], results['mutrel_evidence'] = pairwise.calc_posterior(variants, prior=prior, rel_type='variant', parallel=parallel)
+        resultserializer.save(results, args.results_fn)
       clustermaker._plot.prefix = os.path.basename(args.ssm_fn).split('.')[0]
       supervars, results['clustrel_posterior'], results['clustrel_evidence'], results['clusters'], results['garbage'] = clustermaker.cluster_and_discard_garbage(
         variants,
