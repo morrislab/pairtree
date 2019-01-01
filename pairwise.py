@@ -137,16 +137,22 @@ def calc_posterior(variants, prior, rel_type, parallel=1):
   evidence = mutrel.init_mutrel(vids)
   pairs = list(itertools.combinations(range(M), 2)) + [(V, V) for V in range(M)]
 
-  with progressbar(total=len(pairs), desc='Computing %s relations' % rel_type, unit='pair', dynamic_ncols=True) as pbar:
-    return _compute_pairs(
-      pairs,
-      variants,
-      prior,
-      posterior,
-      evidence,
-      pbar = pbar,
-      parallel = parallel,
-    )
+  _compute = lambda pbar: _compute_pairs(
+     pairs,
+     variants,
+     prior,
+     posterior,
+     evidence,
+     pbar,
+     parallel,
+  )
+
+  if parallel > 0:
+    with progressbar(total=len(pairs), desc='Computing %s relations' % rel_type, unit='pair', dynamic_ncols=True) as pbar:
+      posterior, evidence =_compute(pbar)
+  else:
+    posterior, evidence =_compute(None)
+  return (posterior, evidence)
 
 def merge_variants(to_merge, evidence, prior):
   assert np.all(np.array([V for group in to_merge for V in group]) < len(evidence.vids))
