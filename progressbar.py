@@ -10,6 +10,8 @@ def progressbar(**kwargs):
   fd = kwargs.get('file', sys.stderr)
 
   if fd.isatty():
+    if 'smoothing' not in kwargs:
+      kwargs['smoothing'] = 0.1
     pbar = tqdm(**kwargs)
   else:
     pbar = progressbar_file(

@@ -47,7 +47,8 @@ def main():
   parser.add_argument('--seed', dest='seed', type=int)
   parser.add_argument('--parallel', dest='parallel', type=int, default=None)
   parser.add_argument('--params', dest='params_fn')
-  parser.add_argument('--trees-per-chain', dest='trees_per_chain', type=int, default=1000)
+  parser.add_argument('--burnin-per-chain', dest='burnin_per_chain', type=int, default=1000)
+  parser.add_argument('--trees-per-chain', dest='trees_per_chain', type=int, default=2000)
   parser.add_argument('--tree-chains', dest='tree_chains', type=int, default=None)
   parser.add_argument('--phi-iterations', dest='phi_iterations', type=int, default=1000)
   parser.add_argument('ssm_fn')
@@ -109,9 +110,10 @@ def main():
       results['clustrel_posterior'],
       supervars,
       superclusters,
-      trees_per_chain = args.trees_per_chain,
-      nchains = tree_chains,
-      parallel = parallel,
+      args.trees_per_chain,
+      args.burnin_per_chain,
+      tree_chains,
+      parallel,
     )
     resultserializer.save(results, args.results_fn)
 
