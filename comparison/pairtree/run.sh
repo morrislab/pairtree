@@ -51,9 +51,10 @@ function convert_outputs {
     runid=$(basename $resultsfn | cut -d. -f1)
     echo "cd $PAIRTREE_RESULTS_DIR &&" \
       "python3 $SCRIPTDIR/convert_outputs.py" \
-      "$PAIRTREE_INPUTS_DIR/$runid.params.json" \
-      "$PAIRTREE_RESULTS_DIR/$runid.results.npz" \
-      "$PAIRTREE_RESULTS_DIR/$runid.{pairs,trees}.mutrel.npz"
+      "--clustrel-mutrel $PAIRTREE_RESULTS_DIR/$runid.pairtree_clustrel.mutrel.npz" \
+      "--trees-mutrel $PAIRTREE_RESULTS_DIR/$runid.pairtree_trees.mutrel.npz" \
+      "--phi $PAIRTREE_RESULTS_DIR/$runid.pairtree.phi.npz" \
+      "$PAIRTREE_RESULTS_DIR/$runid.results.npz"
   done | parallel -j$PARALLEL --halt 1
 }
 

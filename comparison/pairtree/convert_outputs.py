@@ -14,8 +14,7 @@ def softmax(V):
 
 def calc_mutrel_from_trees(adjms, llhs, clusters):
   #weights = softmax(llhs)
-  weights = np.eye(len(adjms)) / len(adjms)
-
+  weights = np.ones(len(adjms)) / len(adjms)
   vids = None
 
   for adjm, weight in zip(adjms, weights):
@@ -26,6 +25,11 @@ def calc_mutrel_from_trees(adjms, llhs, clusters):
     else:
       assert mrel.vids == vids
     soft_mutrel += weight * mrel.rels
+
+  # Floating point error means that some entires can slightly exceed 1. Ensure
+  # this doesn't happen by much.
+  assert np.allclose(1, soft_mutrel[soft_mutrel > 1])
+  soft_mutrel = np.minimum(1, soft_mutrel)
 
   return mutrel.Mutrel(
     vids = vids,
@@ -68,6 +72,7 @@ def calc_mutrel_from_clustrel(clustrel, clusters):
 
 def save_sorted_mutrel(mrel, mrelfn):
   mrel = mutrel.sort_mutrel_by_vids(mrel)
+  mutrel.check_posterior_sanity(mrel.rels)
   np.savez_compressed(mrelfn, mutrel=mrel.rels)
 
 def main():
