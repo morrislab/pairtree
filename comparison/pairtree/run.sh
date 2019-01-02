@@ -9,14 +9,16 @@ JOBDIR=~/jobs
 PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
 PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/sims.pairtree.fixedclusters
 
-PARALLEL=40
-TREES_PER_CHAIN=1000
+PARALLEL=80
+TREE_CHAINS=40
+BURNIN_PER_CHAIN=1000
+TREES_PER_CHAIN=2000
 PHI_ITERATIONS=10000
 
 function run_pairtree {
   mkdir -p $PAIRTREE_RESULTS_DIR
 
-  for ssmfn in $PAIRTREE_INPUTS_DIR/*.ssm; do
+  for ssmfn in $(ls $PAIRTREE_INPUTS_DIR/*.ssm | sort --random-sort | head -n50); do
     runid=$(basename $ssmfn | cut -d. -f1)
     jobfn=$(mktemp)
     (
@@ -32,16 +34,17 @@ function run_pairtree {
         "OMP_NUM_THREADS=1 python3 $PROTDIR/basic.py" \
         "--seed 1" \
         "--parallel $PARALLEL" \
-        "--tree-chains $PARALLEL" \
+        "--tree-chains $TREE_CHAINS" \
         "--trees-per-chain $TREES_PER_CHAIN" \
+        "--burnin-per-chain $BURNIN_PER_CHAIN" \
         "--phi-iterations $PHI_ITERATIONS" \
         "--params $PAIRTREE_INPUTS_DIR/${runid}.params.json" \
         "$PAIRTREE_INPUTS_DIR/$runid.ssm" \
         "$PAIRTREE_RESULTS_DIR/$runid.results.npz" \
         ">$runid.stdout" \
         "2>$runid.stderr"
-    ) #> $jobfn
-    #sbatch $jobfn
+    ) > $jobfn
+    sbatch $jobfn
     rm $jobfn
   done
 }
