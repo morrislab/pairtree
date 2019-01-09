@@ -16,7 +16,7 @@ def write_ssms(variants, outfn):
   with open(outfn, 'w') as outf:
     print(*cols, sep='\t', file=outf)
     for V in variants.values():
-      #assert len(set(V['omega_v'])) == 1
+      assert len(set(V['omega_v'])) == 1
 
       variant = {
         'id': 's%s' % int(V['id'][1:]),
