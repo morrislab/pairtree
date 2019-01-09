@@ -48,6 +48,8 @@ def sort_mutrel_by_vids(mrel):
   )
 
 def add_garbage(posterior, garb_svids):
+  if len(garb_svids) == 0:
+    return posterior
   assert len(set(posterior.vids) & set(garb_svids)) == 0
   new_vids = posterior.vids + garb_svids
   new_posterior = init_mutrel(new_vids)
