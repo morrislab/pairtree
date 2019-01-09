@@ -72,10 +72,9 @@ def _permute_adj(adj):
   #debug(adj)
   #debug((A,B))
   if B == 0:
-    assert anc[B,A]
-  if B == 0 and anc[B,A]:
     # Don't permit cluster 0 to become non-root node, since it corresponds to
     # normal cell population.
+    assert anc[B,A]
     #debug('do nothing')
     return adj
   np.fill_diagonal(adj, 0)
