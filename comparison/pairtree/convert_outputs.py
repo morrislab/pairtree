@@ -12,9 +12,13 @@ def softmax(V):
   V = np.copy(V) - np.max(V)
   return np.exp(V) / np.sum(np.exp(V))
 
-def calc_mutrel_from_trees(adjms, llhs, clusters):
-  #weights = softmax(llhs)
-  weights = np.ones(len(adjms)) / len(adjms)
+def calc_mutrel_from_trees(adjms, llhs, clusters, tree_weights):
+  if tree_weights == 'llh':
+    weights = softmax(llhs)
+  elif tree_weights == 'uniform':
+    weights = np.ones(len(adjms)) / len(adjms)
+  else:
+    raise Exception('Unknown tree_weights=%s' % tree_weights)
   vids = None
 
   for adjm, weight in zip(adjms, weights):
@@ -80,6 +84,7 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('--weight-trees-by', choices=('llh', 'uniform'), default='uniform')
   parser.add_argument('--clustrel-mutrel')
   parser.add_argument('--trees-mutrel')
   parser.add_argument('--pure-mutrel')
@@ -98,7 +103,7 @@ def main():
     save_sorted_mutrel(pure_mutrel, args.pure_mutrel)
 
   if args.trees_mutrel is not None:
-    tree_mutrel = calc_mutrel_from_trees(results['adjm'], results['llh'], clusters)
+    tree_mutrel = calc_mutrel_from_trees(results['adjm'], results['llh'], clusters, args.weight_trees_by)
     tree_mutrel = mutrel.add_garbage(tree_mutrel, garbage)
     assert set(tree_mutrel.vids) == all_vids
     save_sorted_mutrel(tree_mutrel, args.trees_mutrel)
