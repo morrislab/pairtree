@@ -7,30 +7,31 @@ BASEDIR=~/work/pairtree
 BATCH=sims
 RESULTSDIR=$BASEDIR/scratch/results
 TRUTH_DIR=$RESULTSDIR/$BATCH.truth
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
 PARALLEL=40
 
 function make_truth_mutrels {
   mkdir -p $TRUTH_DIR
-  for paramsfn in $PAIRTREE_INPUTS_DIR/*.params.json; do
-    runid=$(basename $paramsfn | cut -d. -f1)
+  for datafn in $PAIRTREE_INPUTS_DIR/*.data.pickle; do
+    runid=$(basename $datafn | cut -d. -f1)
     echo "python3 $SCRIPTDIR/make_truth_mutrel.py" \
-      "$PAIRTREE_INPUTS_DIR/$runid.params.json" \
+      "$datafn" \
       "$TRUTH_DIR/$runid.mutrel.npz"
   done | parallel -j$PARALLEL --halt 1
 }
 
 function run_eval {
   cd $RESULTSDIR
-  prefix=steph.xeno.nogarb
+  prefix=sims
   SCORESDIR=$RESULTSDIR/$prefix/scores
   mkdir -p $SCORESDIR
 
-  for mutrelfn in ${prefix}.truth/*.mutrel.npz; do
+  for mutrelfn in $TRUTH_DIR/*.mutrel.npz; do
     runid=$(basename $mutrelfn | cut -d. -f1)
     mutrels="truth=${prefix}.truth/$runid.mutrel.npz "
-    mutrels+="pwgs=${prefix}.pwgs/$runid/$runid.mutrel.npz "
-    mutrels+="pairtree_trees=${prefix}.pairtree/$runid.trees.mutrel.npz "
-    mutrels+="pairtree_pairs=${prefix}.pairtree/$runid.pairs.mutrel.npz"
+    #mutrels+="pwgs=${prefix}.pwgs/$runid/$runid.mutrel.npz "
+    mutrels+="pairtree_trees=${prefix}.pairtree.fixedclusters/$runid.pairtree_trees.mutrel.npz "
+    mutrels+="pairtree_clustrel=${prefix}.pairtree.fixedclusters/$runid.pairtree_clustrel.mutrel.npz"
 
     for M in $(echo $mutrels | tr ' ' '\n' | cut -d= -f2); do
       [[ ! -f $M ]] && continue 2
@@ -49,7 +50,7 @@ function run_eval {
 }
 
 function main {
-  make_truth_mutrels
+  #make_truth_mutrels
   run_eval
 }
 

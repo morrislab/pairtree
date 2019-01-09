@@ -4,9 +4,9 @@ module load gnu-parallel
 
 BASEDIR=~/work/pairtree
 JOBDIR=$SCRATCH/jobs
-INDIR=$BASEDIR/scratch/inputs/steph.xeno.unclust.pwgs
-OUTBASE=$BASEDIR/scratch/results/steph.xeno.unclust.pwgs
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+INDIR=$BASEDIR/scratch/inputs/sims.pwgs.supervars
+OUTBASE=$BASEDIR/scratch/results/sims.pwgs.supervars
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
 PARALLEL=40
 
 function convert_inputs {
@@ -16,6 +16,7 @@ function convert_inputs {
   for ssmfn in $PAIRTREE_INPUTS_DIR/*.ssm; do
     sampid=$(basename $ssmfn | cut -d. -f1)
     echo "python3 $BASEDIR/comparison/pwgs/convert_inputs.py " \
+      "--use-supervars" \
       "$PAIRTREE_INPUTS_DIR/$sampid.ssm" \
       "$PAIRTREE_INPUTS_DIR/$sampid.params.json" \
       "$INDIR/$sampid.ssm" \
@@ -23,10 +24,10 @@ function convert_inputs {
   done | parallel -j$PARALLEL --halt 1
 }
 
-function run_steph {
+function run_pwgs {
   for ssmfn in $INDIR/*.ssm; do
     runid=$(basename $ssmfn | cut -d. -f1)
-    jobname="steph_pwgs_${runid}"
+    jobname="pwgs_${runid}"
     OUTDIR=$OUTBASE/$runid
 
     jobfn=$(mktemp)
@@ -34,7 +35,7 @@ function run_steph {
       echo "#!/bin/bash"
       echo "#SBATCH --nodes=1"
       echo "#SBATCH --ntasks=$PARALLEL"
-      echo "#SBATCH --time=24:00:00"
+      echo "#SBATCH --time=23:59:00"
       echo "#SBATCH --job-name $jobname"
       echo "#SBATCH --output=$JOBDIR/slurm_${jobname}_%j.txt"
       echo "#SBATCH --mail-type=NONE"
@@ -58,7 +59,7 @@ function run_steph {
   done
 }
 
-function create_mutrels {
+function convert_outputs {
   cd $OUTBASE
   for runid in *; do
     OUTDIR=$OUTBASE/$runid
@@ -73,8 +74,8 @@ function create_mutrels {
 
 function main {
   #convert_inputs
-  run_steph
-  #create_mutrels
+  run_pwgs
+  #convert_outputs
 }
 
 main
