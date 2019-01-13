@@ -7,6 +7,7 @@ JOBDIR=$SCRATCH/jobs
 INDIR=$BASEDIR/scratch/inputs/sims.pwgs.supervars
 OUTBASE=$BASEDIR/scratch/results/sims.pwgs.supervars
 PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+PWGS_PATH=~/.apps/phylowgs
 PARALLEL=40
 
 function convert_inputs {
@@ -30,6 +31,9 @@ function run_pwgs {
     jobname="pwgs_${runid}"
     OUTDIR=$OUTBASE/$runid
 
+    treefn=$OUTDIR/chains/trees.zip
+    [[ -f $treefn ]] && continue
+
     jobfn=$(mktemp)
     (
       echo "#!/bin/bash"
@@ -46,7 +50,7 @@ function run_pwgs {
         "module load gsl &&" \
         "mkdir -p $OUTDIR &&" \
         "cd $OUTDIR && " \
-        "python2 $HOME/.apps/phylowgs/multievolve.py" \
+        "python2 $PWGS_PATH/multievolve.py" \
         "--num-chains $PARALLEL" \
         "--ssms $INDIR/${runid}.ssm" \
         "--cnvs $INDIR/empty.cnv" \
@@ -63,19 +67,31 @@ function convert_outputs {
   cd $OUTBASE
   for runid in *; do
     OUTDIR=$OUTBASE/$runid
-    [[ -f $OUTDIR/$runid.summ.json.gz ]] || continue
+    treefn=$OUTDIR/chains/trees.zip
+    [[ -f $treefn ]] || continue
+
     echo "cd $OUTDIR &&" \
-      "python3 $BASEDIR/comparison/pwgs/convert_outputs.py" \
+      "python2 $PWGS_PATH/write_results.py" \
+      "--include-multiprimary" \
+      "$runid" \
+      "$treefn" \
+      "$OUTDIR/$runid.{summ.json.gz,muts.json.gz,mutass.zip}" \
+      ">  $OUTDIR/$runid.results.stdout" \
+      "2> $OUTDIR/$runid.results.stderr &&" \
+    "OMP_NUM_THREADS=1 python3 $BASEDIR/comparison/pwgs/convert_outputs.py" \
+      "--weight-trees-by uniform" \
       "$PAIRTREE_INPUTS_DIR/$runid.{ssm,params.json}" \
       "$OUTDIR/$runid.{summ.json.gz,muts.json.gz,mutass.zip}" \
-      "$OUTDIR/$runid.mutrel.npz"
+      "$OUTDIR/$runid.mutrel.npz" \
+      ">>  $OUTDIR/$runid.results.stdout" \
+      "2>> $OUTDIR/$runid.results.stderr"
   done | parallel -j$PARALLEL --halt 1
 }
 
 function main {
   #convert_inputs
-  run_pwgs
-  #convert_outputs
+  #run_pwgs
+  convert_outputs
 }
 
 main
