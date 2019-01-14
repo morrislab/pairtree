@@ -1,13 +1,9 @@
-import argparse
-import common
-import json
 import os
+import sys
 
-def load_sampnames(paramsfn):
-  with open(paramsfn) as P:
-    params = json.load(P)
-  sampnames = params['samples']
-  return sampnames
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+import argparse
+import inputparser
 
 def convert(variants, sampnames, outdir):
   vids = variants.keys()
@@ -18,8 +14,8 @@ def convert(variants, sampnames, outdir):
         vals = (
           variants[vid]['chrom'],
           variants[vid]['pos'],
-          int(variants[vid]['ref_reads'][sidx]),
-          int(variants[vid]['var_reads'][sidx]),
+          variants[vid]['ref_reads'][sidx],
+          variants[vid]['var_reads'][sidx],
           variants[vid]['vaf'][sidx],
         )
         print(*vals, sep='\t', file=F)
@@ -29,14 +25,15 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('sampid')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
   parser.add_argument('out_dir')
   args = parser.parse_args()
 
-  variants = common.parse_ssms(args.sampid, args.ssm_fn)
-  sampnames = load_sampnames(args.params_fn)
+  variants = inputparser.load_ssms(args.ssm_fn)
+  params = inputparser.load_params(args.params_fn)
+  sampnames = params['samples']
+
   convert(variants, sampnames, args.out_dir)
 
 main()
