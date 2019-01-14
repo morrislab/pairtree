@@ -69,6 +69,7 @@ function convert_outputs {
     OUTDIR=$OUTBASE/$runid
     treefn=$OUTDIR/chains/trees.zip
     [[ -f $treefn ]] || continue
+    [[ -f "$OUTDIR/$runid.mutrel.npz" ]] && continue
 
     echo "cd $OUTDIR &&" \
       "python2 $PWGS_PATH/write_results.py" \
