@@ -3,18 +3,16 @@ import numpy as np
 
 import os
 import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 import common
 import mutrel
 import resultserializer
-
-def softmax(V):
-  V = np.copy(V) - np.max(V)
-  return np.exp(V) / np.sum(np.exp(V))
+import evalutil
 
 def calc_mutrel_from_trees(adjms, llhs, clusters, tree_weights):
   if tree_weights == 'llh':
-    weights = softmax(llhs)
+    weights = evalutil.softmax(llhs)
   elif tree_weights == 'uniform':
     weights = np.ones(len(adjms)) / len(adjms)
   else:
@@ -30,11 +28,7 @@ def calc_mutrel_from_trees(adjms, llhs, clusters, tree_weights):
       assert mrel.vids == vids
     soft_mutrel += weight * mrel.rels
 
-  # Floating point error means that some entires can slightly exceed 1. Ensure
-  # this doesn't happen by much.
-  assert np.allclose(1, soft_mutrel[soft_mutrel > 1])
-  soft_mutrel = np.minimum(1, soft_mutrel)
-
+  soft_mutrel = evalutil.fix_rounding_errors(soft_mutrel)
   return mutrel.Mutrel(
     vids = vids,
     rels = soft_mutrel,
@@ -74,11 +68,6 @@ def calc_mutrel_from_clustrel(clustrel, clusters):
     rels = mrel,
   )
 
-def save_sorted_mutrel(mrel, mrelfn):
-  mrel = mutrel.sort_mutrel_by_vids(mrel)
-  mutrel.check_posterior_sanity(mrel.rels)
-  np.savez_compressed(mrelfn, mutrel=mrel.rels)
-
 def main():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
@@ -100,19 +89,19 @@ def main():
   if args.pure_mutrel is not None:
     pure_mutrel = results['mutrel_posterior']
     assert set(pure_mutrel.vids) == all_vids
-    save_sorted_mutrel(pure_mutrel, args.pure_mutrel)
+    evalutil.save_sorted_mutrel(pure_mutrel, args.pure_mutrel)
 
   if args.trees_mutrel is not None:
     tree_mutrel = calc_mutrel_from_trees(results['adjm'], results['llh'], clusters, args.weight_trees_by)
     tree_mutrel = mutrel.add_garbage(tree_mutrel, garbage)
     assert set(tree_mutrel.vids) == all_vids
-    save_sorted_mutrel(tree_mutrel, args.trees_mutrel)
+    evalutil.save_sorted_mutrel(tree_mutrel, args.trees_mutrel)
 
   if args.clustrel_mutrel is not None:
     clustrel_mutrel = calc_mutrel_from_clustrel(results['clustrel_posterior'], clusters)
     clustrel_mutrel = mutrel.add_garbage(clustrel_mutrel, garbage)
     assert set(clustrel_mutrel.vids) == all_vids
-    save_sorted_mutrel(clustrel_mutrel, args.clustrel_mutrel)
+    evalutil.save_sorted_mutrel(clustrel_mutrel, args.clustrel_mutrel)
 
   if args.phi is not None:
     np.savez_compressed(args.phi, phi=results['phi'])

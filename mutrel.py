@@ -47,28 +47,6 @@ def sort_mutrel_by_vids(mrel):
     rels = reorder_array(mrel.rels, order),
   )
 
-def add_garbage(posterior, garb_svids):
-  if len(garb_svids) == 0:
-    return posterior
-  assert len(set(posterior.vids) & set(garb_svids)) == 0
-  new_vids = posterior.vids + garb_svids
-  new_posterior = init_mutrel(new_vids)
-  G = len(garb_svids)
-  M = len(new_posterior.vids)
-
-  # Rather than carefully slicing and dicing the array to set it, just use a
-  # series of carefully ordered overwrite operations to put it in the correct
-  # state.
-  new_posterior.rels[:] = 0
-  new_posterior.rels[:,:,Models.garbage] = 1
-  diag = range(M)
-  new_posterior.rels[diag,diag,:] = 0
-  new_posterior.rels[diag,diag,Models.cocluster] = 1
-  new_posterior.rels[:-G,:-G,:] = posterior.rels
-
-  check_posterior_sanity(new_posterior.rels)
-  return new_posterior
-
 def check_mutrel_sanity(mrel):
   '''Check properties that should be true of all mutrel arrays.'''
   assert not np.any(np.isnan(mrel))
