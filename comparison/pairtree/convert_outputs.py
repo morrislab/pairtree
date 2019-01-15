@@ -93,13 +93,13 @@ def main():
 
   if args.trees_mutrel is not None:
     tree_mutrel = calc_mutrel_from_trees(results['adjm'], results['llh'], clusters, args.weight_trees_by)
-    tree_mutrel = mutrel.add_garbage(tree_mutrel, garbage)
+    tree_mutrel = evalutil.add_garbage(tree_mutrel, garbage)
     assert set(tree_mutrel.vids) == all_vids
     evalutil.save_sorted_mutrel(tree_mutrel, args.trees_mutrel)
 
   if args.clustrel_mutrel is not None:
     clustrel_mutrel = calc_mutrel_from_clustrel(results['clustrel_posterior'], clusters)
-    clustrel_mutrel = mutrel.add_garbage(clustrel_mutrel, garbage)
+    clustrel_mutrel = evalutil.add_garbage(clustrel_mutrel, garbage)
     assert set(clustrel_mutrel.vids) == all_vids
     evalutil.save_sorted_mutrel(clustrel_mutrel, args.clustrel_mutrel)
 
