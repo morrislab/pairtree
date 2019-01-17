@@ -6,6 +6,7 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import mutrel
+import evalutil
 
 def main():
   parser = argparse.ArgumentParser(
@@ -21,11 +22,9 @@ def main():
   clusters = [[]] + simdata['clusters']
 
   mrel = mutrel.make_mutrel_tensor_from_cluster_adj(simdata['adjm'], clusters)
-  mrel = mutrel.add_garbage(mrel, simdata['vids_garbage'])
-  mrel = mutrel.sort_mutrel_by_vids(mrel)
-
+  mrel = evalutil.add_garbage(mrel, simdata['vids_garbage'])
   assert set(mrel.vids) == set(simdata['vids_good'] + simdata['vids_garbage'])
-  np.savez_compressed(args.mutrel_fn, mutrel=mrel.rels)
+  evalutil.save_sorted_mutrel(mrel, args.mutrel_fn)
 
 if __name__ == '__main__':
   main()
