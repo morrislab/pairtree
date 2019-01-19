@@ -11,11 +11,10 @@ sys.path += [
 from pwgsresults.result_loader import ResultLoader
 import common
 import mutrel
-import clustermaker
 import inputparser
 import evalutil
 
-def replace_supervar_with_variants(supervars, clusters, mutass):
+def replace_supervar_with_variants(clusters, mutass):
   expanded = {}
   for nodeid in mutass.keys():
     assert len(mutass[nodeid]['cnvs']) == 0
@@ -23,38 +22,22 @@ def replace_supervar_with_variants(supervars, clusters, mutass):
     expanded[nodeid] = [vid for cidx in cidxs for vid in clusters[cidx]]
   return expanded
 
-def calc_mutrel(results, base_clusters, supervars, tree_weights):
+def calc_mutrel(results, base_clusters, tree_weights):
   tidxs = sorted(results.tree_summary.keys())
-  soft_mutrel = None
-  vids = None
-
   llhs = np.array([results.tree_summary[tidx]['llh'] for tidx in tidxs])
-  if tree_weights == 'llh':
-    weights = evalutil.softmax(llhs)
-  elif tree_weights == 'uniform':
-    weights = np.ones(len(llhs)) / len(llhs)
-  else:
-    raise Exception('Unknown tree_weights=%s' % tree_weights)
+  adjms = []
+  clusterings = []
 
-  for tidx, mutass in results.load_all_mut_assignments():
-    weight = weights[tidx]
-    full_mutass = replace_supervar_with_variants(supervars, base_clusters, mutass)
+  for idx, (tidx, mutass) in enumerate(results.load_all_mut_assignments()):
+    # Ensure trees are provided in sorted order.
+    assert idx == tidx
+    full_mutass = replace_supervar_with_variants(base_clusters, mutass)
     adjm = common.convert_adjlist_to_adjmatrix(results.tree_summary[tidx]['structure'])
     pwgs_clusters = [full_mutass[cidx] if cidx in full_mutass else [] for cidx in range(len(adjm))]
-    mrel = mutrel.make_mutrel_tensor_from_cluster_adj(adjm, pwgs_clusters)
+    adjms.append(adjm)
+    clusterings.append(pwgs_clusters)
 
-    if vids is None:
-      soft_mutrel = np.zeros(mrel.rels.shape)
-      vids = mrel.vids
-    else:
-      assert vids == mrel.vids
-    soft_mutrel += weight * mrel.rels
-
-  soft_mutrel = evalutil.fix_rounding_errors(soft_mutrel)
-  return mutrel.Mutrel(
-    vids = vids,
-    rels = soft_mutrel,
-  )
+  return evalutil.calc_mutrel_from_trees(adjms, llhs, clusterings, tree_weights)
 
 def main():
   parser = argparse.ArgumentParser(
@@ -62,7 +45,9 @@ def main():
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--weight-trees-by', choices=('llh', 'uniform'), default='uniform')
-  parser.add_argument('pairtree_ssm_fn')
+  # This takes Pairtree rather than PWGS inputs, which seems a little weird,
+  # but it's okay -- the PWGS inputs are the supervariants, ut we need to know
+  # hich variants correspond to each cluster in the original Pairtree inputs.
   parser.add_argument('pairtree_params_fn')
   parser.add_argument('tree_summary',
     help='JSON-formatted tree summaries')
@@ -70,19 +55,17 @@ def main():
     help='JSON-formatted list of mutations')
   parser.add_argument('mutation_assignment',
     help='JSON-formatted list of SSMs and CNVs assigned to each subclone')
-  parser.add_argument('mutrel_fn')
+  parser.add_argument('--trees-mutrel')
   args = parser.parse_args()
 
-  variants = inputparser.load_ssms(args.pairtree_ssm_fn)
-  params = inputparser.load_params(args.pairtree_params_fn)
-  supervars = clustermaker.make_cluster_supervars(params['clusters'], variants)
-
-  base_clusters = params['clusters']
   results = ResultLoader(args.tree_summary, args.mutation_list, args.mutation_assignment)
-  mrel = calc_mutrel(results, base_clusters, supervars, args.weight_trees_by)
-  mrel = evalutil.add_garbage(mrel, params['garbage'])
 
-  evalutil.save_sorted_mutrel(mrel, args.mutrel_fn)
+  if args.trees_mutrel is not None:
+    params = inputparser.load_params(args.pairtree_params_fn)
+    base_clusters = params['clusters']
+    mrel = calc_mutrel(results, base_clusters, args.weight_trees_by)
+    mrel = evalutil.add_garbage(mrel, params['garbage'])
+    evalutil.save_sorted_mutrel(mrel, args.trees_mutrel)
 
 if __name__ == '__main__':
   main()

@@ -1,9 +1,9 @@
 #!/bin/bash
 set -euo pipefail
-module load gnu-parallel
+#module load gnu-parallel
 
 BASEDIR=~/work/pairtree
-JOBDIR=$SCRATCH/jobs
+JOBDIR=/tmp
 INDIR=$BASEDIR/scratch/inputs/sims.pwgs.supervars
 OUTBASE=$BASEDIR/scratch/results/sims.pwgs.supervars
 PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
@@ -71,22 +71,25 @@ function convert_outputs {
     [[ -f $treefn ]] || continue
     [[ -f "$OUTDIR/$runid.mutrel.npz" ]] && continue
 
-    echo "cd $OUTDIR &&" \
-      "python2 $PWGS_PATH/write_results.py" \
-      "--include-multiprimary" \
-      "$runid" \
-      "$treefn" \
-      "$OUTDIR/$runid.{summ.json.gz,muts.json.gz,mutass.zip}" \
-      ">  $OUTDIR/$runid.results.stdout" \
-      "2> $OUTDIR/$runid.results.stderr &&" \
-    "OMP_NUM_THREADS=1 python3 $BASEDIR/comparison/pwgs/convert_outputs.py" \
-      "--weight-trees-by uniform" \
-      "$PAIRTREE_INPUTS_DIR/$runid.{ssm,params.json}" \
-      "$OUTDIR/$runid.{summ.json.gz,muts.json.gz,mutass.zip}" \
-      "$OUTDIR/$runid.mutrel.npz" \
-      ">>  $OUTDIR/$runid.results.stdout" \
-      "2>> $OUTDIR/$runid.results.stderr"
-  done | parallel -j$PARALLEL --halt 1
+    cmd="cd $OUTDIR && "
+    cmd+="python2 $PWGS_PATH/write_results.py "
+    cmd+="--include-multiprimary "
+    cmd+="$runid "
+    cmd+="$treefn "
+    cmd+="$OUTDIR/$runid.{summ.json.gz,muts.json.gz,mutass.zip} "
+    cmd+=">  $OUTDIR/$runid.results.stdout "
+    cmd+="2> $OUTDIR/$runid.results.stderr "
+    for tree_weights in uniform llh; do
+      cmd+="&& OMP_NUM_THREADS=1 python3 $BASEDIR/comparison/pwgs/convert_outputs.py "
+      cmd+="--weight-trees-by $tree_weights "
+      cmd+="--trees-mutrel $OUTDIR/$runid.pwgs_trees_$tree_weights.mutrel.npz "
+      cmd+="$PAIRTREE_INPUTS_DIR/$runid.params.json "
+      cmd+="$OUTDIR/$runid.{summ.json.gz,muts.json.gz,mutass.zip} "
+      cmd+=">>  $OUTDIR/$runid.results.stdout "
+      cmd+="2>> $OUTDIR/$runid.results.stderr"
+    done
+    echo $cmd
+  done  | parallel -j$PARALLEL --halt 1
 }
 
 function main {
