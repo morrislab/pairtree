@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-module load gnu-parallel
+#module load gnu-parallel
 
 PROTDIR=~/work/pairtree
 SCRIPTDIR=$(dirname "$(readlink -f "$0")")
@@ -53,28 +53,35 @@ function run_pairtree {
 function convert_outputs {
   for resultsfn in $PAIRTREE_RESULTS_DIR/*.results.npz; do
     runid=$(basename $resultsfn | cut -d. -f1)
-    jobfn=$(mktemp)
+    #jobfn=$(mktemp)
     (
-        echo "#!/bin/bash"
-        echo "#SBATCH --nodes=1"
-        echo "#SBATCH --ntasks=$PARALLEL"
-        echo "#SBATCH --time=23:59:00"
-        echo "#SBATCH --job-name convert_$runid"
-        echo "#SBATCH --output=$JOBDIR/slurm_${runid}_%j.txt"
-        echo "#SBATCH --mail-type=NONE"
+        #echo "#!/bin/bash"
+        #echo "#SBATCH --nodes=1"
+        #echo "#SBATCH --ntasks=$PARALLEL"
+        #echo "#SBATCH --time=23:59:00"
+        #echo "#SBATCH --job-name convert_$runid"
+        #echo "#SBATCH --output=$JOBDIR/slurm_${runid}_%j.txt"
+        #echo "#SBATCH --mail-type=NONE"
 
         echo "cd $PAIRTREE_RESULTS_DIR &&" \
-          "python3 $SCRIPTDIR/convert_outputs.py" \
-          "--weight-trees-by uniform" \
+          "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/convert_outputs.py" \
           "--clustrel-mutrel $PAIRTREE_RESULTS_DIR/$runid.pairtree_clustrel.mutrel.npz" \
-          "--trees-mutrel $PAIRTREE_RESULTS_DIR/$runid.pairtree_trees.mutrel.npz" \
           "--phi $PAIRTREE_RESULTS_DIR/$runid.pairtree.phi.npz" \
           "$PAIRTREE_RESULTS_DIR/$runid.results.npz" \
           ">$PAIRTREE_RESULTS_DIR/$runid.output_conversion.stdout" \
           "2>$PAIRTREE_RESULTS_DIR/$runid.output_conversion.stderr"
-    ) > $jobfn
-    sbatch $jobfn
-    rm $jobfn
+        for tree_weights in uniform llh; do
+          echo "cd $PAIRTREE_RESULTS_DIR &&" \
+            "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/convert_outputs.py" \
+            "--weight-trees-by $tree_weights" \
+            "--trees-mutrel $PAIRTREE_RESULTS_DIR/$runid.pairtree_trees_$tree_weights.mutrel.npz" \
+            "$PAIRTREE_RESULTS_DIR/$runid.results.npz" \
+            ">>$PAIRTREE_RESULTS_DIR/$runid.output_conversion.stdout" \
+            "2>>$PAIRTREE_RESULTS_DIR/$runid.output_conversion.stderr"
+        done
+    ) #> $jobfn
+    #sbatch $jobfn
+    #rm $jobfn
   done
 }
 

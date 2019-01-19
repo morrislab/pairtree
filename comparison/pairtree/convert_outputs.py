@@ -11,28 +11,8 @@ import resultserializer
 import evalutil
 
 def calc_mutrel_from_trees(adjms, llhs, clusters, tree_weights):
-  if tree_weights == 'llh':
-    weights = evalutil.softmax(llhs)
-  elif tree_weights == 'uniform':
-    weights = np.ones(len(adjms)) / len(adjms)
-  else:
-    raise Exception('Unknown tree_weights=%s' % tree_weights)
-  vids = None
-
-  for adjm, weight in zip(adjms, weights):
-    mrel = mutrel.make_mutrel_tensor_from_cluster_adj(adjm, clusters)
-    if vids is None:
-      vids = mrel.vids
-      soft_mutrel = np.zeros(mrel.rels.shape)
-    else:
-      assert mrel.vids == vids
-    soft_mutrel += weight * mrel.rels
-
-  soft_mutrel = evalutil.fix_rounding_errors(soft_mutrel)
-  return mutrel.Mutrel(
-    vids = vids,
-    rels = soft_mutrel,
-  )
+  clusterings = [clusters for idx in range(len(adjms))]
+  return evalutil.calc_mutrel_from_trees(adjms, llhs, clusterings, tree_weights)
 
 def make_membership_mat(clusters):
   vids = common.sort_vids([vid for C in clusters for vid in C])
