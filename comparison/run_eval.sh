@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-module load gnu-parallel
+#module load gnu-parallel
 
 SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 BASEDIR=~/work/pairtree
@@ -23,15 +23,19 @@ function make_truth_mutrels {
 function run_eval {
   cd $RESULTSDIR
   prefix=sims
+  outfn=$RESULTSDIR/$prefix.txt
   SCORESDIR=$RESULTSDIR/$prefix/scores
   mkdir -p $SCORESDIR
+  rm -f $SCORESDIR/*.score.txt
 
   for mutrelfn in $TRUTH_DIR/*.mutrel.npz; do
     runid=$(basename $mutrelfn | cut -d. -f1)
     mutrels="truth=${prefix}.truth/$runid.mutrel.npz "
-    #mutrels+="pwgs=${prefix}.pwgs/$runid/$runid.mutrel.npz "
-    mutrels+="pairtree_trees=${prefix}.pairtree.fixedclusters/$runid.pairtree_trees.mutrel.npz "
-    mutrels+="pairtree_clustrel=${prefix}.pairtree.fixedclusters/$runid.pairtree_clustrel.mutrel.npz"
+    mutrels+="pwgs=${prefix}.pwgs.supervars/$runid/$runid.mutrel.npz "
+    mutrels+="pairtree_trees_llh=${prefix}.pairtree.fixedclusters/$runid.pairtree_trees_llh.mutrel.npz "
+    mutrels+="pairtree_trees_uniform=${prefix}.pairtree.fixedclusters/$runid.pairtree_trees_uniform.mutrel.npz "
+    mutrels+="pairtree_clustrel_llh=${prefix}.pairtree.fixedclusters/$runid.pairtree_clustrel_llh.mutrel.npz "
+    mutrels+="pairtree_clustrel_uniform=${prefix}.pairtree.fixedclusters/$runid.pairtree_clustrel_uniform.mutrel.npz"
 
     for M in $(echo $mutrels | tr ' ' '\n' | cut -d= -f2); do
       [[ ! -f $M ]] && continue 2
@@ -46,7 +50,8 @@ function run_eval {
     for foo in *.score.txt; do
       echo $(echo $foo | cut -d. -f1),$(tail -n+2 $foo) 
     done
-  ) | grep -v ',$' | curl -F c=@- https://ptpb.pw
+  ) > $outfn
+  cat $outfn | curl -F c=@- https://ptpb.pw
 }
 
 function main {
