@@ -146,6 +146,7 @@ def write_mutrel(sampid, params_fn, trees_fn, tree_weights, trees_mutrel_fn):
   if len(adjms) == 0:
     return
   mrel = evalutil.calc_mutrel_from_trees(adjms, llhs, clusterings, tree_weights)
+  mrel = evalutil.add_garbage(mrel, params['garbage'])
   evalutil.save_sorted_mutrel(mrel, trees_mutrel_fn)
 
 def main():

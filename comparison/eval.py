@@ -11,8 +11,11 @@ def load_mutrels(mutrel_args):
   for mutrel_arg in mutrel_args:
     mutrel_name, mutrel_path = mutrel_arg.split('=', 1)
     assert mutrel_name not in mutrels
-    mutrels[mutrel_name] = np.load(mutrel_path)['mutrel']
-    assert np.all(0 <= mutrels[mutrel_name]) and np.all(mutrels[mutrel_name] <= 1)
+    if os.path.exists(mutrel_path):
+      mutrels[mutrel_name] = np.load(mutrel_path)['mutrel']
+      assert np.all(0 <= mutrels[mutrel_name]) and np.all(mutrels[mutrel_name] <= 1)
+    else:
+      mutrels[mutrel_name] = None
   return mutrels
 
 def compare(mutrels):
@@ -26,6 +29,9 @@ def compare(mutrels):
 
   for name in names:
     mrel = mutrels[name]
+    if mrel is None:
+      scores[name] = -1
+      continue
     assert mrel.shape == (M, M, num_models)
     mutrel.check_posterior_sanity(mrel)
     score = np.nan * np.zeros((M, M))

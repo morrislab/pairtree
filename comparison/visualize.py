@@ -77,13 +77,17 @@ def init_content(method_names, results):
   return children
       
 def update_plot(methx, methy, results, *simparams):
-  visible = results
+  filters = []
   for param_name, param_vals in zip(SIM_PARAMS, simparams):
-    filter = visible[param_name].isin(param_vals)
-    visible = visible[filter]
+    filters.append(results[param_name].isin(param_vals))
+  visible = results[np.logical_and.reduce(filters)]
 
+  visible_X = visible[methx] != -1
+  visible_Y = visible[methy] != -1
+  visible = visible[np.logical_and(visible_X, visible_Y)]
   X = visible[methx]
   Y = visible[methy]
+
   if len(X) > 0:
     diag_topright = min(max(X), max(Y))
   else:
@@ -93,7 +97,7 @@ def update_plot(methx, methy, results, *simparams):
   # SciPy wants input in shape (# of dims, # of data).
   try:
     density = scipy.stats.gaussian_kde(XY)(XY)
-  except ValueError:
+  except (ValueError, np.linalg.LinAlgError):
     density = np.zeros(X.shape)
 
   plot = {
@@ -112,7 +116,13 @@ def update_plot(methx, methy, results, *simparams):
       yaxis = {'title': methy, 'range': (-0.1, 1.1)},
       hovermode = 'closest',
       height = 800,
-      title = '%s vs. %s (%s runs shown, %s total)' % (methy, methx, len(visible), len(results)),
+      title = '%s vs. %s (X=%s, Y=%s, total=%s)' % (
+        methx,
+        methy,
+        np.sum(visible_X),
+        np.sum(visible_Y),
+        len(X)
+      ),
       shapes = [{
         'type': 'line',
         'xref': 'x',
