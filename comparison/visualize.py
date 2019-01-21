@@ -10,6 +10,13 @@ import numpy as np
 import scipy.stats
 
 SIM_PARAMS = ('G', 'K', 'M', 'S', 'T')
+SIM_PARAM_LABELS = {
+  'G': 'Garbage mutations',
+  'K': 'Number of clusters',
+  'M': 'Non-garbage mutations',
+  'S': 'Samples',
+  'T': 'Read depth',
+}
 
 external_css = [{
   'href': 'https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css',
@@ -49,7 +56,7 @@ def init_content(method_names, results):
     ))
 
   for param_name in SIM_PARAMS:
-    controls.append(html.Label(children=param_name))
+    controls.append(html.Label(children=SIM_PARAM_LABELS[param_name]))
     param_vals = sorted(results[param_name].unique())
     controls.append(dcc.Dropdown(
       id = f'{param_name}_chooser',
