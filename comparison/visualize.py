@@ -65,6 +65,17 @@ def init_content(method_names, results):
       multi = True,
     ))
 
+  controls.append(html.Label(children='Jitter'))
+  # Note that `values` must be specified, or I get a weird exception concerning
+  # `TypeError: Object of type method is not JSON serializable`.
+  controls.append(dcc.Slider(
+    id = 'jitter',
+    min = 0,
+    max = 0.1,
+    step = 0.02,
+    value = 0.05
+  ))
+
   plot = dcc.Graph(id='mutrel_results')
   children = [
     html.Div(className='row', children=html.H1(children='Mutation relations')),
@@ -75,8 +86,13 @@ def init_content(method_names, results):
   ]
 
   return children
+
+def jitter_points(P, magnitude=0.01):
+  scale = magnitude * (np.max(P) - np.min(P))
+  noise = scale * np.random.uniform(low=-1, high=1, size=len(P))
+  return P + noise
       
-def update_plot(methx, methy, results, *simparams):
+def update_plot(methx, methy, results, jitter, *simparams):
   filters = []
   for param_name, param_vals in zip(SIM_PARAMS, simparams):
     filters.append(results[param_name].isin(param_vals))
@@ -99,6 +115,10 @@ def update_plot(methx, methy, results, *simparams):
     density = scipy.stats.gaussian_kde(XY)(XY)
   except (ValueError, np.linalg.LinAlgError):
     density = np.zeros(X.shape)
+
+  if jitter > 0:
+    X = jitter_points(X, jitter)
+    Y = jitter_points(Y, jitter)
 
   plot = {
     'data': [go.Scatter(
@@ -145,12 +165,13 @@ def create_callbacks(results):
   mutrel_fig_inputs = [
     dash.dependencies.Input('method_x', 'value'),
     dash.dependencies.Input('method_y', 'value'),
+    dash.dependencies.Input('jitter', 'value'),
   ]
   mutrel_fig_inputs += [dash.dependencies.Input(f'{P}_chooser', 'value') for P in SIM_PARAMS]
   app.callback(
     dash.dependencies.Output('mutrel_results', 'figure'),
     mutrel_fig_inputs,
-  )(lambda methx, methy, *simparams: update_plot(methx, methy, results, *simparams))
+  )(lambda methx, methy, jitter, *simparams: update_plot(methx, methy, results, jitter, *simparams))
 
 def main():
   parser = argparse.ArgumentParser(
