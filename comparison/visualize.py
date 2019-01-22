@@ -3,11 +3,11 @@ import dash_core_components as dcc
 import dash_html_components as html
 import plotly.graph_objs as go
 import re
-import argparse
 import pandas as pd
 from collections import defaultdict
 import numpy as np
 import scipy.stats
+import os
 
 SIM_PARAMS = ('G', 'K', 'M', 'S', 'T')
 SIM_PARAM_LABELS = {
@@ -103,6 +103,10 @@ def update_plot(methx, methy, results, jitter, *simparams):
   visible = visible[np.logical_and(visible_X, visible_Y)]
   X = visible[methx]
   Y = visible[methy]
+  if len(X) > 0:
+    Y_gte_X = np.sum(Y >= X) / float(len(X))
+  else:
+    Y_gte_X = 0
 
   if len(X) > 0:
     diag_topright = min(max(X), max(Y))
@@ -136,12 +140,13 @@ def update_plot(methx, methy, results, jitter, *simparams):
       yaxis = {'title': methy, 'range': (-0.1, 1.1)},
       hovermode = 'closest',
       height = 800,
-      title = '%s vs. %s (X=%s, Y=%s, total=%s)' % (
+      title = '%s vs. %s (X=%s, Y=%s, total=%s, Y>=X=%.3f)' % (
         methx,
         methy,
         np.sum(visible_X),
         np.sum(visible_Y),
-        len(X)
+        len(X),
+        Y_gte_X,
       ),
       shapes = [{
         'type': 'line',
@@ -173,15 +178,8 @@ def create_callbacks(results):
     mutrel_fig_inputs,
   )(lambda methx, methy, jitter, *simparams: update_plot(methx, methy, results, jitter, *simparams))
 
-def main():
-  parser = argparse.ArgumentParser(
-    description='LOL HI THERE',
-    formatter_class=argparse.ArgumentDefaultsHelpFormatter
-  )
-  parser.add_argument('resultsfn')
-  args = parser.parse_args()
-
-  results = pd.read_csv(args.resultsfn)
+def run(resultsfn):
+  results = pd.read_csv(resultsfn)
   method_names = get_method_names(results)
   results = augment(results)
 
@@ -189,7 +187,20 @@ def main():
   content = init_content(method_names, results)
   app.layout = html.Div(children=content, className='container-fluid')
   create_callbacks(results)
-  app.run_server(debug=True, host='0.0.0.0')
 
 if __name__ == '__main__':
-  main()
+  import argparse
+  parser = argparse.ArgumentParser(
+    description='LOL HI THERE',
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter
+  )
+  parser.add_argument('resultsfn')
+  args = parser.parse_args()
+
+  run(args.resultsfn)
+  app.run_server(debug=True, host='0.0.0.0')
+else:
+  run(os.environ['PAIRTREE_SIM_RESULTS'])
+  # Expose this for Gunicorn
+  # PAIRTREE_SIM_RESULTS=../scratch/results/sims.txt gunicorn -w 4 -b 0.0.0.0:4000 visualize:server
+  server = app.server
