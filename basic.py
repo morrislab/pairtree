@@ -10,29 +10,9 @@ import common
 import pairwise
 import inputparser
 import tree_sampler
-import phi_fitter
 import clustermaker
 import resultserializer
 import plotter
-
-def fit_phis(adjm, supervars, superclusters, tidxs, iterations, parallel):
-  ntrees = len(adjm)
-  nsamples = len(next(iter(supervars.values()))['total_reads'])
-
-  N, K, S = ntrees, len(superclusters), nsamples
-  eta = np.ones((N, K, S))
-  phi = np.ones((N, K, S))
-
-  for tidx in tidxs:
-    phi[tidx,:,:], eta[tidx,:,:] = phi_fitter.fit_phis(
-      adjm[tidx],
-      superclusters,
-      supervars,
-      iterations,
-      parallel
-    )
-
-  return (phi, eta)
 
 def main():
   np.set_printoptions(linewidth=400, precision=3, threshold=np.nan, suppress=True)
@@ -51,6 +31,7 @@ def main():
   parser.add_argument('--trees-per-chain', dest='trees_per_chain', type=int, default=2000)
   parser.add_argument('--tree-chains', dest='tree_chains', type=int, default=None)
   parser.add_argument('--phi-iterations', dest='phi_iterations', type=int, default=1000)
+  parser.add_argument('--tree_perturbations', dest='tree_perturbations', type=int, default=100)
   parser.add_argument('ssm_fn')
   parser.add_argument('results_fn')
   args = parser.parse_args()
@@ -106,25 +87,16 @@ def main():
   superclusters.insert(0, [])
 
   if 'adjm' not in results:
-    results['adjm'], results['llh'] = tree_sampler.sample_trees(
+    results['adjm'], results['phi'], results['llh'] = tree_sampler.sample_trees(
       results['clustrel_posterior'],
       supervars,
       superclusters,
       args.trees_per_chain,
       args.burnin_per_chain,
       tree_chains,
+      args.phi_iterations,
+      args.tree_perturbations,
       parallel,
-    )
-    resultserializer.save(results, args.results_fn)
-
-  if 'phi' not in results:
-    results['phi'], results['eta'] = fit_phis(
-      results['adjm'],
-      supervars,
-      superclusters,
-      tidxs = (-1,),
-      iterations = args.phi_iterations,
-      parallel = parallel,
     )
     resultserializer.save(results, args.results_fn)
 

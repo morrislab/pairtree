@@ -9,10 +9,8 @@ debug = common.debug
 
 MIN_FLOAT = np.finfo(np.float).min
 
-def _calc_llh_phi(data_mutrel, supervars, superclusters, cluster_adj):
-  phi, eta = phi_fitter.fit_phis(cluster_adj, superclusters, supervars, iterations=100, parallel=0)
+def _calc_llh_phi(phi, alpha, beta):
   K, S = phi.shape
-  alpha, beta = calc_beta_params(supervars)
   assert alpha.shape == beta.shape == (K-1, S)
   assert np.allclose(1, phi[0])
   phi_llh = scipy.stats.beta.logpdf(phi[1:,:], alpha, beta)
@@ -25,7 +23,7 @@ def _calc_llh_phi(data_mutrel, supervars, superclusters, cluster_adj):
   phi_llh = np.maximum(phi_llh, MIN_FLOAT)
   return phi_llh
 
-def _calc_llh_mutrel(data_mutrel, superclusters, cluster_adj):
+def _calc_llh_mutrel(cluster_adj, data_mutrel, superclusters):
   tree_mutrel = mutrel.make_mutrel_tensor_from_cluster_adj(cluster_adj, superclusters)
   mutrel_fit = 1 - np.abs(data_mutrel.rels - tree_mutrel.rels)
   # Prevent log of zero.
@@ -119,46 +117,58 @@ def calc_beta_params(supervars):
   assert np.all(alpha > 0) and np.all(beta > 0)
   return (alpha, beta)
 
-def _run_metropolis(nsamples, init_cluster_adj, _calc_llh, _sample_adj, progress_queue=None):
+def _run_metropolis(nsamples, init_cluster_adj, _calc_llh, _calc_phi, _sample_adj, progress_queue=None):
   cluster_adj = [init_cluster_adj]
-  llh = [_calc_llh(init_cluster_adj)]
+  phi = [_calc_phi(init_cluster_adj)]
+  llh = [_calc_llh(init_cluster_adj, phi[0])]
 
   for I in range(1, nsamples):
     if progress_queue is not None:
       progress_queue.put(I)
-    old_llh, old_adj = llh[-1], cluster_adj[-1]
+    old_llh, old_adj, old_phi = llh[-1], cluster_adj[-1], phi[-1]
     new_adj = _sample_adj(old_adj)
-    new_llh = _calc_llh(new_adj)
+    new_phi = _calc_phi(new_adj)
+    new_llh = _calc_llh(new_adj, new_phi)
 
     U = np.random.uniform()
     if new_llh - old_llh >= np.log(U):
       # Accept.
       cluster_adj.append(new_adj)
+      phi.append(new_phi)
       llh.append(new_llh)
       action = 'accept'
     else:
       # Reject.
       cluster_adj.append(old_adj)
+      phi.append(old_phi)
       llh.append(old_llh)
       action = 'reject'
     debug(_calc_llh.__name__, I, action, old_llh, new_llh, new_llh - old_llh, U, sep='\t')
 
-  return (cluster_adj, llh)
+  return (cluster_adj, phi, llh)
 
-def _run_chain(data_mutrel, supervars, superclusters, nsamples, progress_queue=None):
+def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_iterations, tree_perturbations, progress_queue=None):
   # Ensure each chain gets a new random state.
   # NOTE: this will break reproducibility.
   np.random.seed()
+
   assert nsamples > 0
   K = len(superclusters)
+  alpha, beta = calc_beta_params(supervars)
 
-  def calc_llh_phi(adj):
-    return _calc_llh_phi(data_mutrel, supervars, superclusters, adj)
-  def calc_llh_mutrel(adj):
-    return _calc_llh_mutrel(data_mutrel, superclusters, adj)
-  def permute_adj_multistep(oldadj, nsteps=100):
-    A, L = _run_metropolis(nsteps, oldadj, calc_llh_mutrel, _permute_adj)
-    best_adj, best_llh = choose_best_tree(A, L)
+  def __calc_phi(adj):
+    phi, eta = phi_fitter.fit_phis(adj, superclusters, supervars, iterations=phi_iterations, parallel=0)
+    return phi
+  def __calc_phi_noop(adj):
+    return None
+  def __calc_llh_phi(adj, phi):
+    return _calc_llh_phi(phi, alpha, beta)
+  def __calc_llh_mutrel(adj, phi):
+    return _calc_llh_mutrel(adj, data_mutrel, superclusters)
+  def __permute_adj_multistep(oldadj, nsteps=tree_perturbations):
+    adj, phi, llh = _run_metropolis(nsteps, oldadj, __calc_llh_mutrel, __calc_phi_noop, _permute_adj)
+    best_idx = choose_best_tree(adj, llh)
+    best_adj, best_llh = adj[best_idx], llh[best_idx]
     debug('best_proposal', best_llh)
     return best_adj
   # Particularly since clusters may not be ordered by mean VAF, a branching
@@ -170,19 +180,18 @@ def _run_chain(data_mutrel, supervars, superclusters, nsamples, progress_queue=N
 
   if progress_queue is not None:
     progress_queue.put(0)
-  adj, llh = _run_metropolis(nsamples, init_cluster_adj, calc_llh_phi, permute_adj_multistep, progress_queue)
-  return (adj, llh)
+  return _run_metropolis(nsamples, init_cluster_adj, __calc_llh_phi, __calc_phi, __permute_adj_multistep, progress_queue)
 
 def choose_best_tree(adj, llh):
   best_llh = -np.inf
-  best_adj = None
-  for A, L in zip(adj, llh):
+  best_idx = None
+  for idx, (A, L) in enumerate(zip(adj, llh)):
     if L > best_llh:
       best_llh = L
-      best_adj = A
-  return (best_adj, best_llh)
+      best_idx = idx
+  return best_idx
 
-def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_per_chain, nchains, parallel):
+def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_per_chain, nchains, phi_iterations, tree_perturbations, parallel):
   assert nchains > 0
   jobs = []
   total_per_chain = trees_per_chain + burnin_per_chain
@@ -200,7 +209,7 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_
     with progressbar(total=total, desc='Sampling trees', unit='tree', dynamic_ncols=True) as pbar:
       with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
         for C in range(nchains):
-          jobs.append(ex.submit(_run_chain, data_mutrel, supervars, superclusters, total_per_chain, progress_queue))
+          jobs.append(ex.submit(_run_chain, data_mutrel, supervars, superclusters, total_per_chain, phi_iterations, tree_perturbations, progress_queue))
 
         # Exactly `total` items will be added to the queue. Once we've
         # retrieved that many items from the queue, we can assume that our
@@ -215,11 +224,13 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_
   else:
     results = []
     for C in range(nchains):
-      results.append(_run_chain(data_mutrel, supervars, superclusters, total_per_chain))
+      results.append(_run_chain(data_mutrel, supervars, superclusters, total_per_chain, tree_perturbations, phi_iterations))
 
   merged_adj = []
+  merged_phi = []
   merged_llh = []
-  for A, L in results:
+  for A, P, L in results:
     merged_adj += A[burnin_per_chain:]
+    merged_phi += P[burnin_per_chain:]
     merged_llh += L[burnin_per_chain:]
-  return (merged_adj, merged_llh)
+  return (merged_adj, merged_phi, merged_llh)
