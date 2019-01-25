@@ -31,6 +31,18 @@ def calc_llh(var_reads, ref_reads, A, Z, psi):
   return np.sum(mut_probs)
 
 def fit_phis(adj, superclusters, supervars, iterations, parallel):
+  key = (hash(adj.tobytes()), iterations)
+  if key not in fit_phis.cache:
+    fit_phis.cache[key] = _fit_phis(adj, superclusters, supervars, iterations, parallel)
+    fit_phis.cache_misses += 1
+  else:
+    fit_phis.cache_hits += 1
+  return fit_phis.cache[key]
+fit_phis.cache = {}
+fit_phis.cache_hits = 0
+fit_phis.cache_misses = 0
+
+def _fit_phis(adj, superclusters, supervars, iterations, parallel):
   svids = common.extract_vids(supervars)
   ref_reads = np.array([supervars[svid]['ref_reads'] for svid in svids])
   var_reads = np.array([supervars[svid]['var_reads'] for svid in svids])
@@ -115,7 +127,7 @@ def calc_grad_numerical(var_reads, ref_reads, A, Z, psi):
     grad[k] = (calc_llh(var_reads, ref_reads, A, Z, P) - calc_llh(var_reads, ref_reads, A, Z, psi)) / delta
   return grad
 
-def grad_desc(var_reads, ref_reads, A, Z, psi, iterations):
+def grad_desc(var_reads, ref_reads, A, Z, psi, iterations, convergence_threshold=1e-30):
   learn_rate = 1e-4
 
   K = len(Z)
@@ -129,16 +141,19 @@ def grad_desc(var_reads, ref_reads, A, Z, psi, iterations):
     #grad_num = calc_grad_numerical(var_reads, ref_reads, A, Z, psi)
     #print(grad - grad_num)
 
-    psi += learn_rate * grad
+    step = learn_rate * grad
+    if np.max(np.abs(step)) < convergence_threshold:
+      break
+    psi += step
     llh = calc_llh(var_reads, ref_reads, A, Z, psi)
 
     if llh > last_llh:
-      #print('%s\tkeep\t%.2e\t%.2e' % (I, learn_rate, llh))
+      #print(I, 'keep', '%.2e' % learn_rate, '%.2e' % llh, sep='\t')
       last_llh = llh
       last_psi = psi
       learn_rate *= 1.1
     else:
-      #print('%s\trevert\t%.2e\t%.2e' % (I, learn_rate, llh))
+      #print(I, 'revert', '%.2e' % learn_rate, '%.2e' % llh, sep='\t')
       llh = last_llh
       psi = last_psi
       learn_rate *= 0.5
