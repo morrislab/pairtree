@@ -46,8 +46,12 @@ def main():
   prior = {'garbage': 0.001}
 
   if args.seed is not None:
-    np.random.seed(args.seed)
-    random.seed(args.seed)
+    seed = args.seed
+  else:
+    # Maximum seed is 2**32 - 1.
+    seed = np.random.randint(2**32)
+  np.random.seed(seed)
+  random.seed(seed)
 
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.params_fn)
@@ -55,7 +59,7 @@ def main():
   if os.path.exists(args.results_fn):
     results = resultserializer.load(args.results_fn)
   else:
-    results = {}
+    results = {'seed': seed}
 
   if 'clustrel_posterior' not in results:
     if 'clusters' in params and 'garbage' in params:
@@ -96,6 +100,7 @@ def main():
       tree_chains,
       args.phi_iterations,
       args.tree_perturbations,
+      seed,
       parallel,
     )
     resultserializer.save(results, args.results_fn)

@@ -147,10 +147,11 @@ def _run_metropolis(nsamples, init_cluster_adj, _calc_llh, _calc_phi, _sample_ad
 
   return (cluster_adj, phi, llh)
 
-def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_iterations, tree_perturbations, progress_queue=None):
-  # Ensure each chain gets a new random state.
-  # NOTE: this will break reproducibility.
-  np.random.seed()
+def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_iterations, tree_perturbations, seed, progress_queue=None):
+  # Ensure each chain gets a new random state. I add chain index to initial
+  # random seed to seed a new chain, so I must ensure that the seed is still in
+  # the valid range [0, 2**32).
+  np.random.seed(seed % 2**32)
 
   assert nsamples > 0
   K = len(superclusters)
@@ -191,7 +192,7 @@ def choose_best_tree(adj, llh):
       best_idx = idx
   return best_idx
 
-def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_per_chain, nchains, phi_iterations, tree_perturbations, parallel):
+def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_per_chain, nchains, phi_iterations, tree_perturbations, seed, parallel):
   assert nchains > 0
   jobs = []
   total_per_chain = trees_per_chain + burnin_per_chain
@@ -209,7 +210,9 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_
     with progressbar(total=total, desc='Sampling trees', unit='tree', dynamic_ncols=True) as pbar:
       with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
         for C in range(nchains):
-          jobs.append(ex.submit(_run_chain, data_mutrel, supervars, superclusters, total_per_chain, phi_iterations, tree_perturbations, progress_queue))
+          # Ensure each chain's random seed is different from the seed used to
+          # seed the initial Pairtree invocation, yet nonetheless reproducible.
+          jobs.append(ex.submit(_run_chain, data_mutrel, supervars, superclusters, total_per_chain, phi_iterations, tree_perturbations, seed + C + 1, progress_queue))
 
         # Exactly `total` items will be added to the queue. Once we've
         # retrieved that many items from the queue, we can assume that our
@@ -224,7 +227,7 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_
   else:
     results = []
     for C in range(nchains):
-      results.append(_run_chain(data_mutrel, supervars, superclusters, total_per_chain, tree_perturbations, phi_iterations))
+      results.append(_run_chain(data_mutrel, supervars, superclusters, total_per_chain, phi_iterations, tree_perturbations, seed + C + 1))
 
   merged_adj = []
   merged_phi = []
