@@ -29,25 +29,28 @@ for idx, M in enumerate(Models._all):
 
 def make_ancestral_from_adj(adj):
   K = len(adj)
-  Z = np.zeros((K,K))
+  root = 0
 
-  def _find_desc(I, vec):
-    # Base case: if I have no children, my ancestor vec is just myself.
-    if np.sum(vec) == 0:
-      return vec
-    else:
-      children = np.array([_find_desc(idx, adj[idx]) for (idx, val) in enumerate(vec) if idx != I and val == 1])
-      self_and_child = vec + np.sum(children, axis=0)
-      self_and_child[self_and_child > 1] = 1
-      return self_and_child
+  # Disable checks to improve performance.
+  #assert np.all(1 == np.diag(adj))
+  #expected_sum = 2 * np.ones(K)
+  #expected_sum[root] = 1
+  #assert np.array_equal(expected_sum, np.sum(adj, axis=0))
 
-  for k in range(K):
-    # If we know `adj` is topologically sorted, we can reduce the complexity of
-    # this -- we would start at leaves and work our way upward, eliminating
-    # need for recursive DFS. But since we don't expect `K` to be large, we can
-    # write more general version that works for non-toposorted trees.
-    Z[k] = _find_desc(k, adj[k])
+  Z = np.copy(adj)
+  np.fill_diagonal(Z, 0)
+  stack = [root]
+  while len(stack) > 0:
+    P = stack.pop()
+    C = list(np.flatnonzero(Z[P]))
+    if len(C) == 0:
+      continue
+    Z[:,C] = Z[:,P][:,np.newaxis]
+    Z[P,C] = 1
+    stack += C
+  np.fill_diagonal(Z, 1)
 
+  #assert np.array_equal(Z[root], np.ones(K))
   return Z
 
 def convert_adjlist_to_adjmatrix(adjlist):
