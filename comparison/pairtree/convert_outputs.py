@@ -5,7 +5,7 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-import common
+from common import Models
 import mutrel
 import resultserializer
 import evalutil
@@ -14,27 +14,14 @@ def calc_mutrel_from_trees(adjms, llhs, clusters, tree_weights):
   clusterings = [clusters for idx in range(len(adjms))]
   return evalutil.calc_mutrel_from_trees(adjms, llhs, clusterings, tree_weights)
 
-def make_membership_mat(clusters):
-  vids = common.sort_vids([vid for C in clusters for vid in C])
-  vidmap = {vid: vidx for vidx, vid in enumerate(vids)}
-  N = len(vids)
-  K = len(clusters)
-
-  # membership[i,j] = 1 iff mutation `i` is in cluster `j`
-  membership = np.zeros((N, K))
-  for cidx, C in enumerate(clusters):
-    members = [vidmap[vid] for vid in C]
-    membership[members,cidx] = 1
-  return (vids, membership)
-
 def calc_mutrel_from_clustrel(clustrel, clusters):
   mutrel.check_posterior_sanity(clustrel.rels)
   assert len(clusters[0]) == 0
-  vids, membership = make_membership_mat(clusters[1:])
+  vids, membership = evalutil.make_membership_mat(clusters[1:])
   # K: number of non-empty clusters
   M, K = membership.shape
 
-  num_models = len(common.Models._all)
+  num_models = len(Models._all)
   mrel = np.zeros((M, M, num_models))
   assert clustrel.rels.shape == (K, K, num_models)
 
@@ -57,7 +44,7 @@ def main():
   parser.add_argument('--clustrel-mutrel')
   parser.add_argument('--trees-mutrel')
   parser.add_argument('--pure-mutrel')
-  parser.add_argument('--phi')
+  parser.add_argument('--phi', dest='mutphifn')
   parser.add_argument('pairtree_results_fn')
   args = parser.parse_args()
 
@@ -83,8 +70,10 @@ def main():
     assert set(clustrel_mutrel.vids) == all_vids
     evalutil.save_sorted_mutrel(clustrel_mutrel, args.clustrel_mutrel)
 
-  if args.phi is not None:
-    np.savez_compressed(args.phi, phi=results['phi'])
+  if args.mutphifn is not None:
+    clusterings = [clusters for idx in range(len(results['adjm']))]
+    mutphi = evalutil.calc_mutphi(results['phi'], results['llh'], clusterings, args.weight_trees_by)
+    evalutil.save_mutphi(mutphi, args.mutphifn)
 
 if __name__ == '__main__':
   main()

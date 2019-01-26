@@ -1,20 +1,26 @@
 import numpy as np
+from collections import namedtuple
 
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import mutrel
+import common
 from common import Models
 
-def _fix_rounding_errors(mrel):
-  # Floating point error means that some entires can slightly exceed 1. Ensure
-  # this doesn't happen by much.
+Mutphi = namedtuple('Mutphi', ('vids', 'phi'))
+
+def _fix_rounding_errors(mat):
+  # Floating point error means that some entires can slightly exceed 1, even if
+  # constituents of average obey the constraint `0 <= entry <= 1`. Ensure this
+  # doesn't happen by much.
   #
   # This issue typically arises when performing evaluations, using an "average"
-  # mutrel created by summing many constituent weighted mutrels.
-  assert np.allclose(1, mrel[mrel > 1])
-  mrel = np.minimum(1, mrel)
-  return mrel
+  # matrix created by summing many constituent weighted matrices.
+  assert np.allclose(1, mat[mat > 1])
+  mat = np.minimum(1, mat)
+  assert np.all(0 <= mat)
+  return mat
 
 def add_garbage(posterior, garb_svids):
   if len(garb_svids) == 0:
@@ -41,9 +47,9 @@ def add_garbage(posterior, garb_svids):
 def save_sorted_mutrel(mrel, mrelfn):
   mrel = mutrel.sort_mutrel_by_vids(mrel)
   mutrel.check_posterior_sanity(mrel.rels)
-  np.savez_compressed(mrelfn, mutrel=mrel.rels)
+  np.savez_compressed(mrelfn, rels=mrel.rels, vids=mrel.vids)
 
-def _distinguish_unique(adjms, logweights, clusterings):
+def _distinguish_unique_trees(adjms, logweights, clusterings):
   used_logweights = set()
   uniq_adjms = []
   uniq_clusterings = []
@@ -90,15 +96,44 @@ def _softmax(V):
   V = np.copy(V) - np.max(V)
   return np.exp(V) / np.sum(np.exp(V))
 
-def calc_mutrel_from_trees(adjms, llhs, clusterings, tree_weights):
+def _make_logweights(llhs, tree_weights):
   if tree_weights == 'llh':
-    logweights = np.copy(llhs)
+    return np.copy(llhs)
   elif tree_weights == 'uniform':
-    logweights = np.zeros(len(llhs))
+    return np.zeros(len(llhs))
   else:
     raise Exception('Unknown tree_weights=%s' % tree_weights)
 
-  uniq_adjms, uniq_clusterings, uniq_logweights, counts = _distinguish_unique(adjms, logweights, clusterings)
+def calc_mutphi(cluster_phis, llhs, clusterings, tree_weights):
+  logweights = _make_logweights(llhs, tree_weights)
+  weights = _softmax(logweights)
+  assert len(cluster_phis) == len(llhs) == len(clusterings)
+
+  vids = None
+
+  for (cluster_phi, clustering, weight) in zip(cluster_phis, clusterings, weights):
+    V, membership = make_membership_mat(clustering)
+    mutphi = np.dot(membership, cluster_phi)
+    if vids is None:
+      vids = V
+      soft_mutphi = np.zeros(mutphi.shape)
+    else:
+      assert vids == V
+    soft_mutphi += weight * mutphi
+
+  soft_mutphi = _fix_rounding_errors(soft_mutphi)
+  return Mutphi(vids=vids, phi=soft_mutphi)
+
+def save_mutphi(mutphi, mutphifn):
+  np.savez_compressed(mutphifn, phi=mutphi.phi, vids=mutphi.vids)
+
+def load_mutphi(mutphifn):
+  results = np.load(mutphifn)
+  return Mutphi(phi=results['phi'], vids=results['vids'])
+
+def calc_mutrel_from_trees(adjms, llhs, clusterings, tree_weights):
+  logweights = _make_logweights(llhs, tree_weights)
+  uniq_adjms, uniq_clusterings, uniq_logweights, counts = _distinguish_unique_trees(adjms, logweights, clusterings)
   # Oftentimes, we will have many samples of the same adjacency matrix paired
   # with the same clustering. This will produce the same mutrel. As computing
   # the mutrel from adjm + clustering is expensive, we want to avoid repeating
@@ -115,9 +150,7 @@ def calc_mutrel_from_trees(adjms, llhs, clusterings, tree_weights):
   weights = _softmax(uniq_logweights + np.log(counts))
 
   vids = None
-  idx = 0
   for adjm, clustering, weight in zip(uniq_adjms, uniq_clusterings, weights):
-    idx += 1
     mrel = mutrel.make_mutrel_tensor_from_cluster_adj(adjm, clustering)
     if vids is None:
       vids = mrel.vids
@@ -131,3 +164,16 @@ def calc_mutrel_from_trees(adjms, llhs, clusterings, tree_weights):
     vids = vids,
     rels = soft_mutrel,
   )
+
+def make_membership_mat(clusters):
+  vids = common.sort_vids([vid for C in clusters for vid in C])
+  vidmap = {vid: vidx for vidx, vid in enumerate(vids)}
+  N = len(vids)
+  K = len(clusters)
+
+  # membership[i,j] = 1 iff mutation `i` is in cluster `j`
+  membership = np.zeros((N, K))
+  for cidx, C in enumerate(clusters):
+    members = [vidmap[vid] for vid in C]
+    membership[members,cidx] = 1
+  return (vids, membership)
