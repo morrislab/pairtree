@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+#set -euo pipefail
 #module load gnu-parallel
 
 BASEDIR=~/work/pairtree
@@ -64,32 +64,45 @@ function run_pwgs {
 }
 
 function convert_outputs {
+  USE_MULTICHAIN=false
+
   cd $OUTBASE
   for runid in *; do
     OUTDIR=$OUTBASE/$runid
-    treefn=$OUTDIR/chains/trees.zip
-    [[ -f $treefn ]] || continue
-    [[ -f "$OUTDIR/$runid.mutrel.npz" ]] && continue
+    multichain_treefn=$OUTDIR/chains/trees.zip
+    [[ -f $multichain_treefn ]] || continue
+
+    if [ "$USE_MULTICHAIN" = true ]; then
+      json_base=$runid.multichain
+      treefn=$multichain_treefn
+      mutrel_base=$runid.pwgs_trees_multi
+    else
+      chainpath=$(ls -d $OUTDIR/chains/chain* | sort --random-sort | head -n1)
+      chain=$(basename $chainpath)
+      json_base=$runid.single_$chain
+      treefn=$chainpath/trees.zip
+      mutrel_base=$runid.pwgs_trees_single
+    fi
 
     cmd="cd $OUTDIR && "
     cmd+="python2 $PWGS_PATH/write_results.py "
     cmd+="--include-multiprimary "
     cmd+="$runid "
     cmd+="$treefn "
-    cmd+="$OUTDIR/$runid.{summ.json.gz,muts.json.gz,mutass.zip} "
+    cmd+="$OUTDIR/$json_base.{summ.json.gz,muts.json.gz,mutass.zip} "
     cmd+=">  $OUTDIR/$runid.results.stdout "
     cmd+="2> $OUTDIR/$runid.results.stderr "
     for tree_weights in uniform llh; do
       cmd+="&& OMP_NUM_THREADS=1 python3 $BASEDIR/comparison/pwgs/convert_outputs.py "
       cmd+="--weight-trees-by $tree_weights "
-      cmd+="--trees-mutrel $OUTDIR/$runid.pwgs_trees_$tree_weights.mutrel.npz "
+      cmd+="--trees-mutrel $OUTDIR/${mutrel_base}_${tree_weights}.mutrel.npz "
       cmd+="$PAIRTREE_INPUTS_DIR/$runid.params.json "
-      cmd+="$OUTDIR/$runid.{summ.json.gz,muts.json.gz,mutass.zip} "
+      cmd+="$OUTDIR/$json_base.{summ.json.gz,muts.json.gz,mutass.zip} "
       cmd+=">>  $OUTDIR/$runid.results.stdout "
       cmd+="2>> $OUTDIR/$runid.results.stderr"
     done
     echo $cmd
-  done  | parallel -j$PARALLEL --halt 1
+  done | parallel -j$PARALLEL --halt 1
 }
 
 function main {
