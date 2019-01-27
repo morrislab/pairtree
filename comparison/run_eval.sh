@@ -14,10 +14,11 @@ function make_truth_mutrels {
   mkdir -p $TRUTH_DIR
   for datafn in $PAIRTREE_INPUTS_DIR/*.data.pickle; do
     runid=$(basename $datafn | cut -d. -f1)
-    echo "python3 $SCRIPTDIR/make_truth_mutrel.py" \
+    echo "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_truth_mutrel.py" \
       "$datafn" \
-      "$TRUTH_DIR/$runid.mutrel.npz"
-  done | parallel -j$PARALLEL --halt 1
+      "$TRUTH_DIR/$runid.mutrel.npz" \
+      "$TRUTH_DIR/$runid.mutphi.npz"
+  done #| parallel -j$PARALLEL --halt 1
 }
 
 function run_eval {
@@ -57,8 +58,8 @@ function run_eval {
 }
 
 function main {
-  #make_truth_mutrels
-  run_eval
+  make_truth_mutrels
+  #run_eval
 }
 
 main
