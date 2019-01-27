@@ -32,8 +32,10 @@ function run_eval {
   for mutrelfn in $TRUTH_DIR/*.mutrel.npz; do
     runid=$(basename $mutrelfn | cut -d. -f1)
     mutrels="truth=${prefix}.truth/$runid.mutrel.npz "
-    mutrels+="pwgs_trees_llh=${prefix}.pwgs.supervars/$runid/$runid.pwgs_trees_llh.mutrel.npz "
-    mutrels+="pwgs_trees_uniform=${prefix}.pwgs.supervars/$runid/$runid.pwgs_trees_uniform.mutrel.npz "
+    mutrels+="pwgs_trees_single_llh=${prefix}.pwgs.supervars/$runid/$runid.pwgs_trees_single_llh.mutrel.npz "
+    mutrels+="pwgs_trees_single_uniform=${prefix}.pwgs.supervars/$runid/$runid.pwgs_trees_single_uniform.mutrel.npz "
+    mutrels+="pwgs_trees_multi_llh=${prefix}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_llh.mutrel.npz "
+    mutrels+="pwgs_trees_multi_uniform=${prefix}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_uniform.mutrel.npz "
     mutrels+="pairtree_trees_llh=${prefix}.pairtree.fixedclusters/$runid.pairtree_trees_llh.mutrel.npz "
     mutrels+="pairtree_trees_uniform=${prefix}.pairtree.fixedclusters/$runid.pairtree_trees_uniform.mutrel.npz "
     mutrels+="pairtree_clustrel=${prefix}.pairtree.fixedclusters/$runid.pairtree_clustrel.mutrel.npz "
