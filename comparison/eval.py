@@ -5,6 +5,8 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import mutrel
+import inputparser
+from common import Models
 
 def load_mutrels(mutrel_args):
   mutrels = {}
@@ -17,6 +19,24 @@ def load_mutrels(mutrel_args):
     else:
       mutrels[mutrel_name] = None
   return mutrels
+
+def discard_garbage(mutrels, clustered, garbage):
+  for name in list(mutrels.keys()):
+    vids = mutrels[name].vids
+    assert set(vids) == clustered | garbage
+
+    gidxs = [idx for idx, vid in enumerate(vids) if vid in garbage]
+    for garbrels in (mutrels[name].rels[gidxs,:,Models.garbage], mutrels[name].rels[:,gidxs,Models.garbage].T):
+      # Garbage mutations should have posterior that coclusters with
+      # themselves, but that renders them garbage to every other mutation
+      # (including other garbage)
+      G, M = garbrels.shape
+      # `expected` shape, given `G` garbage variants and `M` total variants: `GxM`
+      expected = np.ones((G, M))
+      expected[np.arange(G),gidxs] = 0
+      assert np.allclose(expected, garbrels)
+    mutrels[name] = mutrel.remove_variants(mutrels[name], gidxs)
+    assert set(mutrels[name].vids) == clustered
 
 def compare(mutrels):
   assert 'truth' in mutrels
@@ -58,10 +78,18 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('--discard-garbage', dest='discard_garbage', action='store_true')
+  parser.add_argument('--params', dest='paramsfn', required=True)
   parser.add_argument('mutrels', nargs='+')
   args = parser.parse_args()
 
+  params = inputparser.load_params(args.paramsfn)
+  garbage = set(params['garbage'])
+  clustered = set([vid for C in params['clusters'] for vid in C])
+
   mutrels = load_mutrels(args.mutrels)
+  if args.discard_garbage:
+    discard_garbage(mutrels, clustered, garbage)
   compare(mutrels)
 
 if __name__ == '__main__':

@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-#module load gnu-parallel
+command -v parallel || module load gnu-parallel
 
 SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 BASEDIR=~/work/pairtree
@@ -8,7 +8,7 @@ BATCH=sims
 RESULTSDIR=$BASEDIR/scratch/results
 TRUTH_DIR=$RESULTSDIR/$BATCH.truth
 PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
-PARALLEL=40
+PARALLEL=20
 
 function make_truth_mutrels {
   mkdir -p $TRUTH_DIR
@@ -29,25 +29,30 @@ function run_eval {
   mkdir -p $SCORESDIR
   rm -f $SCORESDIR/*.score.txt
 
-  for mutrelfn in $TRUTH_DIR/*.mutrel.npz; do
+  for mutrelfn in $(ls $TRUTH_DIR/*.mutrel.npz | sort --random-sort); do
     runid=$(basename $mutrelfn | cut -d. -f1)
     mutrels="truth=${prefix}.truth/$runid.mutrel.npz "
-    mutrels+="pwgs_trees_single_llh=${prefix}.pwgs.supervars/$runid/$runid.pwgs_trees_single_llh.mutrel.npz "
-    mutrels+="pwgs_trees_single_uniform=${prefix}.pwgs.supervars/$runid/$runid.pwgs_trees_single_uniform.mutrel.npz "
-    mutrels+="pwgs_trees_multi_llh=${prefix}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_llh.mutrel.npz "
-    mutrels+="pwgs_trees_multi_uniform=${prefix}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_uniform.mutrel.npz "
     mutrels+="pairtree_trees_llh=${prefix}.pairtree.fixedclusters/$runid.pairtree_trees_llh.mutrel.npz "
     mutrels+="pairtree_trees_uniform=${prefix}.pairtree.fixedclusters/$runid.pairtree_trees_uniform.mutrel.npz "
     mutrels+="pairtree_clustrel=${prefix}.pairtree.fixedclusters/$runid.pairtree_clustrel.mutrel.npz "
-    mutrels+="pastri_trees_llh=${prefix}.pastri.informative/$runid.pastri_trees_llh.mutrel.npz "
-    mutrels+="pastri_trees_uniform=${prefix}.pastri.informative/$runid.pastri_trees_uniform.mutrel.npz"
+    #mutrels+="pwgs_trees_single_llh=${prefix}.pwgs.supervars/$runid/$runid.pwgs_trees_single_llh.mutrel.npz "
+    #mutrels+="pwgs_trees_single_uniform=${prefix}.pwgs.supervars/$runid/$runid.pwgs_trees_single_uniform.mutrel.npz "
+    #mutrels+="pwgs_trees_multi_llh=${prefix}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_llh.mutrel.npz "
+    #mutrels+="pwgs_trees_multi_uniform=${prefix}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_uniform.mutrel.npz "
+    #mutrels+="pastri_trees_llh=${prefix}.pastri.informative/$runid.pastri_trees_llh.mutrel.npz "
+    #mutrels+="pastri_trees_uniform=${prefix}.pastri.informative/$runid.pastri_trees_uniform.mutrel.npz"
 
-    #for M in $(echo $mutrels | tr ' ' '\n' | cut -d= -f2); do
-    #  [[ ! -f $M ]] && continue 2
-    #done
+    for M in $(echo $mutrels | tr ' ' '\n' | cut -d= -f2); do
+      [[ ! -f $M ]] && continue 2
+    done
 
-    echo "cd $RESULTSDIR && python3 $SCRIPTDIR/eval.py $mutrels > $SCORESDIR/$runid.score.txt"
-  done | parallel -j$PARALLEL
+    echo "cd $RESULTSDIR && " \
+      "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/eval.py " \
+      "--discard-garbage" \
+      "--params $PAIRTREE_INPUTS_DIR/$runid.params.json" \
+      "$mutrels " \
+      "> $SCORESDIR/$runid.score.txt"
+  done | parallel -j10 --halt 1
 
   (
     cd $SCORESDIR
@@ -60,8 +65,8 @@ function run_eval {
 }
 
 function main {
-  make_truth_mutrels
-  #run_eval
+  #make_truth_mutrels
+  run_eval
 }
 
 main
