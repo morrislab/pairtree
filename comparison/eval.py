@@ -22,6 +22,8 @@ def load_mutrels(mutrel_args):
 
 def discard_garbage(mutrels, clustered, garbage):
   for name in list(mutrels.keys()):
+    if mutrels[name] is None:
+      continue
     vids = mutrels[name].vids
     assert set(vids) == clustered | garbage
 
