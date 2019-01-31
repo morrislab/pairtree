@@ -87,7 +87,8 @@ def init_content(method_names, sim_param_vals):
   return children
 
 def jitter_points(P, magnitude=0.01):
-  scale = magnitude * (np.max(P) - np.min(P))
+  # If all points in `P` have the same value, avoid making the jitter 0.
+  scale = np.max((0.01, magnitude * np.max(P) - np.min(P)))
   noise = scale * np.random.uniform(low=-1, high=1, size=len(P))
   return P + noise
       
@@ -97,11 +98,15 @@ def update_plot(plot_type, methx, methy, results, jitter, *simparams):
     filters.append(results[param_name].isin(param_vals))
   visible = results[np.logical_and.reduce(filters)]
 
-  visible_X = visible[methx] != -1
-  visible_Y = visible[methy] != -1
-  visible = visible[np.logical_and(visible_X, visible_Y)]
-  X = visible[methx]
-  Y = visible[methy]
+  missing_X = (visible[methx] == -1)
+  missing_Y = (visible[methy] == -1)
+  missing_X_prop = np.sum(missing_X) / float(len(visible))
+  missing_Y_prop = np.sum(missing_Y) / float(len(visible))
+  X = np.copy(visible[methx])
+  Y = np.copy(visible[methy])
+  X[missing_X] = 0
+  Y[missing_Y] = 0
+
   if len(X) > 0:
     threshold = 0.01
     Y_gt_X = np.sum((Y - X) > threshold) / float(len(X))
@@ -144,13 +149,13 @@ def update_plot(plot_type, methx, methy, results, jitter, *simparams):
       yaxis = {'title': methy, 'range': (-0.1, 1.1)},
       hovermode = 'closest',
       height = 800,
-      title = '%s %s vs. %s (X=%s, Y=%s, total=%s,<br>Y_approx_X=%.3f, Y_gt_X=%.3f, X_gt_Y=%.3f)' % (
+      title = '%s %s vs. %s (total=%s, X=%.3f, Y=%.3f, <br>Y_approx_X=%.3f, Y_gt_X=%.3f, X_gt_Y=%.3f)' % (
         plot_type,
         methx,
         methy,
-        np.sum(visible_X),
-        np.sum(visible_Y),
         len(X),
+        1 - missing_X_prop,
+        1 - missing_Y_prop,
         Y_approx_X,
         Y_gt_X,
         X_gt_Y,

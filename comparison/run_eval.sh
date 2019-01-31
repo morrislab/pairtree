@@ -97,6 +97,8 @@ function compile_scores {
 }
 
 function run_server {
+  # To redirect port 80 to 8000:
+  #   iptables -A PREROUTING -t nat -i eth0 -p tcp --dport 80 -j REDIRECT --to-port 8000
   cd $SCRIPTDIR
   MUTREL_RESULTS=$SCORESDIR/sims.mutrel.txt MUTPHI_RESULTS=$SCORESDIR/sims.mutphi.txt gunicorn -w 4 -b 0.0.0.0:8000 visualize:server
 }
