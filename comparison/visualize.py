@@ -103,9 +103,14 @@ def update_plot(plot_type, methx, methy, results, jitter, *simparams):
   X = visible[methx]
   Y = visible[methy]
   if len(X) > 0:
-    Y_gte_X = np.sum(Y >= X) / float(len(X))
+    threshold = 0.01
+    Y_gt_X = np.sum((Y - X) > threshold) / float(len(X))
+    X_gt_Y = np.sum((X - Y) > threshold) / float(len(X))
+    Y_approx_X = np.sum(np.abs(Y - X) <= threshold) / float(len(X))
   else:
-    Y_gte_X = 0
+    Y_gt_X = 0
+    X_gt_Y = 0
+    Y_approx_X = 0
 
   if len(X) > 0:
     diag_topright = min(max(X), max(Y))
@@ -139,14 +144,16 @@ def update_plot(plot_type, methx, methy, results, jitter, *simparams):
       yaxis = {'title': methy, 'range': (-0.1, 1.1)},
       hovermode = 'closest',
       height = 800,
-      title = '%s %s vs. %s (X=%s, Y=%s, total=%s, Y>=X=%.3f)' % (
+      title = '%s %s vs. %s (X=%s, Y=%s, total=%s,<br>Y_approx_X=%.3f, Y_gt_X=%.3f, X_gt_Y=%.3f)' % (
         plot_type,
         methx,
         methy,
         np.sum(visible_X),
         np.sum(visible_Y),
         len(X),
-        Y_gte_X,
+        Y_approx_X,
+        Y_gt_X,
+        X_gt_Y,
       ),
       shapes = [{
         'type': 'line',
