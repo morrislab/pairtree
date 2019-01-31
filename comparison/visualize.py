@@ -98,24 +98,25 @@ def update_plot(plot_type, methx, methy, results, jitter, *simparams):
     filters.append(results[param_name].isin(param_vals))
   visible = results[np.logical_and.reduce(filters)]
 
-  missing_X = (visible[methx] == -1)
-  missing_Y = (visible[methy] == -1)
-  missing_X_prop = np.sum(missing_X) / float(len(visible))
-  missing_Y_prop = np.sum(missing_Y) / float(len(visible))
+  visible = visible[np.logical_not(np.logical_and(visible[methx] == -1, visible[methy] == -1))]
   X = np.copy(visible[methx])
   Y = np.copy(visible[methy])
-  X[missing_X] = 0
-  Y[missing_Y] = 0
+  X[X == -1] = 0
+  Y[Y == -1] = 0
 
-  if len(X) > 0:
+  if len(visible) > 0:
     threshold = 0.01
     Y_gt_X = np.sum((Y - X) > threshold) / float(len(X))
     X_gt_Y = np.sum((X - Y) > threshold) / float(len(X))
     Y_approx_X = np.sum(np.abs(Y - X) <= threshold) / float(len(X))
+    missing_X_prop = np.sum(visible[methx] == -1) / float(len(visible))
+    missing_Y_prop = np.sum(visible[methy] == -1) / float(len(visible))
   else:
     Y_gt_X = 0
     X_gt_Y = 0
     Y_approx_X = 0
+    missing_X_prop = 0
+    missing_Y_prop = 0
 
   if len(X) > 0:
     diag_topright = min(max(X), max(Y))
