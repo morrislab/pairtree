@@ -22,10 +22,15 @@ def replace_supervar_with_variants(clusters, mutass):
     expanded[nodeid] = [vid for cidx in cidxs for vid in clusters[cidx]]
   return expanded
 
-def calc_mutrel(results, base_clusters, tree_weights):
+def extract_phi(pops):
+  phi = [pops[C]['cellular_prevalence'] for C in sorted(pops.keys())]
+  return np.array(phi)
+
+def calc_mutrel_and_mutphi(results, base_clusters, tree_weights):
   tidxs = sorted(results.tree_summary.keys())
   llhs = np.array([results.tree_summary[tidx]['llh'] for tidx in tidxs])
   adjms = []
+  phis = []
   clusterings = []
 
   for idx, (tidx, mutass) in enumerate(results.load_all_mut_assignments()):
@@ -33,11 +38,16 @@ def calc_mutrel(results, base_clusters, tree_weights):
     assert idx == tidx
     full_mutass = replace_supervar_with_variants(base_clusters, mutass)
     adjm = common.convert_adjlist_to_adjmatrix(results.tree_summary[tidx]['structure'])
+    phi = extract_phi(results.tree_summary[tidx]['populations'])
     pwgs_clusters = [full_mutass[cidx] if cidx in full_mutass else [] for cidx in range(len(adjm))]
     adjms.append(adjm)
+    phis.append(phi)
     clusterings.append(pwgs_clusters)
 
-  return evalutil.calc_mutrel_from_trees(adjms, llhs, clusterings, tree_weights)
+  return (
+    evalutil.calc_mutrel_from_trees(adjms, llhs, clusterings, tree_weights),
+    evalutil.calc_mutphi(phis, llhs, clusterings, tree_weights),
+  )
 
 def main():
   parser = argparse.ArgumentParser(
@@ -48,6 +58,8 @@ def main():
   # This takes Pairtree rather than PWGS inputs, which seems a little weird,
   # but it's okay -- the PWGS inputs are the supervariants, ut we need to know
   # hich variants correspond to each cluster in the original Pairtree inputs.
+  parser.add_argument('--trees-mutrel')
+  parser.add_argument('--phi', dest='mutphifn')
   parser.add_argument('pairtree_params_fn')
   parser.add_argument('tree_summary',
     help='JSON-formatted tree summaries')
@@ -55,17 +67,18 @@ def main():
     help='JSON-formatted list of mutations')
   parser.add_argument('mutation_assignment',
     help='JSON-formatted list of SSMs and CNVs assigned to each subclone')
-  parser.add_argument('--trees-mutrel')
   args = parser.parse_args()
 
   results = ResultLoader(args.tree_summary, args.mutation_list, args.mutation_assignment)
+  params = inputparser.load_params(args.pairtree_params_fn)
+  base_clusters = params['clusters']
+  mrel, mphi = calc_mutrel_and_mutphi(results, base_clusters, args.weight_trees_by)
+  mrel = evalutil.add_garbage(mrel, params['garbage'])
 
   if args.trees_mutrel is not None:
-    params = inputparser.load_params(args.pairtree_params_fn)
-    base_clusters = params['clusters']
-    mrel = calc_mutrel(results, base_clusters, args.weight_trees_by)
-    mrel = evalutil.add_garbage(mrel, params['garbage'])
     evalutil.save_sorted_mutrel(mrel, args.trees_mutrel)
+  if args.mutphifn is not None:
+    evalutil.save_mutphi(mphi, args.mutphifn)
 
 if __name__ == '__main__':
   main()

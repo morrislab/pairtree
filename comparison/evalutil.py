@@ -104,7 +104,7 @@ def _make_logweights(llhs, tree_weights):
   else:
     raise Exception('Unknown tree_weights=%s' % tree_weights)
 
-def calc_mutphi(cluster_phis, llhs, clusterings, tree_weights):
+def calc_mutphi(cluster_phis, llhs, clusterings, tree_weights, fix_rounding=True):
   logweights = _make_logweights(llhs, tree_weights)
   weights = _softmax(logweights)
   assert len(cluster_phis) == len(llhs) == len(clusterings)
@@ -112,6 +112,8 @@ def calc_mutphi(cluster_phis, llhs, clusterings, tree_weights):
   vids = None
 
   for (cluster_phi, clustering, weight) in zip(cluster_phis, clusterings, weights):
+    if fix_rounding:
+      assert np.all(0 <= cluster_phi) and np.all(cluster_phi <= 1)
     V, membership = make_membership_mat(clustering)
     mutphi = np.dot(membership, cluster_phi)
     if vids is None:
@@ -121,10 +123,14 @@ def calc_mutphi(cluster_phis, llhs, clusterings, tree_weights):
       assert vids == V
     soft_mutphi += weight * mutphi
 
-  soft_mutphi = _fix_rounding_errors(soft_mutphi)
+  if fix_rounding:
+    soft_mutphi = _fix_rounding_errors(soft_mutphi)
   return Mutphi(vids=vids, phi=soft_mutphi)
 
 def save_mutphi(mutphi, mutphifn):
+  # calc_mutphi should have created `mutphi` with sorted vids, but double-check
+  # this is true.
+  assert list(mutphi.vids) == common.sort_vids(mutphi.vids)
   np.savez_compressed(mutphifn, phi=mutphi.phi, vids=mutphi.vids)
 
 def load_mutphi(mutphifn):

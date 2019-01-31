@@ -1,5 +1,5 @@
 #!/bin/bash
-#module load gnu-parallel
+command -v parallel || module load gnu-parallel
 
 BASEDIR=~/work/pairtree
 SCRIPTDIR=$(dirname "$(readlink -f "$0")")
@@ -78,17 +78,18 @@ function convert_outputs {
         "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/convert_outputs.py" \
         "--weight-trees-by $tree_weights" \
         "--trees-mutrel $OUTDIR/$runid.pastri_trees_$tree_weights.mutrel.npz" \
+        "--phi $OUTDIR/$runid.pastri_trees_$tree_weights.mutphi.npz" \
         "$runid" \
         "$PAIRTREE_INPUTS_DIR/$runid.params.json" \
         "$treesfn"
     done
-  done | parallel -j$PARALLEL > /dev/null
+  done | parallel -j$PARALLEL --joblog $SCRATCH/tmp/jobs.log
 }
 
 function main {
   #convert_inputs
   #run_pastri
-  #get_F_and_C
+  get_F_and_C
   convert_outputs
 }
 

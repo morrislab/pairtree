@@ -16,3 +16,12 @@ PASTRI:
         File "/home/q/qmorris/jawinter/.apps/pastri/src/RunPASTRI.py", line 246, in main
           with open(prefix+".trees", 'w') as out:
       TypeError: unsupported operand type(s) for +: 'NoneType' and 'str'
+
+  Sometimes PASTRI writes F matrices that look like this:
+    > F
+    (3, 1)
+    .
+    .2
+    .0
+  The lone "." stems from how they mistakenly chop off characters sometimes -- it should be "1."
+    So, any parsing code crashes on this

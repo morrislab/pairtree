@@ -64,7 +64,7 @@ function run_pwgs {
 }
 
 function convert_outputs {
-  USE_MULTICHAIN=false
+  USE_MULTICHAIN=true
 
   cd $OUTBASE
   for runid in *; do
@@ -75,13 +75,13 @@ function convert_outputs {
     if [ "$USE_MULTICHAIN" = true ]; then
       json_base=$runid.multichain
       treefn=$multichain_treefn
-      mutrel_base=$runid.pwgs_trees_multi
+      results_base=$runid.pwgs_trees_multi
     else
       chainpath=$(ls -d $OUTDIR/chains/chain* | sort --random-sort | head -n1)
       chain=$(basename $chainpath)
       json_base=$runid.single_$chain
       treefn=$chainpath/trees.zip
-      mutrel_base=$runid.pwgs_trees_single
+      results_base=$runid.pwgs_trees_single
     fi
 
     cmd="cd $OUTDIR && "
@@ -95,14 +95,15 @@ function convert_outputs {
     for tree_weights in uniform llh; do
       cmd+="&& OMP_NUM_THREADS=1 python3 $BASEDIR/comparison/pwgs/convert_outputs.py "
       cmd+="--weight-trees-by $tree_weights "
-      cmd+="--trees-mutrel $OUTDIR/${mutrel_base}_${tree_weights}.mutrel.npz "
+      cmd+="--trees-mutrel $OUTDIR/${results_base}_${tree_weights}.mutrel.npz "
+      cmd+="--phi $OUTDIR/${results_base}_${tree_weights}.mutphi.npz "
       cmd+="$PAIRTREE_INPUTS_DIR/$runid.params.json "
       cmd+="$OUTDIR/$json_base.{summ.json.gz,muts.json.gz,mutass.zip} "
       cmd+=">>  $OUTDIR/$runid.results.stdout "
       cmd+="2>> $OUTDIR/$runid.results.stderr"
     done
     echo $cmd
-  done | parallel -j$PARALLEL --halt 1
+  done #| parallel -j$PARALLEL --halt 1
 }
 
 function main {

@@ -45,7 +45,7 @@ def get_method_names(results):
   methnames = [K for K in results.keys() if K != 'runid']
   return methnames
 
-def init_content(method_names, results):
+def init_content(method_names, sim_param_vals):
   controls = []
   for axis, default_val in (('x', method_names[0]), ('y', method_names[1])):
     controls.append(html.Label(children=f'Method {axis.upper()}'))
@@ -57,11 +57,10 @@ def init_content(method_names, results):
 
   for param_name in SIM_PARAMS:
     controls.append(html.Label(children=SIM_PARAM_LABELS[param_name]))
-    param_vals = sorted(results[param_name].unique())
     controls.append(dcc.Dropdown(
       id = f'{param_name}_chooser',
-      options = [{'label': V, 'value': V} for V in param_vals],
-      value = param_vals,
+      options = [{'label': V, 'value': V} for V in sim_param_vals[param_name]],
+      value = sim_param_vals[param_name],
       multi = True,
     ))
 
@@ -76,7 +75,7 @@ def init_content(method_names, results):
     value = 0.05
   ))
 
-  plot = dcc.Graph(id='mutrel_results')
+  plot = [dcc.Graph(id=f'{plot_type}_results') for plot_type in ('mutrel', 'mutphi')]
   children = [
     html.Div(className='row', children=html.H1(children='Mutation relations')),
     html.Div(className='row', children=[
@@ -92,7 +91,7 @@ def jitter_points(P, magnitude=0.01):
   noise = scale * np.random.uniform(low=-1, high=1, size=len(P))
   return P + noise
       
-def update_plot(methx, methy, results, jitter, *simparams):
+def update_plot(plot_type, methx, methy, results, jitter, *simparams):
   filters = []
   for param_name, param_vals in zip(SIM_PARAMS, simparams):
     filters.append(results[param_name].isin(param_vals))
@@ -140,7 +139,8 @@ def update_plot(methx, methy, results, jitter, *simparams):
       yaxis = {'title': methy, 'range': (-0.1, 1.1)},
       hovermode = 'closest',
       height = 800,
-      title = '%s vs. %s (X=%s, Y=%s, total=%s, Y>=X=%.3f)' % (
+      title = '%s %s vs. %s (X=%s, Y=%s, total=%s, Y>=X=%.3f)' % (
+        plot_type,
         methx,
         methy,
         np.sum(visible_X),
@@ -173,18 +173,32 @@ def create_callbacks(results):
     dash.dependencies.Input('jitter', 'value'),
   ]
   mutrel_fig_inputs += [dash.dependencies.Input(f'{P}_chooser', 'value') for P in SIM_PARAMS]
+
   app.callback(
     dash.dependencies.Output('mutrel_results', 'figure'),
     mutrel_fig_inputs,
-  )(lambda methx, methy, jitter, *simparams: update_plot(methx, methy, results, jitter, *simparams))
+  )(lambda methx, methy, jitter, *simparams: update_plot('mutrel', methx, methy, results['mutrel'], jitter, *simparams))
+  app.callback(
+    dash.dependencies.Output('mutphi_results', 'figure'),
+    mutrel_fig_inputs,
+  )(lambda methx, methy, jitter, *simparams: update_plot('mutphi', methx, methy, results['mutphi'], jitter, *simparams))
 
-def run(resultsfn):
-  results = pd.read_csv(resultsfn)
-  method_names = get_method_names(results)
-  results = augment(results)
+def run(mutrel_results_fn, mutphi_results_fn):
+  results = {
+    'mutrel': pd.read_csv(mutrel_results_fn),
+    'mutphi': pd.read_csv(mutphi_results_fn),
+  }
+
+  assert np.all(results['mutrel'].runid == results['mutphi'].runid)
+  assert get_method_names(results['mutrel']) == get_method_names(results['mutphi'])
+  method_names = get_method_names(results['mutrel'])
+
+  for K in results.keys():
+    results[K] = augment(results[K])
+  sim_param_vals = {K: sorted(results['mutrel'][K].unique()) for K in SIM_PARAMS}
 
   app.title = 'Pairtree simulation results'
-  content = init_content(method_names, results)
+  content = init_content(method_names, sim_param_vals)
   app.layout = html.Div(children=content, className='container-fluid')
   create_callbacks(results)
 
@@ -194,13 +208,15 @@ if __name__ == '__main__':
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('resultsfn')
+  parser.add_argument('mutrel_results_fn')
+  parser.add_argument('mutphi_results_fn')
   args = parser.parse_args()
 
-  run(args.resultsfn)
+  run(args.mutrel_results_fn, args.mutphi_results_fn)
   app.run_server(debug=True, host='0.0.0.0')
 else:
-  run(os.environ['PAIRTREE_SIM_RESULTS'])
+  run(os.environ['MUTREL_RESULTS'], os.environ['MUTPHI_RESULTS'])
+  # To run via Gunicorn:
+  #   MUTREL_RESULTS=../scratch/results/sims.mutrel.txt MUTPHI_RESULTS=../scratch/results/sims.mutphi.txt gunicorn -w 4 -b 0.0.0.0:4000 visualize:server
   # Expose this for Gunicorn
-  # PAIRTREE_SIM_RESULTS=../scratch/results/sims.txt gunicorn -w 4 -b 0.0.0.0:4000 visualize:server
   server = app.server
