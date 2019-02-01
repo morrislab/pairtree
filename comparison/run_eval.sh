@@ -11,11 +11,11 @@ TRUTH_DIR=$RESULTSDIR/$BATCH.truth
 PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
 PARALLEL=20
 
-function make_truth_mutrels {
+function make_truth {
   mkdir -p $TRUTH_DIR
   for datafn in $PAIRTREE_INPUTS_DIR/*.data.pickle; do
     runid=$(basename $datafn | cut -d. -f1)
-    echo "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_truth_mutrel.py" \
+    echo "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_truth.py" \
       "$datafn" \
       "$TRUTH_DIR/$runid.mutrel.npz" \
       "$TRUTH_DIR/$runid.mutphi.npz"
@@ -104,7 +104,7 @@ function run_server {
 }
 
 function main {
-  #make_truth_mutrels
+  #make_truth
   #eval_mutrels
   #compile_scores mutrel
   #eval_mutphis
