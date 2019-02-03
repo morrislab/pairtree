@@ -39,8 +39,7 @@ def _init_cluster_adj_linear(K):
 
 def _init_cluster_adj_branching(K):
   cluster_adj = np.eye(K)
-  cluster_adj[0,1] = 1
-  cluster_adj[1,range(2,K)] = 1
+  cluster_adj[0,:] = 1
   return cluster_adj
 
 def _init_cluster_adj_random(K):
