@@ -39,6 +39,9 @@ def _init_cluster_adj_linear(K):
 
 def _init_cluster_adj_branching(K):
   cluster_adj = np.eye(K)
+  # Every node comes off node 0, which will always be the tree root. Note that
+  # we don't assume that the first cluster (node 1, cluster 0) is the clonal
+  # cluster -- it's not treated differently from any other nodes/clusters.
   cluster_adj[0,:] = 1
   return cluster_adj
 
@@ -66,13 +69,11 @@ def _permute_adj(adj):
 
   anc = common.make_ancestral_from_adj(adj)
   A, B = np.random.choice(K, size=2, replace=False)
-  #debug(adj)
-  #debug((A,B))
   if B == 0:
     # Don't permit cluster 0 to become non-root node, since it corresponds to
     # normal cell population.
     assert anc[B,A]
-    #debug('do nothing')
+    debug('tree_permute', (A,B), 'do nothing')
     return adj
   np.fill_diagonal(adj, 0)
 
@@ -91,12 +92,12 @@ def _permute_adj(adj):
 
     if adj_BA:
       adj[A,B] = 1
-    #debug('swapping', A, B)
+    debug('tree_permute', (A,B), 'swapping', A, B)
   else:
     # Move B so it becomes child of A. I don't need to modify the A column.
     adj[:,B] = 0
     adj[A,B] = 1
-    #debug('moving', B, 'under', A)
+    debug('tree_permute', (A,B), 'moving', B, 'under', A)
 
   np.fill_diagonal(adj, 1)
   return adj
@@ -115,6 +116,11 @@ def calc_beta_params(supervars):
   beta = np.maximum(1, R - V + 1)
   assert np.all(alpha > 0) and np.all(beta > 0)
   return (alpha, beta)
+
+def _find_parents(adj):
+  adj = np.copy(adj)
+  np.fill_diagonal(adj, 0)
+  return np.argmax(adj[:,1:], axis=0)
 
 def _run_metropolis(nsamples, init_cluster_adj, _calc_llh, _calc_phi, _sample_adj, progress_queue=None):
   cluster_adj = [init_cluster_adj]
@@ -142,7 +148,18 @@ def _run_metropolis(nsamples, init_cluster_adj, _calc_llh, _calc_phi, _sample_ad
       phi.append(old_phi)
       llh.append(old_llh)
       action = 'reject'
-    debug(_calc_llh.__name__, I, action, old_llh, new_llh, new_llh - old_llh, U, sep='\t')
+    debug(
+      _calc_llh.__name__,
+      I,
+      action,
+      old_llh,
+      new_llh,
+      new_llh - old_llh,
+      U,
+      _find_parents(old_adj),
+      _find_parents(new_adj),
+      sep='\t'
+    )
 
   return (cluster_adj, phi, llh)
 
@@ -167,10 +184,16 @@ def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_iterations, 
     return _calc_llh_mutrel(adj, data_mutrel, superclusters)
   def __permute_adj_multistep(oldadj, nsteps=tree_perturbations):
     adj, phi, llh = _run_metropolis(nsteps, oldadj, __calc_llh_mutrel, __calc_phi_noop, _permute_adj)
-    best_idx = choose_best_tree(adj, llh)
-    best_adj, best_llh = adj[best_idx], llh[best_idx]
-    debug('best_proposal', best_llh)
-    return best_adj
+    # Before, I called `choose_best_tree` to choose this index. Now, I just
+    # select the last tree sampled, on the assumption this is a valid sample
+    # from the posterior (i.e., the chain has burned in).
+    #
+    # Before, when choosing the tree with the highest likelihood, I would often
+    # always propose the same tree, missing reasonable structures altogether.
+    chosen_idx = len(adj) - 1
+    chosen_adj, chosen_llh = adj[chosen_idx], llh[chosen_idx]
+    debug('chosen_proposal', _find_parents(chosen_adj), chosen_llh)
+    return chosen_adj
   # Particularly since clusters may not be ordered by mean VAF, a branching
   # tree in which every node comes off the root is the least biased
   # initialization, as it doesn't require any steps that "undo" bad choices, as
