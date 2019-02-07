@@ -112,7 +112,7 @@ def calc_mutphi(cluster_phis, llhs, clusterings, tree_weights, fix_rounding=True
   vids = None
 
   for (cluster_phi, clustering, weight) in zip(cluster_phis, clusterings, weights):
-    if fix_rounding:
+    if not fix_rounding:
       assert np.all(0 <= cluster_phi) and np.all(cluster_phi <= 1)
     V, membership = make_membership_mat(clustering)
     mutphi = np.dot(membership, cluster_phi)
