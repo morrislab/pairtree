@@ -57,19 +57,11 @@ def compare(mutrels):
 
     assert mrel.rels.shape == (M, M, num_models)
     assert np.array_equal(mrel.vids, mutrels['truth'].vids)
-
     mutrel.check_posterior_sanity(mrel.rels)
-    score = np.nan * np.zeros((M, M))
-    for I in range(M):
-      for J in range(M):
-        # I don't know how to use `correct` in this format to index into
-        # `mutrels[name]`, hence the `I` and `J` for loops.
-        score[I,J] = mrel.rels[I,J,correct[I,J]]
-    assert not np.any(np.isnan(score))
-    # Check truth as a sanity check.
+
+    scores[name] = np.mean(1 - np.abs(mrel.rels - mutrels['truth'].rels))
     if name == 'truth':
-      assert np.allclose(1, score)
-    scores[name] = np.mean(score)
+      assert np.isclose(1, scores[name])
     
   names.remove('truth')
   print(*names, sep=',')
