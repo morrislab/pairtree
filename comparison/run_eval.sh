@@ -15,9 +15,12 @@ function make_truth {
   mkdir -p $TRUTH_DIR
   for datafn in $PAIRTREE_INPUTS_DIR/*.data.pickle; do
     runid=$(basename $datafn | cut -d. -f1)
-    echo "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_truth.py" \
+    echo "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_truth_mutrel.py" \
+      "--enumerate-trees" \
       "$datafn" \
-      "$TRUTH_DIR/$runid.mutrel.npz" \
+      "$TRUTH_DIR/$runid.mutrel.npz"
+    echo "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_truth_mutphi.py" \
+      "$datafn" \
       "$TRUTH_DIR/$runid.mutphi.npz"
   done #| parallel -j$PARALLEL --halt 1
 }
@@ -26,7 +29,7 @@ function make_results_paths {
   runid=$1
   result_type=$2
 
-  paths="truth=${BATCH}.truth/$runid.$result_type.npz "
+  paths="truth=${TRUTH_DIR}/$runid.$result_type.npz "
   paths+="pairtree_trees_llh=${BATCH}.pairtree.fixedclusters/$runid.pairtree_trees_llh.$result_type.npz "
   paths+="pairtree_trees_uniform=${BATCH}.pairtree.fixedclusters/$runid.pairtree_trees_uniform.$result_type.npz "
   paths+="pairtree_clustrel=${BATCH}.pairtree.fixedclusters/$runid.pairtree_clustrel.$result_type.npz "
@@ -104,12 +107,12 @@ function run_server {
 }
 
 function main {
-  #make_truth
+  make_truth
   #eval_mutrels
   #compile_scores mutrel
   #eval_mutphis
   #compile_scores mutphi
-  run_server
+  #run_server
 }
 
 main
