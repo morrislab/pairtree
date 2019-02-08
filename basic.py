@@ -91,19 +91,32 @@ def main():
   superclusters.insert(0, [])
 
   if 'adjm' not in results:
-    results['adjm'], results['phi'], results['llh'] = tree_sampler.sample_trees(
-      results['clustrel_posterior'],
-      supervars,
-      superclusters,
-      args.trees_per_chain,
-      args.burnin_per_chain,
-      tree_chains,
-      args.phi_iterations,
-      args.tree_perturbations,
-      seed,
-      parallel,
-    )
-    resultserializer.save(results, args.results_fn)
+    if 'structure' not in params:
+      results['adjm'], results['phi'], results['llh'] = tree_sampler.sample_trees(
+        results['clustrel_posterior'],
+        supervars,
+        superclusters,
+        args.trees_per_chain,
+        args.burnin_per_chain,
+        tree_chains,
+        args.phi_iterations,
+        args.tree_perturbations,
+        seed,
+        parallel,
+      )
+      resultserializer.save(results, args.results_fn)
+    else:
+      adjlist = params['structure']
+      adjlist = {int(P): C for P, C in adjlist.items()}
+      adjm = common.convert_adjlist_to_adjmatrix(adjlist)
+      results['adjm'], results['phi'], results['llh'] = tree_sampler.use_existing_structure(
+        adjm,
+        supervars,
+        superclusters,
+        args.phi_iterations,
+        parallel
+      )
+      resultserializer.save(results, args.results_fn)
 
 if __name__ == '__main__':
   main()

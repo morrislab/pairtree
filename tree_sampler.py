@@ -205,6 +205,12 @@ def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_iterations, 
     progress_queue.put(0)
   return _run_metropolis(nsamples, init_cluster_adj, __calc_llh_phi, __calc_phi, __permute_adj_multistep, progress_queue)
 
+def use_existing_structure(adjm, supervars, superclusters, phi_iterations, parallel=0):
+  phi, eta = phi_fitter.fit_phis(adjm, superclusters, supervars, iterations=phi_iterations, parallel=parallel)
+  alpha, beta = calc_beta_params(supervars)
+  llh = _calc_llh_phi(phi, alpha, beta)
+  return ([adjm], [phi], [llh])
+
 def choose_best_tree(adj, llh):
   best_llh = -np.inf
   best_idx = None
