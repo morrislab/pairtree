@@ -47,6 +47,23 @@ def check_complete(mutphis, clustered):
       continue
     assert set(mutphi.vids) == clustered
 
+def remove_garbage(mutphis, garbage):
+  # Remove garbage if present. Some mutphis have it (e.g., PWGS run on all
+  # variants, without benefit of handbuilt clusters) while others don't.
+  garbage = set(garbage)
+  revised = {}
+
+  for name, mutphi in mutphis.items():
+    if mutphi is None:
+      revised[name] = None
+      continue
+    garb_idxs = [idx for idx, vid in enumerate(mutphi.vids) if vid in garbage]
+    new_vids = [vid for idx, vid in enumerate(mutphi.vids) if idx not in set(garb_idxs)]
+    new_phi = np.delete(mutphi.phi, garb_idxs, axis=0)
+    revised[name] = evalutil.Mutphi(phi=new_phi, vids=new_vids)
+
+  return revised
+
 def main():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
@@ -60,6 +77,7 @@ def main():
   clustered = set([vid for C in params['clusters'] for vid in C])
 
   mutphis = load_mutphis(args.mutphis)
+  mutphis = remove_garbage(mutphis, params['garbage'])
   check_complete(mutphis, clustered)
   compare(mutphis)
 
