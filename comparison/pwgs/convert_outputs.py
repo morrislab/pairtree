@@ -26,7 +26,7 @@ def extract_phi(pops):
   phi = [pops[C]['cellular_prevalence'] for C in sorted(pops.keys())]
   return np.array(phi)
 
-def calc_mutrel_and_mutphi(results, base_clusters, tree_weights):
+def calc_mutrel_and_mutphi(results, base_clusters, tree_weights, use_supervars):
   tidxs = sorted(results.tree_summary.keys())
   llhs = np.array([results.tree_summary[tidx]['llh'] for tidx in tidxs])
   adjms = []
@@ -36,7 +36,10 @@ def calc_mutrel_and_mutphi(results, base_clusters, tree_weights):
   for idx, (tidx, mutass) in enumerate(results.load_all_mut_assignments()):
     # Ensure trees are provided in sorted order.
     assert idx == tidx
-    full_mutass = replace_supervar_with_variants(base_clusters, mutass)
+    if use_supervars:
+      full_mutass = replace_supervar_with_variants(base_clusters, mutass)
+    else:
+      full_mutass = {cid: mutass[cid]['ssms'] for cid in mutass.keys()}
     adjm = common.convert_adjlist_to_adjmatrix(results.tree_summary[tidx]['structure'])
     phi = extract_phi(results.tree_summary[tidx]['populations'])
     pwgs_clusters = [full_mutass[cidx] if cidx in full_mutass else [] for cidx in range(len(adjm))]
@@ -59,8 +62,9 @@ def main():
   # but it's okay -- the PWGS inputs are the supervariants, ut we need to know
   # hich variants correspond to each cluster in the original Pairtree inputs.
   parser.add_argument('--trees-mutrel')
+  parser.add_argument('--use-supervars', action='store_true')
   parser.add_argument('--phi', dest='mutphifn')
-  parser.add_argument('pairtree_params_fn')
+  parser.add_argument('--pairtree-params', dest='pairtree_params_fn')
   parser.add_argument('tree_summary',
     help='JSON-formatted tree summaries')
   parser.add_argument('mutation_list',
@@ -70,10 +74,15 @@ def main():
   args = parser.parse_args()
 
   results = ResultLoader(args.tree_summary, args.mutation_list, args.mutation_assignment)
-  params = inputparser.load_params(args.pairtree_params_fn)
-  base_clusters = params['clusters']
-  mrel, mphi = calc_mutrel_and_mutphi(results, base_clusters, args.weight_trees_by)
-  mrel = evalutil.add_garbage(mrel, params['garbage'])
+  if args.use_supervars:
+    params = inputparser.load_params(args.pairtree_params_fn)
+    base_clusters = params['clusters']
+  else:
+    base_clusters = None
+
+  mrel, mphi = calc_mutrel_and_mutphi(results, base_clusters, args.weight_trees_by, args.use_supervars)
+  if args.use_supervars:
+    mrel = evalutil.add_garbage(mrel, params['garbage'])
 
   if args.trees_mutrel is not None:
     evalutil.save_sorted_mutrel(mrel, args.trees_mutrel)
