@@ -9,7 +9,6 @@ import numpy as np
 import scipy.stats
 import os
 
-SIM_PARAMS = ('G', 'K', 'M', 'S', 'T')
 SIM_PARAM_LABELS = {
   'G': 'Garbage mutations',
   'K': 'Number of clusters',
@@ -27,6 +26,8 @@ external_css = [{
 app = dash.Dash(__name__, external_stylesheets=external_css)
 
 def augment(results):
+  if len(SIM_PARAMS) < 1:
+    return results
   simparams = defaultdict(list)
   sim_param_names = ''.join(SIM_PARAMS)
   for rid in results.runid:
@@ -42,10 +43,10 @@ def augment(results):
   return results
 
 def get_method_names(results):
-  methnames = [K for K in results.keys() if K != 'runid']
+  methnames = [K for K in results.keys() if K != 'runid' and K not in SIM_PARAMS]
   return methnames
 
-def init_content(method_names, sim_param_vals):
+def init_content(method_names, sim_param_vals, result_types):
   controls = []
   for axis, default_val in (('x', method_names[0]), ('y', method_names[1])):
     controls.append(html.Label(children=f'Method {axis.upper()}'))
@@ -75,7 +76,7 @@ def init_content(method_names, sim_param_vals):
     value = 0.05
   ))
 
-  plot = [dcc.Graph(id=f'{plot_type}_results') for plot_type in ('mutrel', 'mutphi')]
+  plot = [dcc.Graph(id=f'{plot_type}_results') for plot_type in result_types]
   children = [
     html.Div(className='row', children=html.H1(children='Mutation relations')),
     html.Div(className='row', children=[
@@ -93,12 +94,12 @@ def jitter_points(P, magnitude=0.01):
   return P + noise
       
 def update_plot(plot_type, methx, methy, results, jitter, *simparams):
-  filters = []
+  filters = [len(results)*[True]]
   for param_name, param_vals in zip(SIM_PARAMS, simparams):
     filters.append(results[param_name].isin(param_vals))
   visible = results[np.logical_and.reduce(filters)]
-
   visible = visible[np.logical_not(np.logical_and(visible[methx] == -1, visible[methy] == -1))]
+
   X = np.copy(visible[methx])
   Y = np.copy(visible[methy])
   X[X == -1] = 0
@@ -134,6 +135,12 @@ def update_plot(plot_type, methx, methy, results, jitter, *simparams):
     X = jitter_points(X, jitter)
     Y = jitter_points(Y, jitter)
 
+  xaxis = {'title': methx}
+  yaxis = {'title': methy}
+  if plot_type == 'mutrel':
+    for axis in (xaxis, yaxis):
+      axis['range'] = (-0.1, 1.1)
+
   plot = {
     'data': [go.Scatter(
       x = X,
@@ -146,8 +153,8 @@ def update_plot(plot_type, methx, methy, results, jitter, *simparams):
       },
     )],
     'layout': go.Layout(
-      xaxis = {'title': methx, 'range': (-0.1, 1.1)},
-      yaxis = {'title': methy, 'range': (-0.1, 1.1)},
+      xaxis = xaxis,
+      yaxis = yaxis,
       hovermode = 'closest',
       height = 800,
       title = '%s %s vs. %s (total=%s, X=%.3f, Y=%.3f, <br>Y_approx_X=%.3f, Y_gt_X=%.3f, X_gt_Y=%.3f)' % (
@@ -180,55 +187,56 @@ def update_plot(plot_type, methx, methy, results, jitter, *simparams):
   return plot
 
 def create_callbacks(results):
-  mutrel_fig_inputs = [
+  fig_inputs = [
     dash.dependencies.Input('method_x', 'value'),
     dash.dependencies.Input('method_y', 'value'),
     dash.dependencies.Input('jitter', 'value'),
   ]
-  mutrel_fig_inputs += [dash.dependencies.Input(f'{P}_chooser', 'value') for P in SIM_PARAMS]
-
-  app.callback(
-    dash.dependencies.Output('mutrel_results', 'figure'),
-    mutrel_fig_inputs,
-  )(lambda methx, methy, jitter, *simparams: update_plot('mutrel', methx, methy, results['mutrel'], jitter, *simparams))
-  app.callback(
-    dash.dependencies.Output('mutphi_results', 'figure'),
-    mutrel_fig_inputs,
-  )(lambda methx, methy, jitter, *simparams: update_plot('mutphi', methx, methy, results['mutphi'], jitter, *simparams))
-
-def run(mutrel_results_fn, mutphi_results_fn):
-  results = {
-    'mutrel': pd.read_csv(mutrel_results_fn),
-    'mutphi': pd.read_csv(mutphi_results_fn),
-  }
-
-  assert np.all(results['mutrel'].runid == results['mutphi'].runid)
-  assert get_method_names(results['mutrel']) == get_method_names(results['mutphi'])
-  method_names = get_method_names(results['mutrel'])
+  fig_inputs += [dash.dependencies.Input(f'{P}_chooser', 'value') for P in SIM_PARAMS]
 
   for K in results.keys():
+    app.callback(
+      dash.dependencies.Output('%s_results' % K, 'figure'),
+      fig_inputs,
+    )(lambda methx, methy, jitter, *simparams: update_plot(K, methx, methy, results[K], jitter, *simparams))
+
+def load_results(*result_types):
+  results = {}
+  for K in result_types:
+    env_name = '%s_RESULTS' % K.upper()
+    if env_name in os.environ:
+      results[K] = pd.read_csv(os.environ[env_name])
+  return results
+
+def run():
+  results = load_results('mutrel', 'mutphi')
+  assert len(results) > 0
+  result_types = list(results.keys())
+  first_result_type = result_types[0]
+
+  for K in results:
+    assert np.all(results[K].runid == results[first_result_type].runid)
+    assert get_method_names(results[K]) == get_method_names(results[first_result_type])
     results[K] = augment(results[K])
-  sim_param_vals = {K: sorted(results['mutrel'][K].unique()) for K in SIM_PARAMS}
+
+  method_names = get_method_names(results[first_result_type])
+  sim_param_vals = {K: sorted(results[first_result_type][K].unique()) for K in SIM_PARAMS}
 
   app.title = 'Pairtree simulation results'
-  content = init_content(method_names, sim_param_vals)
+  content = init_content(method_names, sim_param_vals, result_types)
   app.layout = html.Div(children=content, className='container-fluid')
   create_callbacks(results)
 
-if __name__ == '__main__':
-  import argparse
-  parser = argparse.ArgumentParser(
-    description='LOL HI THERE',
-    formatter_class=argparse.ArgumentDefaultsHelpFormatter
-  )
-  parser.add_argument('mutrel_results_fn')
-  parser.add_argument('mutphi_results_fn')
-  args = parser.parse_args()
-
-  run(args.mutrel_results_fn, args.mutphi_results_fn)
-  app.run_server(debug=True, host='0.0.0.0')
+if 'SIM_PARAMS' in os.environ:
+  SIM_PARAMS = tuple(os.environ['SIM_PARAMS'])
 else:
-  run(os.environ['MUTREL_RESULTS'], os.environ['MUTPHI_RESULTS'])
+  SIM_PARAMS = tuple()
+
+run()
+
+if __name__ == '__main__':
+  app.run_server(debug=True, host='0.0.0.0', port=8000)
+else:
   # To run via Gunicorn:
   #   MUTREL_RESULTS=../scratch/results/sims.mutrel.txt MUTPHI_RESULTS=../scratch/results/sims.mutphi.txt gunicorn -w 4 -b 0.0.0.0:4000 visualize:server
   # Expose this for Gunicorn
