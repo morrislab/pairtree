@@ -36,7 +36,8 @@ def augment(results):
       simparams[K].append(int(V))
 
   lengths = np.array([len(V) for V in simparams.values()])
-  assert np.all(lengths == len(results))
+  if not np.all(lengths == len(results)):
+    raise Exception('Some SIM_PARAMS missing from some points')
 
   for K in simparams.keys():
     results[K] = simparams[K]
@@ -76,6 +77,12 @@ def init_content(method_names, sim_param_vals, result_types):
     value = 0.05
   ))
 
+  controls.append(dcc.Checklist(
+    id = 'show_missing',
+    options = [{'label': 'Show missing data', 'value': 'show_missing'}],
+    values = ['show_missing'],
+  ))
+
   plot = [dcc.Graph(id=f'{plot_type}_results') for plot_type in result_types]
   children = [
     html.Div(className='row', children=html.H1(children='Mutation relations')),
@@ -93,7 +100,9 @@ def jitter_points(P, magnitude=0.01):
   noise = scale * np.random.uniform(low=-1, high=1, size=len(P))
   return P + noise
       
-def update_plot(plot_type, methx, methy, results, jitter, *simparams):
+def update_plot(plot_type, methx, methy, results, jitter, show_missing, *simparams):
+  show_missing = 'show_missing' in show_missing
+
   filters = [len(results)*[True]]
   for param_name, param_vals in zip(SIM_PARAMS, simparams):
     filters.append(results[param_name].isin(param_vals))
@@ -102,8 +111,15 @@ def update_plot(plot_type, methx, methy, results, jitter, *simparams):
 
   X = np.copy(visible[methx])
   Y = np.copy(visible[methy])
-  X[X == -1] = 0
-  Y[Y == -1] = 0
+
+  if show_missing:
+    X[X == -1] = 0
+    Y[Y == -1] = 0
+  else:
+    missing = np.logical_or(X == -1, Y == -1)
+    present = np.logical_not(missing)
+    X = X[present]
+    Y = Y[present]
 
   if len(visible) > 0:
     threshold = 0.01
@@ -131,6 +147,8 @@ def update_plot(plot_type, methx, methy, results, jitter, *simparams):
   except (ValueError, np.linalg.LinAlgError):
     density = np.zeros(X.shape)
 
+  X_orig = X
+  Y_orig = Y
   if jitter > 0:
     X = jitter_points(X, jitter)
     Y = jitter_points(Y, jitter)
@@ -141,11 +159,12 @@ def update_plot(plot_type, methx, methy, results, jitter, *simparams):
     for axis in (xaxis, yaxis):
       axis['range'] = (-0.1, 1.1)
 
+  labels = [f'{runid}<br>orig=({xorig:.2f}, {yorig:.2f})' for runid, xorig, yorig in zip(visible['runid'], X_orig, Y_orig)]
   plot = {
     'data': [go.Scatter(
       x = X,
       y = Y,
-      text = visible['runid'],
+      text = labels,
       mode = 'markers',
       marker = {
         'color': density,
@@ -191,6 +210,7 @@ def create_callbacks(results):
     dash.dependencies.Input('method_x', 'value'),
     dash.dependencies.Input('method_y', 'value'),
     dash.dependencies.Input('jitter', 'value'),
+    dash.dependencies.Input('show_missing', 'values'),
   ]
   fig_inputs += [dash.dependencies.Input(f'{P}_chooser', 'value') for P in SIM_PARAMS]
 
@@ -198,7 +218,7 @@ def create_callbacks(results):
     app.callback(
       dash.dependencies.Output('%s_results' % K, 'figure'),
       fig_inputs,
-    )(lambda methx, methy, jitter, *simparams: update_plot(K, methx, methy, results[K], jitter, *simparams))
+    )(lambda methx, methy, jitter, show_missing, *simparams: update_plot(K, methx, methy, results[K], jitter, show_missing, *simparams))
 
 def load_results(*result_types):
   results = {}
