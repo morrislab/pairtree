@@ -1,5 +1,6 @@
 import numpy as np
 import argparse
+import scipy.stats
 
 import os
 import sys
@@ -20,24 +21,40 @@ def load_mutphis(phi_args):
       mutphis[name] = None
   return mutphis
 
-def compare(mutphis):
-  names = sorted(mutphis.keys())
+def score_phis(mutphi, variants):
+  def _extract_arr(K, vids):
+    return np.array([variants[V][K] for V in vids])
+  vardata = {K: _extract_arr(K, mutphi.vids) for K in ('var_reads', 'total_reads', 'omega_v')}
+  assert len(set([V.shape for V in vardata.values()] + [mutphi.phi.shape])) == 1
+
+  log_px = scipy.stats.binom.logpmf(
+    vardata['var_reads'],
+    vardata['total_reads'],
+    vardata['omega_v'] * mutphi.phi,
+  )
+  assert np.all(log_px <= 0)
+
+  score = np.sum(log_px)
+  score /= mutphi.phi.size
+  # Convert to bits.
+  score /= np.log(2)
+  return -score
+
+def compare(mutphis, variants):
+  names = list(mutphis.keys())
   scores = {}
-  truth = mutphis['truth']
+  vids = mutphis[names[0]].vids
+  mutphi_shape = mutphis[names[0]].phi.shape
 
   for name in names:
     mutphi = mutphis[name]
     if mutphi is None:
       scores[name] = -1
       continue
-    assert np.array_equal(mutphi.vids, truth.vids)
-    assert mutphi.phi.shape == truth.phi.shape
-    score = np.mean(1 - (np.abs(mutphi.phi - truth.phi)))
-    if name == 'truth':
-      assert np.allclose(1, score)
-    scores[name] = score
+    assert np.array_equal(mutphi.vids, vids)
+    assert mutphi.phi.shape == mutphi_shape
+    scores[name] = score_phis(mutphi, variants)
 
-  names.remove('truth')
   print(*names, sep=',')
   print(*[scores[name] for name in names], sep=',')
 
@@ -70,16 +87,18 @@ def main():
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--params', dest='paramsfn', required=True)
+  parser.add_argument('--ssms', dest='ssmsfn', required=True)
   parser.add_argument('mutphis', nargs='+')
   args = parser.parse_args()
 
   params = inputparser.load_params(args.paramsfn)
+  variants = inputparser.load_ssms(args.ssmsfn)
   clustered = set([vid for C in params['clusters'] for vid in C])
 
   mutphis = load_mutphis(args.mutphis)
   mutphis = remove_garbage(mutphis, params['garbage'])
   check_complete(mutphis, clustered)
-  compare(mutphis)
+  compare(mutphis, variants)
 
 if __name__ == '__main__':
   main()
