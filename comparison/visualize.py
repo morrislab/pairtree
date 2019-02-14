@@ -57,7 +57,16 @@ def get_method_names(results):
   return methnames
 
 def init_content(method_names, sim_param_vals, result_types):
+  method_names = sorted(method_names)
   controls = []
+
+  controls.append(html.Label(children='Result type'))
+  controls.append(dcc.Dropdown(
+    id = 'result_type',
+    options = [{'label': rt, 'value': rt} for rt in result_types],
+    value = result_types[0],
+  ))
+
   for axis, default_val in (('x', method_names[0]), ('y', method_names[1])):
     controls.append(html.Label(children=f'Method {axis.upper()}'))
     controls.append(dcc.Dropdown(
@@ -95,8 +104,8 @@ def init_content(method_names, sim_param_vals, result_types):
     values = ['show_missing'],
   ))
 
-  plot = [dcc.Graph(
-    id = f'{plot_type}_results',
+  plot = dcc.Graph(
+    id = f'results_plot',
     config = {
       'showLink': True,
       'toImageButtonOptions': {
@@ -104,7 +113,8 @@ def init_content(method_names, sim_param_vals, result_types):
         'width': 750,
         'height': 450,
       },
-    }) for plot_type in result_types]
+    }
+  )
   children = [
     html.Div(className='row', children=html.H1(children='Mutation relations')),
     html.Div(className='row', children=[
@@ -116,8 +126,10 @@ def init_content(method_names, sim_param_vals, result_types):
   return children
 
 def jitter_points(P, magnitude=0.01):
+  if len(P) == 0:
+    return P
   # If all points in `P` have the same value, avoid making the jitter 0.
-  scale = np.max((0.01, magnitude * np.max(P) - np.min(P)))
+  scale = np.max((0.01, magnitude * (np.max(P) - np.min(P))))
   noise = scale * np.random.uniform(low=-1, high=1, size=len(P))
   return P + noise
       
@@ -134,6 +146,7 @@ def update_plot(plot_type, methx, methy, results, jitter, toggleable_options, *s
 
   X = np.copy(visible[methx])
   Y = np.copy(visible[methy])
+  assert np.logical_not(np.any(np.logical_or(np.isinf(X), np.isinf(Y))))
 
   if show_missing:
     X[X == -1] = 0
@@ -144,7 +157,7 @@ def update_plot(plot_type, methx, methy, results, jitter, toggleable_options, *s
     X = X[present]
     Y = Y[present]
 
-  if len(visible) > 0:
+  if len(X) > 0 and len(Y) > 0:
     threshold = 0.01
     Y_gt_X = np.sum((Y - X) > threshold) / float(len(X))
     X_gt_Y = np.sum((X - Y) > threshold) / float(len(X))
@@ -158,17 +171,6 @@ def update_plot(plot_type, methx, methy, results, jitter, toggleable_options, *s
     missing_X_prop = 0
     missing_Y_prop = 0
 
-  if len(X) > 0:
-    diag_topright = plot_padding * np.max((np.max(X), np.max(Y)))
-  else:
-    diag_topright = 1
-
-  XY = np.vstack((X, Y))
-  # SciPy wants input in shape (# of dims, # of data).
-  try:
-    density = scipy.stats.gaussian_kde(XY)(XY)
-  except (ValueError, np.linalg.LinAlgError):
-    density = np.zeros(X.shape)
 
   X_orig = X
   Y_orig = Y
@@ -176,20 +178,30 @@ def update_plot(plot_type, methx, methy, results, jitter, toggleable_options, *s
     X = jitter_points(X, jitter)
     Y = jitter_points(Y, jitter)
 
-  marker = { 'size': 14, }
+  if len(X) + len(Y) > 0:
+    max_val = np.max(np.concatenate((X, Y)))
+  else:
+    max_val = 1
+
+  marker = { 'size': 14 }
   if plot_type == 'mutrel':
     axis_range = (-0.1, 1.1)
+  elif plot_type == 'mutphi':
+    axis_range = (-0.5, plot_padding * max_val)
   else:
     axis_range = None
+  if len(X) == 0:
+    diag_topright = 1
 
   if make_quaid_happy:
-    xtitle = 'Error of %s (bits)' % HAPPY_METHOD_NAMES.get(methx, methx)
-    ytitle = 'Error of %s (bits)' % HAPPY_METHOD_NAMES.get(methy, methy)
+    axis_label = {
+      'mutrel': 'Average pairwise score for %s',
+      'mutphi': 'Error of %s (bits',
+    }[plot_type]
+    xtitle = axis_label % HAPPY_METHOD_NAMES.get(methx, methx)
+    ytitle = axis_label % HAPPY_METHOD_NAMES.get(methy, methy)
     title = None
     template = 'plotly_white'
-    if plot_type == 'mutphi':
-      max_value = np.max(np.concatenate((X, Y)))
-      axis_range = (-0.5, plot_padding * max_value)
   else:
     xtitle = methx
     ytitle = methy
@@ -204,11 +216,20 @@ def update_plot(plot_type, methx, methy, results, jitter, toggleable_options, *s
       Y_gt_X,
       X_gt_Y,
     )
-    marker['color'] = density
-    marker['colorscale'] = 'Viridis'
     template = 'seaborn'
 
+    # SciPy wants input in shape (# of dims, # of data).
+    XY = np.vstack((X, Y))
+    try:
+      density = scipy.stats.gaussian_kde(XY)(XY)
+    except (ValueError, np.linalg.LinAlgError):
+      density = np.zeros(X.shape)
+    marker['color'] = density
+    marker['colorscale'] = 'Viridis'
+
+  diag_topright = plot_padding * max_val
   labels = [f'{runid}<br>orig=({xorig:.2f}, {yorig:.2f})' for runid, xorig, yorig in zip(visible['runid'], X_orig, Y_orig)]
+
   plot = {
     'data': [go.Scatter(
       x = X,
@@ -245,6 +266,7 @@ def update_plot(plot_type, methx, methy, results, jitter, toggleable_options, *s
 
 def create_callbacks(results):
   fig_inputs = [
+    dash.dependencies.Input('result_type', 'value'),
     dash.dependencies.Input('method_x', 'value'),
     dash.dependencies.Input('method_y', 'value'),
     dash.dependencies.Input('jitter', 'value'),
@@ -252,11 +274,10 @@ def create_callbacks(results):
   ]
   fig_inputs += [dash.dependencies.Input(f'{P}_chooser', 'value') for P in SIM_PARAMS]
 
-  for K in results.keys():
-    app.callback(
-      dash.dependencies.Output('%s_results' % K, 'figure'),
-      fig_inputs,
-    )(lambda methx, methy, jitter, show_missing, *simparams: update_plot(K, methx, methy, results[K], jitter, show_missing, *simparams))
+  app.callback(
+    dash.dependencies.Output('results_plot', 'figure'),
+    fig_inputs,
+  )(lambda result_type, methx, methy, jitter, show_missing, *simparams: update_plot(result_type, methx, methy, results[result_type], jitter, show_missing, *simparams))
 
 def load_results(*result_types):
   results = {}
@@ -267,21 +288,35 @@ def load_results(*result_types):
   return results
 
 def run():
+  np.set_printoptions(linewidth=400, precision=3, threshold=np.nan, suppress=True)
+  np.seterr(all='raise')#divide='raise', invalid='raise')
+
   results = load_results('mutrel', 'mutphi')
   assert len(results) > 0
   result_types = list(results.keys())
   first_result_type = result_types[0]
 
+  all_methods = set([M for K in results for M in get_method_names(results[K])])
   for K in results:
+    methods = set(get_method_names(results[K]))
+    assert methods.issubset(all_methods)
+    for missing in all_methods - methods:
+      results[K][missing] = -1
+
     assert np.all(results[K].runid == results[first_result_type].runid)
-    assert get_method_names(results[K]) == get_method_names(results[first_result_type])
     results[K] = augment(results[K])
 
-  method_names = get_method_names(results[first_result_type])
-  sim_param_vals = {K: sorted(results[first_result_type][K].unique()) for K in SIM_PARAMS}
+    for M in all_methods:
+      inf_idxs = np.isinf(results[K][M])
+      if np.any(inf_idxs):
+        # Sometimes the LLH may be -inf. (Thanks, PASTRI.) Consider this to be a
+        # failed run.
+        print('%s %s has %s infs' % (K, M, np.sum(inf_idxs)))
+        results[K].loc[inf_idxs,M] = -1
 
   app.title = 'Pairtree simulation results'
-  content = init_content(method_names, sim_param_vals, result_types)
+  sim_param_vals = {K: sorted(results[first_result_type][K].unique()) for K in SIM_PARAMS}
+  content = init_content(all_methods, sim_param_vals, result_types)
   app.layout = html.Div(children=content, className='container-fluid')
   create_callbacks(results)
 
@@ -295,7 +330,5 @@ run()
 if __name__ == '__main__':
   app.run_server(debug=True, host='0.0.0.0', port=8000)
 else:
-  # To run via Gunicorn:
-  #   MUTREL_RESULTS=../scratch/results/sims.mutrel.txt MUTPHI_RESULTS=../scratch/results/sims.mutphi.txt gunicorn -w 4 -b 0.0.0.0:4000 visualize:server
   # Expose this for Gunicorn
   server = app.server
