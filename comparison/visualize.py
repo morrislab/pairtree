@@ -16,6 +16,15 @@ SIM_PARAM_LABELS = {
   'S': 'Samples',
   'T': 'Read depth',
 }
+HAPPY_METHOD_NAMES = {
+  'mle_unconstrained': 'MLE lineage frequencies',
+  'pairtree_trees_llh': 'Pairtree (automated tree search)',
+  'pairtree_handbuilt': 'Pairtree (manually constructed trees)',
+  'pwgs_allvars_single_llh': 'PhyloWGS (no clustering enforced)',
+  'pwgs_allvars_multi_llh': 'Multi-chain PhyloWGS (no clustering enforced)',
+  'pwgs_supervars_single_llh': 'PhyloWGS (enforced clustering)',
+  'pwgs_supervars_multi_llh': 'Multi-chain PhyloWGS (enforced clustering)',
+}
 
 external_css = [{
   'href': 'https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css',
@@ -78,12 +87,24 @@ def init_content(method_names, sim_param_vals, result_types):
   ))
 
   controls.append(dcc.Checklist(
-    id = 'show_missing',
-    options = [{'label': 'Show missing data', 'value': 'show_missing'}],
+    id = 'toggleable_options',
+    options = [
+      {'label': 'Show missing data', 'value': 'show_missing'},
+      {'label': 'Make Quaid happy', 'value': 'make_quaid_happy'},
+    ],
     values = ['show_missing'],
   ))
 
-  plot = [dcc.Graph(id=f'{plot_type}_results') for plot_type in result_types]
+  plot = [dcc.Graph(
+    id = f'{plot_type}_results',
+    config = {
+      'showLink': True,
+      'toImageButtonOptions': {
+        'format': 'svg',
+        'width': 750,
+        'height': 450,
+      },
+    }) for plot_type in result_types]
   children = [
     html.Div(className='row', children=html.H1(children='Mutation relations')),
     html.Div(className='row', children=[
@@ -100,8 +121,10 @@ def jitter_points(P, magnitude=0.01):
   noise = scale * np.random.uniform(low=-1, high=1, size=len(P))
   return P + noise
       
-def update_plot(plot_type, methx, methy, results, jitter, show_missing, *simparams):
-  show_missing = 'show_missing' in show_missing
+def update_plot(plot_type, methx, methy, results, jitter, toggleable_options, *simparams):
+  show_missing = 'show_missing' in toggleable_options
+  make_quaid_happy = 'make_quaid_happy' in toggleable_options
+  plot_padding = 1.05
 
   filters = [len(results)*[True]]
   for param_name, param_vals in zip(SIM_PARAMS, simparams):
@@ -136,7 +159,7 @@ def update_plot(plot_type, methx, methy, results, jitter, show_missing, *simpara
     missing_Y_prop = 0
 
   if len(X) > 0:
-    diag_topright = min(max(X), max(Y))
+    diag_topright = plot_padding * np.max((np.max(X), np.max(Y)))
   else:
     diag_topright = 1
 
@@ -153,11 +176,37 @@ def update_plot(plot_type, methx, methy, results, jitter, show_missing, *simpara
     X = jitter_points(X, jitter)
     Y = jitter_points(Y, jitter)
 
-  xaxis = {'title': methx}
-  yaxis = {'title': methy}
+  marker = { 'size': 14, }
   if plot_type == 'mutrel':
-    for axis in (xaxis, yaxis):
-      axis['range'] = (-0.1, 1.1)
+    axis_range = (-0.1, 1.1)
+  else:
+    axis_range = None
+
+  if make_quaid_happy:
+    xtitle = 'Error of %s (bits)' % HAPPY_METHOD_NAMES.get(methx, methx)
+    ytitle = 'Error of %s (bits)' % HAPPY_METHOD_NAMES.get(methy, methy)
+    title = None
+    template = 'plotly_white'
+    if plot_type == 'mutphi':
+      max_value = np.max(np.concatenate((X, Y)))
+      axis_range = (-0.5, plot_padding * max_value)
+  else:
+    xtitle = methx
+    ytitle = methy
+    title = '%s %s vs. %s (total=%s, X=%.3f, Y=%.3f, <br>Y_approx_X=%.3f, Y_gt_X=%.3f, X_gt_Y=%.3f)' % (
+      plot_type,
+      methy,
+      methx,
+      len(X),
+      1 - missing_X_prop,
+      1 - missing_Y_prop,
+      Y_approx_X,
+      Y_gt_X,
+      X_gt_Y,
+    )
+    marker['color'] = density
+    marker['colorscale'] = 'Viridis'
+    template = 'seaborn'
 
   labels = [f'{runid}<br>orig=({xorig:.2f}, {yorig:.2f})' for runid, xorig, yorig in zip(visible['runid'], X_orig, Y_orig)]
   plot = {
@@ -166,27 +215,16 @@ def update_plot(plot_type, methx, methy, results, jitter, show_missing, *simpara
       y = Y,
       text = labels,
       mode = 'markers',
-      marker = {
-        'color': density,
-        'colorscale': 'Viridis',
-      },
+      marker = marker,
     )],
     'layout': go.Layout(
-      xaxis = xaxis,
-      yaxis = yaxis,
+      xaxis = {'title': xtitle, 'range': axis_range},
+      yaxis = {'title': ytitle, 'range': axis_range},
+      template = template,
       hovermode = 'closest',
       height = 800,
-      title = '%s %s vs. %s (total=%s, X=%.3f, Y=%.3f, <br>Y_approx_X=%.3f, Y_gt_X=%.3f, X_gt_Y=%.3f)' % (
-        plot_type,
-        methx,
-        methy,
-        len(X),
-        1 - missing_X_prop,
-        1 - missing_Y_prop,
-        Y_approx_X,
-        Y_gt_X,
-        X_gt_Y,
-      ),
+      title = title,
+      font = {'size': 12},
       shapes = [{
         'type': 'line',
         'xref': 'x',
@@ -210,7 +248,7 @@ def create_callbacks(results):
     dash.dependencies.Input('method_x', 'value'),
     dash.dependencies.Input('method_y', 'value'),
     dash.dependencies.Input('jitter', 'value'),
-    dash.dependencies.Input('show_missing', 'values'),
+    dash.dependencies.Input('toggleable_options', 'values'),
   ]
   fig_inputs += [dash.dependencies.Input(f'{P}_chooser', 'value') for P in SIM_PARAMS]
 
