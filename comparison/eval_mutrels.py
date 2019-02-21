@@ -36,7 +36,7 @@ def discard_garbage(mutrels, clustered, garbage):
       # `expected` shape, given `G` garbage variants and `M` total variants: `GxM`
       expected = np.ones((G, M))
       expected[np.arange(G),gidxs] = 0
-      assert np.allclose(expected, garbrels)
+      assert np.allclose(expected, garbrels), '%s garbage relations are wrong' % name
     mutrels[name] = mutrel.remove_variants(mutrels[name], gidxs)
     assert set(mutrels[name].vids) == clustered
 

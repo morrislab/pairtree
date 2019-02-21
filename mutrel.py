@@ -39,9 +39,10 @@ def remove_variants(mrel, vidxs):
   )
 
 def sort_mutrel_by_vids(mrel):
+  sort_map = {vid: vidx for vidx, vid in enumerate(mrel.vids)}
   sorted_vids = common.sort_vids(mrel.vids)
-  sort_map = {vid: vidx for vidx, vid in enumerate(sorted_vids)}
-  order = [sort_map[vid] for vid in mrel.vids]
+  order = [sort_map[vid] for vid in sorted_vids]
+  assert sorted_vids == [mrel.vids[idx] for idx in order]
   return Mutrel(
     vids = sorted_vids,
     rels = reorder_array(mrel.rels, order),
