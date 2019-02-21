@@ -47,6 +47,11 @@ def load_params(paramsfn):
   with open(paramsfn) as P:
     return json.load(P)
 
+def load_structure(params):
+  adjlist = params['structure']
+  adjlist = {int(P): C for P, C in adjlist.items()}
+  return adjlist
+
 def write_ssms(variants, ssm_fn):
   keys = ('id', 'name', 'var_reads', 'total_reads', 'var_read_prob')
 

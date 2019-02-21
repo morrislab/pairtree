@@ -30,7 +30,7 @@ def main():
   parser.add_argument('--burnin-per-chain', dest='burnin_per_chain', type=int, default=1000)
   parser.add_argument('--trees-per-chain', dest='trees_per_chain', type=int, default=2000)
   parser.add_argument('--tree-chains', dest='tree_chains', type=int, default=None)
-  parser.add_argument('--phi-iterations', dest='phi_iterations', type=int, default=1000)
+  parser.add_argument('--phi-iterations', dest='phi_iterations', type=int, default=10000)
   parser.add_argument('--tree_perturbations', dest='tree_perturbations', type=int, default=100)
   parser.add_argument('ssm_fn')
   parser.add_argument('results_fn')
@@ -106,8 +106,7 @@ def main():
       )
       resultserializer.save(results, args.results_fn)
     else:
-      adjlist = params['structure']
-      adjlist = {int(P): C for P, C in adjlist.items()}
+      adjlist = inputparser.load_structure(params['structure'])
       adjm = common.convert_adjlist_to_adjmatrix(adjlist)
       results['adjm'], results['phi'], results['llh'] = tree_sampler.use_existing_structure(
         adjm,
