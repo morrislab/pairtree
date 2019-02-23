@@ -8,16 +8,16 @@ import numpy as np
 import sys
 
 HAPPY_METHOD_NAMES = {
+  'truth': 'Truth',
   'mle_unconstrained': 'MLE lineage frequencies',
-  'pairtree_clustrel': 'Pairwise cluster relations',
-  'pairtree_trees_llh': 'Pairtree (automated tree search)',
   'pairtree_handbuilt': 'Pairtree (manually constructed trees)',
+  'pairtree_trees_llh': 'Pairtree (automated tree search)',
+  'pairtree_clustrel': 'Pairwise cluster relations',
   'pastri_trees_llh': 'PASTRI',
   'pwgs_allvars_single_llh': 'PhyloWGS (no clustering enforced)',
   'pwgs_allvars_multi_llh': 'Multi-chain PhyloWGS (no clustering enforced)',
   'pwgs_supervars_single_llh': 'PhyloWGS (enforced clustering)',
   'pwgs_supervars_multi_llh': 'Multi-chain PhyloWGS (enforced clustering)',
-  'truth': 'Truth',
 }
 
 for name, synonym in (
@@ -55,8 +55,6 @@ def load_results(resultsfn):
       # failed run.
       print('%s has %s infs' % (M, np.sum(inf_idxs)), file=sys.stderr)
       results.loc[inf_idxs,M] = -1
-    #missing_idxs = results[M] == -1
-    #results.loc[missing_idxs,M] = 0
 
   return (results, methods)
 
@@ -94,10 +92,18 @@ def partition(results, methods, key):
 
   return partitioned
 
+def sort_methods(methods):
+  # Sort methods in same order as given in dictionary, so that we control
+  # horizontal order of groups on plot.
+  methods = set(methods)
+  assert methods.issubset(HAPPY_METHOD_NAMES.keys())
+  methods = [M for M in HAPPY_METHOD_NAMES.keys() if M in methods]
+  return methods
+
 def make_bar_traces(parted, _make_legend_label):
   traces = []
   for V in parted.keys():
-    methods = sorted(parted[V].keys(), key=lambda M: HAPPY_METHOD_NAMES[M])
+    methods = sort_methods(parted[V].keys())
     trace = {
       'type': 'bar',
       'x': [HAPPY_METHOD_NAMES[M] for M in methods],
@@ -113,7 +119,7 @@ def make_bar_traces(parted, _make_legend_label):
 def make_box_traces(parted, _make_legend_label):
   traces = []
   for V in parted.keys():
-    methods = sorted(parted[V].keys(), key=lambda M: HAPPY_METHOD_NAMES[M])
+    methods = sort_methods(parted[V].keys())
     points = [(HAPPY_METHOD_NAMES[M], R) for M in methods for R in parted[V][M]]
     X, Y = zip(*points)
     trace = {
@@ -139,7 +145,7 @@ def make_fig(traces, template, ytitle, max_y=None, layout_options=None):
     'layout': {
       'template': template,
       'yaxis': yaxis,
-    }
+    },
   }
   if layout_options is not None:
     fig['layout'] = {**fig['layout'], **layout_options}
@@ -152,6 +158,14 @@ def write_figs(figs, outfn):
       fig,
       output_type = 'div',
       include_plotlyjs = 'cdn',
+      config = {
+        'showLink': True,
+        'toImageButtonOptions': {
+          'format': 'svg',
+          'width': 750,
+          'height': 450,
+        },
+      },
     )
   with open(outfn, 'w') as outf:
     print(plot, file=outf)
@@ -164,16 +178,25 @@ def main():
   parser.add_argument('--partition-by-samples', action='store_true')
   parser.add_argument('--template', default='seaborn')
   parser.add_argument('--max-y')
+  parser.add_argument('--plot-type', required=True, choices=('mutrel', 'mutphi'))
   parser.add_argument('results_fn')
   parser.add_argument('plot_fn')
   args = parser.parse_args()
 
   results, methods = load_results(args.results_fn)
+
   if args.partition_by_samples:
     results = augment(results, 'S')
     parted = partition(results, methods, key='S')
   else:
     parted = partition(results, methods, key=None)
+
+  if args.plot_type == 'mutrel':
+    ytitle = 'Error (bits)'
+  elif args.plot_type == 'mutphi':
+    ytitle = 'Mean distance from truth'
+  else:
+    raise Exception('Unknown plot type %s' % args.plot_type)
 
   figs = []
   results_score = {}
@@ -181,6 +204,15 @@ def main():
   for V in parted:
     results_score[V]         = {M: parted[V][M]['scores']        for M in parted[V]}
     results_frac_complete[V] = {M: parted[V][M]['frac_complete'] for M in parted[V]}
+
+  if args.plot_type == 'mutphi':
+    truth_method = None
+    for T in ('truth', 'pairtree_handbuilt'):
+      if T in methods:
+        truth_method = T
+    for V in parted:
+      results_score[V] = {M: results_score[V][M] - results_score[V][truth_method] for M in results_score[V]}
+      del results_score[V][truth_method]
 
   def _make_legend_label(V):
     suffix = 'sample' if V == 1 else 'samples'
@@ -192,7 +224,7 @@ def main():
     make_fig(
       box_traces,
       args.template,
-      'Error (bits)',
+      ytitle,
       args.max_y,
       {'boxmode': 'group'},
     ),
@@ -200,8 +232,8 @@ def main():
       bar_traces,
       args.template,
       'Proportion of successful runs',
-      args.max_y,
-      {'barmode': 'group'},
+      max_y = None,
+      layout_options = {'barmode': 'group'},
     ),
   ]
   write_figs(figs, args.plot_fn)

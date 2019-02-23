@@ -4,12 +4,16 @@ command -v parallel > /dev/null || module load gnu-parallel
 
 SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 BASEDIR=~/work/pairtree
-BATCH=sims
+
+BATCH=steph
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+#BATCH=sims
+#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+
 RESULTSDIR=$BASEDIR/scratch/results
 SCORESDIR=$BASEDIR/scratch/scores
 TRUTH_DIR=$RESULTSDIR/${BATCH}.truth
 MLE_MUTPHIS_DIR=$RESULTSDIR/${BATCH}.mle_unconstrained
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
 PARALLEL=20
 
 function make_truth {
@@ -86,12 +90,18 @@ function eval_mutrels {
     runid=$(basename $mutrelfn | cut -d. -f1)
     mutrels=$(make_results_paths $runid mutrel)
 
-    echo "cd $RESULTSDIR && " \
-      "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/eval_mutrels.py " \
-      "--discard-garbage" \
-      "--params $PAIRTREE_INPUTS_DIR/$runid.params.json" \
-      "$mutrels " \
-      "> $SCORESDIR/$BATCH/$runid.mutrel_score.txt"
+    cmd="cd $RESULTSDIR && "
+    cmd+="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/eval_mutrels.py "
+    cmd+="--discard-garbage "
+    if [[ $BATCH == steph ]]; then
+      for method in pwgs_allvars_{single,multi}_{uniform,llh}; do
+        cmd+="--ignore-garbage-for $method "
+      done
+    fi
+    cmd+="--params $PAIRTREE_INPUTS_DIR/$runid.params.json "
+    cmd+="$mutrels "
+    cmd+="> $SCORESDIR/$BATCH/$runid.mutrel_score.txt"
+    echo $cmd
   done #| parallel -j$PARALLEL --halt 1
 }
 
@@ -160,9 +170,10 @@ function plot_individual {
   cd $SCORESDIR
   for batch in steph sims; do
     for ptype in mutphi mutrel; do
+        #"$( [[ $batch == sims && $ptype == mutphi ]] && echo --max-y 10)" \
       echo "python3 ~/work/pairtree/comparison/plot_individual.py" \
         "--template plotly_white" \
-        "$( [[ $batch == sims && $ptype == mutphi ]] && echo --max-y 10)" \
+        "--plot-type $ptype" \
         "$( [[ $batch == sims ]] && echo --partition-by-samples)" \
         "$batch.$ptype.txt" \
         "$batch.$ptype.html"
@@ -174,12 +185,12 @@ function main {
   #make_truth
   #make_mle_mutphis
 
-  eval_mutrels
-  eval_mutphis
+  #eval_mutrels
+  #eval_mutphis
   #compile_scores mutrel
   #compile_scores mutphi
 
-  #plot_individual
+  plot_individual
   #plot_comparison
 }
 
