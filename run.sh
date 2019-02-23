@@ -1,5 +1,6 @@
 #!/bin/bash
 #set -euo pipefail
+command -v parallel || module load gnu-parallel
 
 PROTDIR=~/work/pairtree
 RESULTSDIR=$PROTDIR/scratch/results
@@ -10,7 +11,9 @@ STEPH_INDIR=$PROTDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 STEPH_OUTDIR=$RESULTSDIR/steph.xeno.withgarb.pairtree
 
 PARALLEL=40
-TREES_PER_CHAIN=1000
+TREE_CHAINS=40
+BURNIN_PER_CHAIN=1000
+TREES_PER_CHAIN=2000
 PHI_ITERATIONS=10000
 
 function run_steph {
@@ -18,9 +21,6 @@ function run_steph {
   #rm -f $STEPH_OUTDIR/SJ*.{html,json,csv,stdout}
 
   for ssmfn in $STEPH_INDIR/*.ssm; do
-    if (echo $ssmfn | grep -e SJBALL022610 -e SJETV010 > /dev/null); then
-      continue
-    fi
     runid=$(basename $ssmfn | cut -d. -f1)
     jobname="steph_pairtree_${runid}"
     jobfn=$(mktemp)
@@ -35,10 +35,10 @@ function run_steph {
 
       echo "cd $STEPH_OUTDIR && " \
         "OMP_NUM_THREADS=1 python3 $PROTDIR/basic.py" \
-        "--verbose" \
         "--seed 1" \
         "--parallel $PARALLEL" \
-        "--tree-chains $PARALLEL" \
+        "--tree-chains $TREE_CHAINS" \
+        "--burnin-per-chain $BURNIN_PER_CHAIN" \
         "--trees-per-chain $TREES_PER_CHAIN" \
         "--phi-iterations $PHI_ITERATIONS" \
         "--params $STEPH_INDIR/${runid}.params.json" \
@@ -98,9 +98,9 @@ function write_indices {
 }
 
 function main {
-  #run_steph
+  run_steph
   #plot_steph
-  write_indices
+  #write_indices
 }
 
 main

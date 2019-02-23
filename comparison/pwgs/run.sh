@@ -1,6 +1,6 @@
 #!/bin/bash
 #set -euo pipefail
-#module load gnu-parallel
+command -v parallel || module load gnu-parallel
 
 BASEDIR=~/work/pairtree
 JOBDIR=/tmp
@@ -57,14 +57,15 @@ function run_pwgs {
         "--params $INDIR/${runid}.params.json" \
         ">$runid.stdout" \
         "2>$runid.stderr"
-    ) > $jobfn
-    sbatch $jobfn
+    ) #> $jobfn
+    #sbatch $jobfn
     rm $jobfn
   done
 }
 
 function convert_outputs {
-  USE_MULTICHAIN=true
+  #USE_MULTICHAIN=true
+  USE_MULTICHAIN=$1
 
   cd $OUTBASE
   for runid in *; do
@@ -84,7 +85,7 @@ function convert_outputs {
       results_base=$runid.pwgs_trees_single
     fi
 
-    cmd="cd $OUTDIR && "
+    cmd="cd $OUTDIR && export OMP_NUM_THREADS=1 && "
     cmd+="python2 $PWGS_PATH/write_results.py "
     cmd+="--include-multiprimary "
     cmd+="$runid "
@@ -93,11 +94,14 @@ function convert_outputs {
     cmd+=">  $OUTDIR/$runid.results.stdout "
     cmd+="2> $OUTDIR/$runid.results.stderr "
     for tree_weights in uniform llh; do
-      cmd+="&& OMP_NUM_THREADS=1 python3 $BASEDIR/comparison/pwgs/convert_outputs.py "
+      cmd+="&& python3 $BASEDIR/comparison/pwgs/convert_outputs.py "
+      if [[ $OUTDIR =~ supervars ]]; then
+        cmd+="--use-supervars "
+      fi
       cmd+="--weight-trees-by $tree_weights "
       cmd+="--trees-mutrel $OUTDIR/${results_base}_${tree_weights}.mutrel.npz "
       cmd+="--phi $OUTDIR/${results_base}_${tree_weights}.mutphi.npz "
-      cmd+="$PAIRTREE_INPUTS_DIR/$runid.params.json "
+      cmd+="--pairtree-params $PAIRTREE_INPUTS_DIR/$runid.params.json "
       cmd+="$OUTDIR/$json_base.{summ.json.gz,muts.json.gz,mutass.zip} "
       cmd+=">>  $OUTDIR/$runid.results.stdout "
       cmd+="2>> $OUTDIR/$runid.results.stderr"
@@ -109,7 +113,8 @@ function convert_outputs {
 function main {
   #convert_inputs
   #run_pwgs
-  convert_outputs
+  convert_outputs true
+  convert_outputs false
 }
 
 main

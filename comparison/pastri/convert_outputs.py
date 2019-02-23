@@ -9,9 +9,13 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 import inputparser
 import evalutil
 
-def load_matrices(matfn, dtype=np.float):
+class UnexpectedShapeError(Exception):
+  pass
+
+def load_matrices(matfn, dtype=np.float, check_shapes=True):
   mats = {}
   matname = None
+  shapes = {}
 
   with open(matfn) as outf:
     for line in outf:
@@ -23,15 +27,24 @@ def load_matrices(matfn, dtype=np.float):
         assert matname not in mats
         mats[matname] = ''
       elif line.startswith('(') and line.endswith(')'):
-        # This is just the shape of the matrix. Ignore.
-        # Note that "tree labelling" files don't have this header. We don't
-        # require it as a consequence.
-        pass
+        # Ensure shapeensions not specified multiple times.
+        assert matname not in shapes
+        shapes[matname] = tuple([int(T.strip()) for T in line[1:-1].split(',')])
       else:
         mats[matname] += line + '\n'
 
   for matname in mats:
     mats[matname] = np.loadtxt(StringIO(mats[matname]), dtype=dtype)
+
+    # If the matrix is `Rx1`, the parsing code will actually have loaded it as
+    # an `R`-length vector, rather than a `Rx1` matrix. Correct this.
+    if mats[matname].ndim == 1:
+      mats[matname] = mats[matname][:,np.newaxis]
+
+    if check_shapes:
+      assert matname in shapes
+      if shapes[matname] != mats[matname].shape:
+        raise UnexpectedShapeError('expected=%s actual=%s' % (shapes[matname], mats[matname].shape))
   return mats
 
 def load_prelim_trees(trees_fn):
@@ -62,8 +75,9 @@ def load_prelim_trees(trees_fn):
 def load_final_trees(trees_fn):
   # These are final trees, representing all possible permutations of nodes with
   # the sampled frequencies that are consistent with any tree structure. Tree
-  # structure is provided as a Kx2 matrix of edges.
-  mats = load_matrices(trees_fn, dtype=np.int)
+  # structure is provided as a Kx2 matrix of edges. Matrix shape is not
+  # provided.
+  mats = load_matrices(trees_fn, dtype=np.int, check_shapes=False)
   adjms = []
 
   for edges in mats.values():
@@ -117,14 +131,14 @@ def convert_results(sampid, prelim_trees, variant_clusters, outdir):
     # LH.
     if not os.path.exists(freqfn):
       continue
-    freqs = load_matrices(freqfn, np.float)
+    try:
+      freqs = load_matrices(freqfn, np.float)
+    except UnexpectedShapeError:
+      # Sometimes the stated shape of the matrix is `Kx1`, but PASTRI gives us
+      # `kx1`, where `k < K`. Ignore these cases.
+      continue
     assert len(freqs) == 1
     F = next(iter(freqs.values()))
-    # If there's only one sample, our matrix-parsing code will have loaded the
-    # frequency matrix as a K-length vector, rather than a Kx1 matrix. This
-    # will screw up downstream code that expects F to have two dimensions.
-    if F.ndim == 1:
-      F = F[:,np.newaxis]
 
     K = len(F)
     clustfn = _makefn(tidx, 'C')
@@ -162,10 +176,9 @@ def write_results(sampid, params_fn, trees_fn, tree_weights, trees_mutrel_fn, mu
     evalutil.save_sorted_mutrel(mrel, trees_mutrel_fn)
 
   if mutphi_fn is not None:
-    # PASTRI has some phis > 1 (e.g., 1.00079953), so don't fix rounding
-    # errors, which presumes that all elements that went into an average had
-    # elements in [0, 1].
-    mphi = evalutil.calc_mutphi(phis, llhs, clusterings, tree_weights, fix_rounding=False)
+    # PASTRI has some phis > 1 (e.g., 1.00079953). Ugh.
+    phis = np.minimum(1, phis)
+    mphi = evalutil.calc_mutphi(phis, llhs, clusterings, tree_weights)
     evalutil.save_mutphi(mphi, mutphi_fn)
 
 def main():

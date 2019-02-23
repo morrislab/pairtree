@@ -1,14 +1,13 @@
 #!/bin/bash
-command -v parallel || module load gnu-parallel
+command -v parallel > /dev/null || module load gnu-parallel
 
 BASEDIR=~/work/pairtree
 SCRIPTDIR=$(dirname "$(readlink -f "$0")")
-JOBDIR=/tmp
 PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
 BATCH=sims.pastri.informative
 INDIR=$BASEDIR/scratch/inputs/$BATCH
 OUTDIR=$BASEDIR/scratch/results/$BATCH
-PARALLEL=80
+PARALLEL=40
 NUM_ITERS=10000
 PASTRI_DIR=$HOME/.apps/pastri
 
@@ -17,13 +16,13 @@ function convert_inputs {
 
   for ssmfn in $PAIRTREE_INPUTS_DIR/*.ssm; do
     sampid=$(basename $ssmfn | cut -d. -f1)
+      #"--uniform-proposal" \
     echo "python3 $SCRIPTDIR/convert_inputs.py " \
-      "--uniform-proposal" \
       "$PAIRTREE_INPUTS_DIR/$sampid.ssm" \
       "$PAIRTREE_INPUTS_DIR/$sampid.params.json" \
       "$INDIR/$sampid.counts" \
       "$INDIR/$sampid.proposal"
-  done | parallel -j$PARALLEL --halt 1
+  done #| parallel -j$PARALLEL --halt 1
 }
 
 function run_pastri {
@@ -81,15 +80,16 @@ function convert_outputs {
         "--phi $OUTDIR/$runid.pastri_trees_$tree_weights.mutphi.npz" \
         "$runid" \
         "$PAIRTREE_INPUTS_DIR/$runid.params.json" \
-        "$treesfn"
+        "$treesfn" \
+        "2>$OUTDIR/$runid.output_conversion.stderr"
     done
-  done | parallel -j$PARALLEL --joblog $SCRATCH/tmp/jobs.log
+  done #| parallel -j$PARALLEL --joblog $SCRATCH/tmp/jobs.log
 }
 
 function main {
   #convert_inputs
   #run_pastri
-  get_F_and_C
+  #get_F_and_C
   convert_outputs
 }
 

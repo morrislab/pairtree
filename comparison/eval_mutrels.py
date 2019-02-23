@@ -62,6 +62,10 @@ def compare(mutrels):
     scores[name] = np.mean(1 - np.abs(mrel.rels - mutrels['truth'].rels))
     if name == 'truth':
       assert np.isclose(1, scores[name])
+
+    # Convert fro L1 distance to error.
+    assert 0 <= scores[name] <= 1
+    scores[name] = 1 - scores[name]
     
   names.remove('truth')
   print(*names, sep=',')

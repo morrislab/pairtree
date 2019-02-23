@@ -65,6 +65,7 @@ function convert_outputs {
     runid=$(basename $resultsfn | cut -d. -f1)
     resultsfn="$PAIRTREE_RESULTS_DIR/$runid.results.npz"
     is_run_complete $resultsfn || continue
+
     #jobfn=$(mktemp)
     (
         #echo "#!/bin/bash"
@@ -98,8 +99,8 @@ function convert_outputs {
 }
 
 function main {
-  run_pairtree
-  #convert_outputs
+  #run_pairtree
+  convert_outputs
 }
 
 main
