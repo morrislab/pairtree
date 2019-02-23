@@ -20,7 +20,7 @@ def load_mutrels(mutrel_args):
       mutrels[mutrel_name] = None
   return mutrels
 
-def discard_garbage(mutrels, clustered, garbage):
+def discard_garbage(mutrels, clustered, garbage, ignore_garbage_for):
   for name in list(mutrels.keys()):
     if mutrels[name] is None:
       continue
@@ -28,15 +28,16 @@ def discard_garbage(mutrels, clustered, garbage):
     assert set(vids) == clustered | garbage
 
     gidxs = [idx for idx, vid in enumerate(vids) if vid in garbage]
-    for garbrels in (mutrels[name].rels[gidxs,:,Models.garbage], mutrels[name].rels[:,gidxs,Models.garbage].T):
-      # Garbage mutations should have posterior that coclusters with
-      # themselves, but that renders them garbage to every other mutation
-      # (including other garbage)
-      G, M = garbrels.shape
-      # `expected` shape, given `G` garbage variants and `M` total variants: `GxM`
-      expected = np.ones((G, M))
-      expected[np.arange(G),gidxs] = 0
-      assert np.allclose(expected, garbrels), '%s garbage relations are wrong' % name
+    if name not in ignore_garbage_for:
+      for garbrels in (mutrels[name].rels[gidxs,:,Models.garbage], mutrels[name].rels[:,gidxs,Models.garbage].T):
+        # Garbage mutations should have posterior that coclusters with
+        # themselves, but that renders them garbage to every other mutation
+        # (including other garbage)
+        G, M = garbrels.shape
+        # `expected` shape, given `G` garbage variants and `M` total variants: `GxM`
+        expected = np.ones((G, M))
+        expected[np.arange(G),gidxs] = 0
+        assert np.allclose(expected, garbrels), '%s garbage relations are wrong' % name
     mutrels[name] = mutrel.remove_variants(mutrels[name], gidxs)
     assert set(mutrels[name].vids) == clustered
 
@@ -77,6 +78,11 @@ def main():
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--discard-garbage', dest='discard_garbage', action='store_true')
+  # Normally, we check to ensure that garbage mutations have all their
+  # posterior mass on the garbage relation. However, if a method has been
+  # allowed to cluster mutations itself, this won't necessarily hold true, so
+  # permit this behaviour to be disabled for those methods.
+  parser.add_argument('--ignore-garbage-for', action='append')
   parser.add_argument('--params', dest='paramsfn', required=True)
   parser.add_argument('mutrels', nargs='+')
   args = parser.parse_args()
@@ -87,7 +93,7 @@ def main():
 
   mutrels = load_mutrels(args.mutrels)
   if args.discard_garbage:
-    discard_garbage(mutrels, clustered, garbage)
+    discard_garbage(mutrels, clustered, garbage, set(args.ignore_garbage_for))
   compare(mutrels)
 
 if __name__ == '__main__':
