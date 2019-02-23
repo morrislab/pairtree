@@ -25,3 +25,5 @@ PASTRI:
     .0
   The lone "." stems from how they mistakenly chop off characters sometimes -- it should be "1."
     So, any parsing code crashes on this
+
+Enumerate trees crash: sim_K100_S10_T1000_M10000_G10000

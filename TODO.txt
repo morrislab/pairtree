@@ -26,3 +26,16 @@ Change my grad desc to use Adam instead
 Bugs:
   In phi_fitter's calc_mut_p, should I actually use 0.5? or omega_v?
     Since it's working on superclusters, this is probably okay
+
+
+Steph:
+  19 datasets
+  14 patients
+    +1 extra for SJBALL022610
+    +4 extra for SJETV010
+  PASTRI + SciClone:
+    SciClone failed on four datasets
+    Dropped variable numbers of variants on others
+      cd ~/work/pairtree/scratch/results/steph.xeno.sciclone && for foo in *stdout; do echo $(echo $foo | cut -d. -f1) $(cat $foo | grep "of inadequate depth" | awk '{print $1/$4}'); done | sort -nk2
+      | column -t
+      Median: 17.4% of variants dropped
