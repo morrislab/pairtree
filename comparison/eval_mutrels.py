@@ -60,15 +60,29 @@ def compare(mutrels):
     assert np.array_equal(mrel.vids, mutrels['truth'].vids)
     mutrel.check_posterior_sanity(mrel.rels)
 
-    scores[name] = np.mean(1 - np.abs(mrel.rels - mutrels['truth'].rels))
-    if name == 'truth':
-      assert np.isclose(1, scores[name])
+    # Compute L1 distance.
+    dist = np.sum(np.abs(mrel.rels - mutrels['truth'].rels), axis=2)
+    assert np.allclose(dist, dist.T)
+    assert np.allclose(0, np.diag(dist))
+    # A pairwise mutrel vector can have a maximum L1 distance of 2, when no
+    # elements have overlap with each other. Normalize this so scores can be
+    # interpreted as "mean proportion of miscalled relations", given hard 0/1
+    # calls for relation types.
+    dist /= 2
+    # Distances may be slightly higher than 1 because of floating point error.
+    # Set these to exactly 1.
+    dist[np.logical_and(dist > 1, np.isclose(1, dist))] = 1
+    assert np.all(0 <= dist) and np.all(dist <= 1)
 
-    # Convert fro L1 distance to error.
-    assert 0 <= scores[name] <= 1
-    scores[name] = 1 - scores[name]
+    # Take entries below main diagonal.
+    dist_lower = np.tril(dist, 1)
+    assert dist_lower.shape == (M, M)
+    # There are (M choose 2) elements below the diagonal, so divide by this
+    # when computing mean.
+    scores[name] = np.sum(dist_lower) / (0.5*M*(M - 1))
+    if name == 'truth':
+      assert np.isclose(0, scores[name])
     
-  names.remove('truth')
   print(*names, sep=',')
   print(*[scores[name] for name in names], sep=',')
 

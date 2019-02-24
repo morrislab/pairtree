@@ -7,23 +7,25 @@ import re
 import numpy as np
 import sys
 
-HAPPY_METHOD_NAMES = {
-  'truth': 'Truth',
-  'mle_unconstrained': 'MLE lineage frequencies',
-  'pairtree_handbuilt': 'Pairtree (manually constructed trees)',
-  'pairtree_trees_llh': 'Pairtree (automated tree search)',
-  'singlepairtree_trees_llh': 'Pairtree (single chain)',
-  'pairtree_clustrel': 'Pairwise cluster relations',
-  'pastri_trees_llh': 'PASTRI',
-  'pwgs_allvars_single_llh': 'PhyloWGS (no clustering enforced)',
-  'pwgs_allvars_multi_llh': 'Multi-chain PhyloWGS (no clustering enforced)',
-  'pwgs_supervars_single_llh': 'PhyloWGS (enforced clustering)',
-  'pwgs_supervars_multi_llh': 'Multi-chain PhyloWGS (enforced clustering)',
-}
+HAPPY_METHOD_NAMES = (
+  ('truth', 'Truth'),
+  ('mle_unconstrained', 'MLE lineage frequencies'),
+  ('pairtree_handbuilt', 'Pairtree (manually constructed trees)'),
+  ('pairtree_trees_llh', 'Pairtree (automated tree search)'),
+  ('singlepairtree_trees_llh', 'Pairtree (single chain)'),
+  ('pairtree_clustrel', 'Pairwise cluster relations'),
+  ('pastri_trees_llh', 'PASTRI'),
+  ('pwgs_allvars_single_llh', 'PhyloWGS (unclustered)'),
+  ('pwgs_supervars_single_llh', 'PhyloWGS'),
+  ('pwgs_trees_single_llh', 'PhyloWGS'),
+  ('pwgs_allvars_multi_llh', 'PhyloWGS multichain (unclustered)'),
+  ('pwgs_supervars_multi_llh', 'PhyloWGS multichain'),
+  ('pwgs_trees_multi_llh', 'PhyloWGS multichain'),
+)
+METHOD_ORDER = {M: idx for idx, (M, M_full) in enumerate(HAPPY_METHOD_NAMES)}
+HAPPY_METHOD_NAMES = {M: M_full for (M, M_full) in HAPPY_METHOD_NAMES}
 
 for name, synonym in (
-  (('pwgs_trees_single_llh', 'pwgs_supervars_single_llh')),
-  (('pwgs_trees_multi_llh', 'pwgs_supervars_multi_llh')),
 ):
   HAPPY_METHOD_NAMES[name] = HAPPY_METHOD_NAMES[synonym]
 
@@ -94,11 +96,7 @@ def partition(results, methods, key):
   return partitioned
 
 def sort_methods(methods):
-  # Sort methods in same order as given in dictionary, so that we control
-  # horizontal order of groups on plot.
-  methods = set(methods)
-  assert methods.issubset(HAPPY_METHOD_NAMES.keys())
-  methods = [M for M in HAPPY_METHOD_NAMES.keys() if M in methods]
+  methods = sorted(methods, key = lambda M: METHOD_ORDER[M])
   return methods
 
 def make_bar_traces(parted, _make_legend_label):
@@ -180,6 +178,7 @@ def main():
   parser.add_argument('--template', default='seaborn')
   parser.add_argument('--max-y')
   parser.add_argument('--plot-type', required=True, choices=('mutrel', 'mutphi'))
+  parser.add_argument('--baseline-name', default='baseline')
   parser.add_argument('results_fn')
   parser.add_argument('plot_fn')
   args = parser.parse_args()
@@ -195,7 +194,7 @@ def main():
   if args.plot_type == 'mutrel':
     ytitle = 'Mean distance from truth'
   elif args.plot_type == 'mutphi':
-    ytitle = 'Error (bits)'
+    ytitle = 'VAF reconstruction error above %s (bits)' % args.baseline_name
   else:
     raise Exception('Unknown plot type %s' % args.plot_type)
 
@@ -206,17 +205,19 @@ def main():
     results_score[V]         = {M: parted[V][M]['scores']        for M in parted[V]}
     results_frac_complete[V] = {M: parted[V][M]['frac_complete'] for M in parted[V]}
 
+  truth_method = None
+  for T in ('truth', 'pairtree_handbuilt'):
+    if T in methods:
+      truth_method = T
+      break
+  else:
+    raise Exception('truth_method %s not present' % truth_method)
+
   if args.plot_type == 'mutphi':
-    truth_method = None
-    for T in ('truth', 'pairtree_handbuilt'):
-      if T in methods:
-        truth_method = T
-        break
-    else:
-      raise Exception('truth_method %s not present' % truth_method)
     for V in parted:
       results_score[V] = {M: results_score[V][M] - results_score[V][truth_method] for M in results_score[V]}
-      del results_score[V][truth_method]
+  for V in parted:
+    del results_score[V][truth_method]
 
   def _make_legend_label(V):
     suffix = 'sample' if V == 1 else 'samples'

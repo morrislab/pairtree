@@ -6,16 +6,7 @@ SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 BASEDIR=~/work/pairtree
 RESULTSDIR=$BASEDIR/scratch/results
 SCORESDIR=$BASEDIR/scratch/scores
-
-#BATCH=sims
-#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
-#TRUTH_DIR=$RESULTSDIR/sims.truth
-BATCH=steph
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
-TRUTH_DIR=$RESULTSDIR/steph.pairtree.hbstruct
-
-MLE_MUTPHIS_DIR=$RESULTSDIR/${BATCH}.mle_unconstrained
-PARALLEL=20
+PARALLEL=40
 
 function make_truth {
   mkdir -p $TRUTH_DIR
@@ -29,7 +20,7 @@ function make_truth {
     echo "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_truth_mutphi.py" \
       "$datafn" \
       "$TRUTH_DIR/$runid.mutphi.npz"
-  done #| parallel -j$PARALLEL --halt 1
+  done
 }
 
 function make_mle_mutphis {
@@ -42,7 +33,7 @@ function make_mle_mutphis {
     echo "python3 $SCRIPTDIR/calc_mle_mutphis.py" \
       "$ssmfn" \
       "$MLE_MUTPHIS_DIR/$runid.mutphi.npz"
-  done #| parallel -j$PARALLEL --halt 1
+  done
 }
 
 function make_results_paths {
@@ -109,7 +100,7 @@ function eval_mutrels {
     cmd+="$mutrels "
     cmd+="> $SCORESDIR/$BATCH/$runid.mutrel_score.txt"
     echo $cmd
-  done #| parallel -j$PARALLEL --halt 1
+  done
 }
 
 function eval_mutphis {
@@ -126,7 +117,7 @@ function eval_mutphis {
       "--ssms $PAIRTREE_INPUTS_DIR/$runid.ssm" \
       "$mutphis " \
       "> $SCORESDIR/$BATCH/$runid.mutphi_score.txt"
-  done #| parallel -j$PARALLEL --halt 1
+  done
 }
 
 function compile_scores {
@@ -153,7 +144,7 @@ function compile_scores {
       echo $S,$(tail -n+2 $foo)
     done
   ) > $outfn
-  cat $outfn | curl -F c=@- https://ptpb.pw >&2
+  #cat $outfn | curl -F c=@- https://ptpb.pw >&2
 }
 
 function plot_comparison {
@@ -175,28 +166,41 @@ function plot_comparison {
 
 function plot_individual {
   cd $SCORESDIR
-  for batch in steph sims; do
-    for ptype in mutphi mutrel; do
-      echo "python3 ~/work/pairtree/comparison/plot_individual.py" \
-        "--template plotly_white" \
-        "--plot-type $ptype" \
-        "$( [[ $batch == sims ]] && echo --partition-by-samples)" \
-        "$batch.$ptype.txt" \
-        "$batch.$ptype.html"
-    done
-  done | parallel -j40 --halt 1
+  for ptype in mutphi mutrel; do
+    echo "python3 $SCRIPTDIR/plot_individual.py" \
+      "--template plotly_white" \
+      "--plot-type $ptype" \
+      "$( [[ $BATCH == sims && $ptype == mutphi ]] && echo --baseline-name truth)" \
+      "$( [[ $BATCH == steph && $ptype == mutphi ]] && echo --baseline-name \'expert reconstruction\')" \
+      "$( [[ $BATCH == sims ]] && echo --partition-by-samples)" \
+      "$SCORESDIR/$BATCH.$ptype.txt" \
+      "$SCORESDIR/$BATCH.$ptype.html"
+  done
+}
+
+function run_batch {
+  export MLE_MUTPHIS_DIR=$RESULTSDIR/${BATCH}.mle_unconstrained
+
+  (eval_mutrels; eval_mutphis) | parallel -j$PARALLEL --halt 1
+  compile_scores mutrel
+  compile_scores mutphi
+  plot_individual | parallel -j$PARALLEL --halt 1
 }
 
 function main {
   #make_truth
   #make_mle_mutphis
 
-  #eval_mutrels
-  #eval_mutphis
-  #compile_scores mutrel
-  #compile_scores mutphi
+  export BATCH=sims
+  export PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+  export TRUTH_DIR=$RESULTSDIR/sims.truth
+  run_batch
 
-  plot_individual
+  export BATCH=steph
+  export PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+  export TRUTH_DIR=$RESULTSDIR/steph.pairtree.hbstruct
+  run_batch
+
   #plot_comparison
 }
 
