@@ -93,7 +93,8 @@ def main():
 
   mutrels = load_mutrels(args.mutrels)
   if args.discard_garbage:
-    discard_garbage(mutrels, clustered, garbage, set(args.ignore_garbage_for))
+    ignore_garbage_for = set(args.ignore_garbage_for) if args.ignore_garbage_for is not None else set()
+    discard_garbage(mutrels, clustered, garbage, ignore_garbage_for)
   compare(mutrels)
 
 if __name__ == '__main__':
