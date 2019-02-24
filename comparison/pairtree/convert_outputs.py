@@ -35,11 +35,27 @@ def calc_mutrel_from_clustrel(clustrel, clusters):
     rels = mrel,
   )
 
+def choose_subset(results, subset_size):
+  keys = ('adjm', 'llh', 'phi')
+  lengths = set([len(results[K]) for K in keys])
+  assert len(lengths) == 1
+  total = lengths.pop()
+  assert 0 < subset_size <= total
+  assert total % subset_size == 0
+
+  partitions = int(total / subset_size)
+  part_idx = np.random.randint(partitions)
+  start  = part_idx * subset_size
+  end = start + subset_size
+  for K in keys:
+    results[K] = results[K][start:end]
+
 def main():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('--use-subset', type=int)
   parser.add_argument('--weight-trees-by', choices=('llh', 'uniform'), default='uniform')
   parser.add_argument('--clustrel-mutrel')
   parser.add_argument('--trees-mutrel')
@@ -52,6 +68,9 @@ def main():
   clusters = [[]] + list(results['clusters'])
   garbage = list(results['garbage'])
   all_vids = set([V for C in results['clusters'] for V in C] + garbage)
+
+  if args.use_subset is not None:
+    choose_subset(results, args.use_subset)
 
   if args.pure_mutrel is not None:
     pure_mutrel = results['mutrel_posterior']

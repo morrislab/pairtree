@@ -12,6 +12,7 @@ HAPPY_METHOD_NAMES = {
   'mle_unconstrained': 'MLE lineage frequencies',
   'pairtree_handbuilt': 'Pairtree (manually constructed trees)',
   'pairtree_trees_llh': 'Pairtree (automated tree search)',
+  'singlepairtree_trees_llh': 'Pairtree (single chain)',
   'pairtree_clustrel': 'Pairwise cluster relations',
   'pastri_trees_llh': 'PASTRI',
   'pwgs_allvars_single_llh': 'PhyloWGS (no clustering enforced)',
@@ -192,9 +193,9 @@ def main():
     parted = partition(results, methods, key=None)
 
   if args.plot_type == 'mutrel':
-    ytitle = 'Error (bits)'
-  elif args.plot_type == 'mutphi':
     ytitle = 'Mean distance from truth'
+  elif args.plot_type == 'mutphi':
+    ytitle = 'Error (bits)'
   else:
     raise Exception('Unknown plot type %s' % args.plot_type)
 
@@ -210,6 +211,9 @@ def main():
     for T in ('truth', 'pairtree_handbuilt'):
       if T in methods:
         truth_method = T
+        break
+    else:
+      raise Exception('truth_method %s not present' % truth_method)
     for V in parted:
       results_score[V] = {M: results_score[V][M] - results_score[V][truth_method] for M in results_score[V]}
       del results_score[V][truth_method]

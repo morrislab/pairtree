@@ -4,15 +4,16 @@ command -v parallel > /dev/null || module load gnu-parallel
 
 SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 BASEDIR=~/work/pairtree
-
-BATCH=steph
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
-#BATCH=sims
-#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
-
 RESULTSDIR=$BASEDIR/scratch/results
 SCORESDIR=$BASEDIR/scratch/scores
-TRUTH_DIR=$RESULTSDIR/${BATCH}.truth
+
+#BATCH=sims
+#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+#TRUTH_DIR=$RESULTSDIR/sims.truth
+BATCH=steph
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+TRUTH_DIR=$RESULTSDIR/steph.pairtree.hbstruct
+
 MLE_MUTPHIS_DIR=$RESULTSDIR/${BATCH}.mle_unconstrained
 PARALLEL=20
 
@@ -54,10 +55,14 @@ function make_results_paths {
   fi
 
   if [[ $BATCH == steph ]]; then
-    paths+="truth=${BATCH}.truth/$runid.$result_type.npz "
+    if [[ $result_type == mutrel ]]; then
+      paths+="truth=${TRUTH_DIR}/$runid.pairtree_trees_llh.$result_type.npz "
+    fi
     paths+="pairtree_trees_llh=${BATCH}.xeno.withgarb.pairtree/$runid.pairtree_trees_llh.$result_type.npz "
     paths+="pairtree_trees_uniform=${BATCH}.xeno.withgarb.pairtree/$runid.pairtree_trees_uniform.$result_type.npz "
-    paths+="pairtree_handbuilt=${BATCH}.pairtree.hbstruct/$runid.$result_type.npz "
+    paths+="singlepairtree_trees_llh=${BATCH}.xeno.withgarb.pairtree/$runid.singlepairtree_trees_llh.$result_type.npz "
+    paths+="singlepairtree_trees_uniform=${BATCH}.xeno.withgarb.pairtree/$runid.singlepairtree_trees_uniform.$result_type.npz "
+    paths+="pairtree_handbuilt=${BATCH}.pairtree.hbstruct/$runid.pairtree_trees_llh.$result_type.npz "
     paths+="pwgs_allvars_single_uniform=${BATCH}.pwgs.allvars/$runid/$runid.pwgs_trees_single_uniform.$result_type.npz "
     paths+="pwgs_allvars_single_llh=${BATCH}.pwgs.allvars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
     paths+="pwgs_allvars_multi_uniform=${BATCH}.pwgs.allvars/$runid/$runid.pwgs_trees_multi_uniform.$result_type.npz "
@@ -69,7 +74,9 @@ function make_results_paths {
   elif [[ $BATCH == sims ]]; then
     paths+="truth=${TRUTH_DIR}/$runid.$result_type.npz "
     paths+="pairtree_trees_llh=${BATCH}.pairtree.fixedclusters/$runid.pairtree_trees_llh.$result_type.npz "
-    paths+="pairtree_trees_uniform=${BATCH}.pairtree.fixedclusters/$runid.pairtree_trees_uniform.$result_type.npz "
+    paths+="singlepairtree_trees_uniform=${BATCH}.pairtree.fixedclusters/$runid.pairtree_trees_uniform.$result_type.npz "
+    paths+="singlepairtree_trees_llh=${BATCH}.pairtree.fixedclusters/$runid.singlepairtree_trees_llh.$result_type.npz "
+    paths+="pairtree_trees_uniform=${BATCH}.pairtree.fixedclusters/$runid.singlepairtree_trees_uniform.$result_type.npz "
     paths+="pairtree_clustrel=${BATCH}.pairtree.fixedclusters/$runid.pairtree_clustrel.$result_type.npz "
     paths+="pwgs_trees_single_llh=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
     paths+="pwgs_trees_single_uniform=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_single_uniform.$result_type.npz "
@@ -86,8 +93,8 @@ function eval_mutrels {
   cd $RESULTSDIR
   mkdir -p $SCORESDIR/$BATCH
 
-  for mutrelfn in $(ls $TRUTH_DIR/*.mutrel.npz | sort --random-sort); do
-    runid=$(basename $mutrelfn | cut -d. -f1)
+  for truthfn in $(ls $TRUTH_DIR/*.mutrel.npz | sort --random-sort); do
+    runid=$(basename $truthfn | cut -d. -f1)
     mutrels=$(make_results_paths $runid mutrel)
 
     cmd="cd $RESULTSDIR && "
@@ -170,7 +177,6 @@ function plot_individual {
   cd $SCORESDIR
   for batch in steph sims; do
     for ptype in mutphi mutrel; do
-        #"$( [[ $batch == sims && $ptype == mutphi ]] && echo --max-y 10)" \
       echo "python3 ~/work/pairtree/comparison/plot_individual.py" \
         "--template plotly_white" \
         "--plot-type $ptype" \

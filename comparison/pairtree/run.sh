@@ -6,8 +6,11 @@ PROTDIR=~/work/pairtree
 SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 BASEDIR=~/work/pairtree
 JOBDIR=~/jobs
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
-PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/sims.pairtree.fixedclusters
+
+#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+#PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/sims.pairtree.fixedclusters
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/steph.xeno.withgarb.pairtree
 
 PARALLEL=40
 TREE_CHAINS=40
@@ -83,11 +86,12 @@ function convert_outputs {
           ">$PAIRTREE_RESULTS_DIR/$runid.output_conversion.stdout" \
           "2>$PAIRTREE_RESULTS_DIR/$runid.output_conversion.stderr"
         for tree_weights in uniform llh; do
+            #"--use-subset 2000" \
           echo "cd $PAIRTREE_RESULTS_DIR &&" \
             "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/convert_outputs.py" \
             "--weight-trees-by $tree_weights" \
-            "--trees-mutrel $PAIRTREE_RESULTS_DIR/$runid.pairtree_trees_$tree_weights.mutrel.npz" \
-            "--phi $PAIRTREE_RESULTS_DIR/$runid.pairtree_trees_$tree_weights.mutphi.npz" \
+            "--trees-mutrel $PAIRTREE_RESULTS_DIR/$runid.singlepairtree_trees_$tree_weights.mutrel.npz" \
+            "--phi $PAIRTREE_RESULTS_DIR/$runid.singlepairtree_trees_$tree_weights.mutphi.npz" \
             "$resultsfn" \
             ">>$PAIRTREE_RESULTS_DIR/$runid.output_conversion.stdout" \
             "2>>$PAIRTREE_RESULTS_DIR/$runid.output_conversion.stderr"
