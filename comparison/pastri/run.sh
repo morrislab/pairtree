@@ -32,6 +32,8 @@ function run_pastri {
     runid=$(basename $countsfn | cut -d. -f1)
     jobname="steph_pastri_${runid}"
 
+    [[ -f $OUTDIR/$runid.trees ]] && continue
+
     (
       # Must source ~/.bash_host_specific to get PATH set properly for
       # Miniconda.
@@ -45,7 +47,7 @@ function run_pastri {
         ">$runid.stdout" \
         "2>$runid.stderr"
     ) 
-  done | parallel -j$PARALLEL --joblog $SCRATCH/tmp/$BATCH.log
+  done #| parallel -j$PARALLEL --joblog $SCRATCH/tmp/$BATCH.log
 }
 
 function get_F_and_C {
@@ -63,9 +65,11 @@ function get_F_and_C {
         "-o $OUTDIR/$runid" \
         "$INDIR/${runid}.counts" \
         "$treesfn" \
-        "$OUTDIR/${runid}.fsamples"
+        "$OUTDIR/${runid}.fsamples" \
+        "> $OUTDIR/${runid}.${idx}.output_conversion.stdout" \
+        "2>$OUTDIR/${runid}.${idx}.output_conversion.stderr"
     done
-  done | parallel -j$PARALLEL > /dev/null
+  done | parallel -j$PARALLEL
 }
 
 function convert_outputs {
@@ -81,15 +85,16 @@ function convert_outputs {
         "$runid" \
         "$PAIRTREE_INPUTS_DIR/$runid.params.json" \
         "$treesfn" \
-        "2>$OUTDIR/$runid.output_conversion.stderr"
+        "> $OUTDIR/${runid}.output_conversion.stdout" \
+        "2>$OUTDIR/${runid}.output_conversion.stderr"
     done
-  done #| parallel -j$PARALLEL --joblog $SCRATCH/tmp/jobs.log
+  done | parallel -j$PARALLEL
 }
 
 function main {
   #convert_inputs
   #run_pastri
-  #get_F_and_C
+  get_F_and_C
   convert_outputs
 }
 

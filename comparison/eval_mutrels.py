@@ -12,7 +12,7 @@ def load_mutrels(mutrel_args):
   mutrels = {}
   for mutrel_arg in mutrel_args:
     mutrel_name, mutrel_path = mutrel_arg.split('=', 1)
-    assert mutrel_name not in mutrels
+    assert mutrel_name not in mutrels, '%s is duplicate' % mutrel_name
     if os.path.exists(mutrel_path):
       mrel = np.load(mutrel_path)
       mutrels[mutrel_name] = mutrel.Mutrel(vids=mrel['vids'], rels=mrel['rels'])

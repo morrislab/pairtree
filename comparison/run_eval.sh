@@ -46,9 +46,7 @@ function make_results_paths {
   fi
 
   if [[ $BATCH == steph ]]; then
-    if [[ $result_type == mutrel ]]; then
-      paths+="truth=${TRUTH_DIR}/$runid.pairtree_trees_llh.$result_type.npz "
-    fi
+    paths+="truth=${TRUTH_DIR}/$runid.pairtree_trees_llh.$result_type.npz "
     paths+="pairtree_trees_llh=${BATCH}.xeno.withgarb.pairtree/$runid.pairtree_trees_llh.$result_type.npz "
     paths+="pairtree_trees_uniform=${BATCH}.xeno.withgarb.pairtree/$runid.pairtree_trees_uniform.$result_type.npz "
     paths+="singlepairtree_trees_llh=${BATCH}.xeno.withgarb.pairtree/$runid.singlepairtree_trees_llh.$result_type.npz "
@@ -69,12 +67,13 @@ function make_results_paths {
     paths+="singlepairtree_trees_llh=${BATCH}.pairtree.fixedclusters/$runid.singlepairtree_trees_llh.$result_type.npz "
     paths+="pairtree_trees_uniform=${BATCH}.pairtree.fixedclusters/$runid.singlepairtree_trees_uniform.$result_type.npz "
     paths+="pairtree_clustrel=${BATCH}.pairtree.fixedclusters/$runid.pairtree_clustrel.$result_type.npz "
-    paths+="pwgs_trees_single_llh=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
-    paths+="pwgs_trees_single_uniform=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_single_uniform.$result_type.npz "
-    paths+="pwgs_trees_multi_llh=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_llh.$result_type.npz "
-    paths+="pwgs_trees_multi_uniform=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_uniform.$result_type.npz "
+    paths+="pwgs_supervars_single_llh=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
+    paths+="pwgs_supervars_single_uniform=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_single_uniform.$result_type.npz "
+    paths+="pwgs_supervars_multi_llh=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_llh.$result_type.npz "
+    paths+="pwgs_supervars_multi_uniform=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_uniform.$result_type.npz "
     paths+="pastri_trees_llh=${BATCH}.pastri.informative/$runid.pastri_trees_llh.$result_type.npz "
     paths+="pastri_trees_uniform=${BATCH}.pastri.informative/$runid.pastri_trees_uniform.$result_type.npz"
+    paths+="pairtree_trees_uniform=${BATCH}.pairtree.fixedclusters/$runid.singlepairtree_trees_uniform.$result_type.npz "
   fi
 
   echo $paths
@@ -167,11 +166,13 @@ function plot_comparison {
 function plot_individual {
   cd $SCORESDIR
   for ptype in mutphi mutrel; do
+      #"--hide-method pairtree_clustrel" \
     echo "python3 $SCRIPTDIR/plot_individual.py" \
       "--template plotly_white" \
       "--plot-type $ptype" \
-      "$( [[ $BATCH == sims && $ptype == mutphi ]] && echo --baseline-name truth)" \
-      "$( [[ $BATCH == steph && $ptype == mutphi ]] && echo --baseline-name \'expert reconstruction\')" \
+      "--hide-method truth" \
+      "--hide-method mle_unconstrained" \
+      "--hide-method pairtree_handbuilt" \
       "$( [[ $BATCH == sims ]] && echo --partition-by-samples)" \
       "$SCORESDIR/$BATCH.$ptype.txt" \
       "$SCORESDIR/$BATCH.$ptype.html"
@@ -181,9 +182,9 @@ function plot_individual {
 function run_batch {
   export MLE_MUTPHIS_DIR=$RESULTSDIR/${BATCH}.mle_unconstrained
 
-  (eval_mutrels; eval_mutphis) | parallel -j$PARALLEL --halt 1
-  compile_scores mutrel
-  compile_scores mutphi
+  #(eval_mutrels; eval_mutphis) | parallel -j$PARALLEL --halt 1
+  #compile_scores mutrel
+  #compile_scores mutphi
   plot_individual | parallel -j$PARALLEL --halt 1
 }
 
@@ -201,6 +202,7 @@ function main {
   export TRUTH_DIR=$RESULTSDIR/steph.pairtree.hbstruct
   run_batch
 
+  #export BATCH=sims
   #plot_comparison
 }
 

@@ -147,6 +147,7 @@ def convert_results(sampid, prelim_trees, variant_clusters, outdir):
 
     treefn = _makefn(tidx, 'labeled_trees')
     tree_adjms = load_final_trees(treefn)
+    assert len(tree_adjms) > 0
     for A in tree_adjms:
       adjms.append(A)
       # There are multiple possible permutations of tree nodes within this

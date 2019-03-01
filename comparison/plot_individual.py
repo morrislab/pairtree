@@ -6,21 +6,20 @@ from collections import defaultdict
 import re
 import numpy as np
 import sys
+import os
 
 HAPPY_METHOD_NAMES = (
   ('truth', 'Truth'),
   ('mle_unconstrained', 'MLE lineage frequencies'),
   ('pairtree_handbuilt', 'Pairtree (manually constructed trees)'),
-  ('pairtree_trees_llh', 'Pairtree (automated tree search)'),
-  ('singlepairtree_trees_llh', 'Pairtree (single chain)'),
-  ('pairtree_clustrel', 'Pairwise cluster relations'),
+  ('pairtree_trees_llh', 'Pairtree'),
   ('pastri_trees_llh', 'PASTRI'),
-  ('pwgs_allvars_single_llh', 'PhyloWGS (unclustered)'),
+  ('singlepairtree_trees_llh', 'Pairtree (single)'),
+  ('pwgs_supervars_multi_llh', 'PhyloPlus'),
+  ('pwgs_allvars_multi_llh', 'PhyloPlus (unclustered)'),
   ('pwgs_supervars_single_llh', 'PhyloWGS'),
-  ('pwgs_trees_single_llh', 'PhyloWGS'),
-  ('pwgs_allvars_multi_llh', 'PhyloWGS multichain (unclustered)'),
-  ('pwgs_supervars_multi_llh', 'PhyloWGS multichain'),
-  ('pwgs_trees_multi_llh', 'PhyloWGS multichain'),
+  ('pwgs_allvars_single_llh', 'PhyloWGS (unclustered)'),
+  ('pairtree_clustrel', 'Pairs tensor'),
 )
 METHOD_ORDER = {M: idx for idx, (M, M_full) in enumerate(HAPPY_METHOD_NAMES)}
 HAPPY_METHOD_NAMES = {M: M_full for (M, M_full) in HAPPY_METHOD_NAMES}
@@ -96,7 +95,7 @@ def partition(results, methods, key):
   return partitioned
 
 def sort_methods(methods):
-  methods = sorted(methods, key = lambda M: METHOD_ORDER[M])
+  methods = sorted(methods, key = lambda M: METHOD_ORDER.get(M, 0))
   return methods
 
 def make_bar_traces(parted, _make_legend_label):
@@ -105,7 +104,7 @@ def make_bar_traces(parted, _make_legend_label):
     methods = sort_methods(parted[V].keys())
     trace = {
       'type': 'bar',
-      'x': [HAPPY_METHOD_NAMES[M] for M in methods],
+      'x': [HAPPY_METHOD_NAMES.get(M, M) for M in methods],
       'y': [parted[V][M] for M in methods],
     }
     if V is None:
@@ -119,11 +118,10 @@ def make_box_traces(parted, _make_legend_label):
   traces = []
   for V in parted.keys():
     methods = sort_methods(parted[V].keys())
-    points = [(HAPPY_METHOD_NAMES[M], R) for M in methods for R in parted[V][M]]
+    points = [(HAPPY_METHOD_NAMES.get(M, M), R) for M in methods for R in parted[V][M]]
     X, Y = zip(*points)
     trace = {
       'type': 'box',
-      'boxpoints': False,
       'x': X,
       'y': Y,
       'boxmean': True
@@ -152,7 +150,13 @@ def make_fig(traces, template, ytitle, max_y=None, layout_options=None):
 
 def write_figs(figs, outfn):
   plot = ''
-  for fig in figs:
+  for idx, fig in enumerate(figs):
+    imgfn = os.path.basename(outfn)
+    if imgfn.endswith('.html'):
+      imgfn = imgfn[:-5]
+    imgfn = imgfn.replace('.', '_')
+    imgfn = '%s_%s' % (imgfn, idx + 1)
+
     plot += plotly.offline.plot(
       fig,
       output_type = 'div',
@@ -163,6 +167,7 @@ def write_figs(figs, outfn):
           'format': 'svg',
           'width': 750,
           'height': 450,
+          'filename': imgfn,
         },
       },
     )
@@ -178,12 +183,13 @@ def main():
   parser.add_argument('--template', default='seaborn')
   parser.add_argument('--max-y')
   parser.add_argument('--plot-type', required=True, choices=('mutrel', 'mutphi'))
-  parser.add_argument('--baseline-name', default='baseline')
+  parser.add_argument('--hide-method', action='append')
   parser.add_argument('results_fn')
   parser.add_argument('plot_fn')
   args = parser.parse_args()
 
   results, methods = load_results(args.results_fn)
+  hidden_methods = set(args.hide_method) if args.hide_method is not None else set()
 
   if args.partition_by_samples:
     results = augment(results, 'S')
@@ -192,9 +198,9 @@ def main():
     parted = partition(results, methods, key=None)
 
   if args.plot_type == 'mutrel':
-    ytitle = 'Mean distance from truth'
+    ytitle = 'Tree reconstruction error<br>(% pairwise relations)'
   elif args.plot_type == 'mutphi':
-    ytitle = 'VAF reconstruction error above %s (bits)' % args.baseline_name
+    ytitle = 'Frequency reconstruction error<br>(Δbits per mutation perr tissue sample)'
   else:
     raise Exception('Unknown plot type %s' % args.plot_type)
 
@@ -202,8 +208,12 @@ def main():
   results_score = {}
   results_frac_complete = {}
   for V in parted:
-    results_score[V]         = {M: parted[V][M]['scores']        for M in parted[V]}
+    results_score[V] = {M: parted[V][M]['scores'] for M in parted[V]}
     results_frac_complete[V] = {M: parted[V][M]['frac_complete'] for M in parted[V]}
+  if args.plot_type == 'mutrel':
+    for V in parted:
+      for M in parted[V]:
+        results_score[V][M] *= 100
 
   truth_method = None
   for T in ('truth', 'pairtree_handbuilt'):
@@ -217,7 +227,8 @@ def main():
     for V in parted:
       results_score[V] = {M: results_score[V][M] - results_score[V][truth_method] for M in results_score[V]}
   for V in parted:
-    del results_score[V][truth_method]
+    for M in (hidden_methods & set(results_score[V].keys())):
+      del results_score[V][M]
 
   def _make_legend_label(V):
     suffix = 'sample' if V == 1 else 'samples'
