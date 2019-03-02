@@ -15,8 +15,7 @@ def load_mutphis(phi_args):
     name, phi_path = phi_arg.split('=', 1)
     assert name not in mutphis
     if os.path.exists(phi_path):
-      mutphi = np.load(phi_path)
-      mutphis[name] = evalutil.Mutphi(phi=mutphi['phi'], vids=mutphi['vids'])
+      mutphis[name] = evalutil.load_mutphi(phi_path)
     else:
       mutphis[name] = None
   return mutphis
@@ -25,26 +24,31 @@ def score_phis(mutphi, variants):
   def _extract_arr(K, vids):
     return np.array([variants[V][K] for V in vids])
   vardata = {K: _extract_arr(K, mutphi.vids) for K in ('var_reads', 'total_reads', 'omega_v')}
-  assert len(set([V.shape for V in vardata.values()] + [mutphi.phi.shape])) == 1
+  assert len(set([V.shape for V in vardata.values()] + [mutphi.phis[0].shape])) == 1
 
   log_px = scipy.stats.binom.logpmf(
-    vardata['var_reads'],
-    vardata['total_reads'],
-    vardata['omega_v'] * mutphi.phi,
+    vardata['var_reads'][np.newaxis,:,:],
+    vardata['total_reads'][np.newaxis,:,:],
+    vardata['omega_v'][np.newaxis,:,:] * mutphi.phis,
   )
   assert np.all(log_px <= 0)
 
-  score = np.sum(log_px)
-  score /= mutphi.phi.size
+  scores = np.sum(log_px, axis=(1,2))
+  scores /= mutphi.phis[0].size
+  assert np.all(scores < 0)
   # Convert to bits.
-  score /= np.log(2)
+  scores /= np.log(2)
+
+  assert np.all(mutphi.weights >= 0)
+  assert np.isclose(1, np.sum(mutphi.weights))
+  score = np.sum(mutphi.weights * scores)
   return -score
 
 def compare(mutphis, variants):
   names = list(mutphis.keys())
   scores = {}
   vids = mutphis[names[0]].vids
-  mutphi_shape = mutphis[names[0]].phi.shape
+  mutphi_shape = mutphis[names[0]].phis[0].shape
 
   for name in names:
     mutphi = mutphis[name]
@@ -52,7 +56,7 @@ def compare(mutphis, variants):
       scores[name] = -1
       continue
     assert np.array_equal(mutphi.vids, vids)
-    assert mutphi.phi.shape == mutphi_shape
+    assert mutphi.phis[0].shape == mutphi_shape
     scores[name] = score_phis(mutphi, variants)
 
   print(*names, sep=',')
@@ -76,8 +80,8 @@ def remove_garbage(mutphis, garbage):
       continue
     garb_idxs = [idx for idx, vid in enumerate(mutphi.vids) if vid in garbage]
     new_vids = [vid for idx, vid in enumerate(mutphi.vids) if idx not in set(garb_idxs)]
-    new_phi = np.delete(mutphi.phi, garb_idxs, axis=0)
-    revised[name] = evalutil.Mutphi(phi=new_phi, vids=new_vids)
+    new_phi = np.delete(mutphi.phis, garb_idxs, axis=1)
+    revised[name] = evalutil.Mutphi(phis=new_phi, vids=new_vids, weights=mutphi.weights)
 
   return revised
 
