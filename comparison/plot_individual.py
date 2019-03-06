@@ -198,9 +198,17 @@ def main():
     parted = partition(results, methods, key=None)
 
   if args.plot_type == 'mutrel':
-    ytitle = 'Tree reconstruction error<br>(% pairwise relations)'
+    if 'steph' in args.plot_fn:
+      ytitle = 'Tree reconstruction differences from expert baseline'
+    else:
+      ytitle = 'Tree reconstruction error'
+    ytitle += '<br>(% relations)'
   elif args.plot_type == 'mutphi':
-    ytitle = 'Frequency reconstruction error<br>(Δbits per mutation perr tissue sample)'
+    if 'steph' in args.plot_fn:
+      ytitle = 'Frequency reconstruction differences from expert baseline'
+    else:
+      ytitle = 'Frequency reconstruction error'
+    ytitle += '<br>(Δbits / mutation / assay)'
   else:
     raise Exception('Unknown plot type %s' % args.plot_type)
 
@@ -229,6 +237,7 @@ def main():
   for V in parted:
     for M in (hidden_methods & set(results_score[V].keys())):
       del results_score[V][M]
+      del results_frac_complete[V][M]
 
   def _make_legend_label(V):
     suffix = 'sample' if V == 1 else 'samples'
