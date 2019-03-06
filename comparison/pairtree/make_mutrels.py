@@ -9,6 +9,7 @@ from common import Models
 import mutrel
 import resultserializer
 import evalutil
+import pairtree_util
 
 def calc_mutrel_from_trees(adjms, llhs, clusters, tree_weights):
   clusterings = [clusters for idx in range(len(adjms))]
@@ -35,21 +36,6 @@ def calc_mutrel_from_clustrel(clustrel, clusters):
     rels = mrel,
   )
 
-def choose_subset(results, subset_size):
-  keys = ('adjm', 'llh', 'phi')
-  lengths = set([len(results[K]) for K in keys])
-  assert len(lengths) == 1
-  total = lengths.pop()
-  assert 0 < subset_size <= total
-  assert total % subset_size == 0
-
-  partitions = int(total / subset_size)
-  part_idx = np.random.randint(partitions)
-  start  = part_idx * subset_size
-  end = start + subset_size
-  for K in keys:
-    results[K] = results[K][start:end]
-
 def main():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
@@ -60,7 +46,6 @@ def main():
   parser.add_argument('--clustrel-mutrel')
   parser.add_argument('--trees-mutrel')
   parser.add_argument('--pure-mutrel')
-  parser.add_argument('--phi', dest='mutphifn')
   parser.add_argument('pairtree_results_fn')
   args = parser.parse_args()
 
@@ -70,7 +55,7 @@ def main():
   all_vids = set([V for C in results['clusters'] for V in C] + garbage)
 
   if args.use_subset is not None:
-    choose_subset(results, args.use_subset)
+    pairtree_util.choose_subset(results, args.use_subset)
 
   if args.pure_mutrel is not None:
     pure_mutrel = results['mutrel_posterior']
@@ -88,11 +73,6 @@ def main():
     clustrel_mutrel = evalutil.add_garbage(clustrel_mutrel, garbage)
     assert set(clustrel_mutrel.vids) == all_vids
     evalutil.save_sorted_mutrel(clustrel_mutrel, args.clustrel_mutrel)
-
-  if args.mutphifn is not None:
-    clusterings = [clusters for idx in range(len(results['adjm']))]
-    mutphi = evalutil.calc_mutphi(results['phi'], results['llh'], clusterings, args.weight_trees_by)
-    evalutil.save_mutphi(mutphi, args.mutphifn)
 
 if __name__ == '__main__':
   main()

@@ -7,10 +7,10 @@ SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 BASEDIR=~/work/pairtree
 JOBDIR=~/jobs
 
-#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
-#PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/sims.pairtree.fixedclusters
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
-PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/steph.xeno.withgarb.pairtree
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/sims.pairtree.fixedclusters
+#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+#PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/steph.xeno.withgarb.pairtree
 
 PARALLEL=40
 TREE_CHAINS=40
@@ -79,22 +79,45 @@ function convert_outputs {
         #echo "#SBATCH --output=$JOBDIR/slurm_${runid}_%j.txt"
         #echo "#SBATCH --mail-type=NONE"
 
+        basepath="${PAIRTREE_RESULTS_DIR}/${runid}.pairtree_clustrel"
         echo "cd $PAIRTREE_RESULTS_DIR &&" \
-          "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/convert_outputs.py" \
-          "--clustrel-mutrel $PAIRTREE_RESULTS_DIR/$runid.pairtree_clustrel.mutrel.npz" \
+          "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_mutrels.py" \
+          "--clustrel-mutrel ${basepath}.mutrel.npz" \
           "$resultsfn" \
-          ">$PAIRTREE_RESULTS_DIR/$runid.output_conversion.stdout" \
-          "2>$PAIRTREE_RESULTS_DIR/$runid.output_conversion.stderr"
-        for tree_weights in uniform llh; do
-            #"--use-subset 2000" \
-          echo "cd $PAIRTREE_RESULTS_DIR &&" \
-            "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/convert_outputs.py" \
-            "--weight-trees-by $tree_weights" \
-            "--trees-mutrel $PAIRTREE_RESULTS_DIR/$runid.singlepairtree_trees_$tree_weights.mutrel.npz" \
-            "--phi $PAIRTREE_RESULTS_DIR/$runid.singlepairtree_trees_$tree_weights.mutphi.npz" \
-            "$resultsfn" \
-            ">>$PAIRTREE_RESULTS_DIR/$runid.output_conversion.stdout" \
-            "2>>$PAIRTREE_RESULTS_DIR/$runid.output_conversion.stderr"
+          ">${basepath}.output_conversion.stdout" \
+          "2>${basepath}.output_conversion.stderr"
+
+        for use_subset in true false; do
+          for tree_weights in uniform llh; do
+            basepath="${PAIRTREE_RESULTS_DIR}/${runid}.pairtree_trees."
+            basepath+=$([[ "$use_subset" == "true" ]] && echo subset || echo all)
+            basepath+=".${tree_weights}"
+
+            cmd="cd $PAIRTREE_RESULTS_DIR && "
+            cmd+="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_mutphis.py "
+            cmd+="--weight-trees-by $tree_weights "
+            cmd+="--ssms ${PAIRTREE_INPUTS_DIR}/${runid}.ssm "
+            if [[ "$use_subset" == "true" ]]; then
+              cmd+="--use-subset 2000 "
+            fi
+            cmd+="$resultsfn "
+            cmd+="${basepath}.mutphi.npz "
+            cmd+=">${basepath}.mutphi_output_conversion.stdout "
+            cmd+="2>${basepath}.mutphi_output_conversion.stderr"
+            echo $cmd
+
+            cmd="cd $PAIRTREE_RESULTS_DIR && "
+            cmd+="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_mutrels.py "
+            if [[ "$use_subset" == "true" ]]; then
+              cmd+="--use-subset 2000 "
+            fi
+            cmd+="--weight-trees-by $tree_weights "
+            cmd+="--trees-mutrel ${basepath}.mutrel.npz "
+            cmd+="$resultsfn "
+            cmd+=">${basepath}.mutrel_output_conversion.stdout "
+            cmd+="2>${basepath}.mutrel_output_conversion.stderr"
+            echo $cmd
+          done
         done
     ) #> $jobfn
     #sbatch $jobfn

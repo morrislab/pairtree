@@ -1,5 +1,4 @@
 import numpy as np
-from collections import namedtuple
 
 import os
 import sys
@@ -7,8 +6,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import mutrel
 import common
 from common import Models
-
-Mutphi = namedtuple('Mutphi', ('vids', 'phis', 'weights'))
 
 def _fix_rounding_errors(mat):
   # Floating point error means that some entires can slightly exceed 1, even if
@@ -103,37 +100,6 @@ def _make_logweights(llhs, tree_weights):
     return np.zeros(len(llhs))
   else:
     raise Exception('Unknown tree_weights=%s' % tree_weights)
-
-def calc_mutphi(cluster_phis, llhs, clusterings, tree_weights):
-  logweights = _make_logweights(llhs, tree_weights)
-  weights = _softmax(logweights)
-  assert len(cluster_phis) == len(llhs) == len(clusterings)
-
-  vids = None
-  mutphis = []
-
-  for (cluster_phi, clustering, weight) in zip(cluster_phis, clusterings, weights):
-    assert np.all(0 <= cluster_phi) and np.all(cluster_phi <= 1)
-    V, membership = make_membership_mat(clustering)
-    mutphi = np.dot(membership, cluster_phi)
-
-    if vids is None:
-      vids = V
-    assert V == vids
-    mutphis.append(mutphi)
-
-  mutphis = np.array(mutphis)
-  return Mutphi(vids=vids, phis=mutphis, weights=weights)
-
-def save_mutphi(mutphi, mutphifn):
-  # calc_mutphi should have created `mutphi` with sorted vids, but double-check
-  # this is true.
-  assert list(mutphi.vids) == common.sort_vids(mutphi.vids)
-  np.savez_compressed(mutphifn, phis=mutphi.phis, vids=mutphi.vids, weights=mutphi.weights)
-
-def load_mutphi(mutphifn):
-  results = np.load(mutphifn)
-  return Mutphi(phis=results['phis'], vids=results['vids'], weights=results['weights'])
 
 def calc_mutrel_from_trees(adjms, llhs, clusterings, tree_weights):
   logweights = _make_logweights(llhs, tree_weights)
