@@ -78,23 +78,33 @@ function convert_outputs {
       runid=$(basename $treesfn | cut -d. -f1)
       echo "source $HOME/.bash_host_specific && " \
         "cd $OUTDIR && " \
-        "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/convert_outputs.py" \
+        "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_mutrels.py" \
         "--weight-trees-by $tree_weights" \
-        "--trees-mutrel $OUTDIR/$runid.pastri_trees_$tree_weights.mutrel.npz" \
-        "--phi $OUTDIR/$runid.pastri_trees_$tree_weights.mutphi.npz" \
         "$runid" \
         "$PAIRTREE_INPUTS_DIR/$runid.params.json" \
         "$treesfn" \
-        "> $OUTDIR/${runid}.output_conversion.stdout" \
-        "2>$OUTDIR/${runid}.output_conversion.stderr"
+        "${OUTDIR}/${runid}.pastri_trees_${tree_weights}.mutrel.npz" #\
+        #"> $OUTDIR/${runid}.mutrel_output_conversion.stdout" \
+        #"2>$OUTDIR/${runid}.mutrel_output_conversion.stderr"
+      echo "source $HOME/.bash_host_specific && " \
+        "cd $OUTDIR && " \
+        "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_mutphis.py" \
+        "--weight-trees-by $tree_weights" \
+        "$runid" \
+        "${PAIRTREE_INPUTS_DIR}/${runid}.ssm" \
+        "${PAIRTREE_INPUTS_DIR}/${runid}.params.json" \
+        "$treesfn" \
+        "${OUTDIR}/${runid}.pastri_trees_${tree_weights}.mutphi.npz" #\
+        #"> $OUTDIR/${runid}.mutphi_output_conversion.stdout" \
+        #"2>$OUTDIR/${runid}.mutphi_output_conversion.stderr"
     done
-  done | parallel -j$PARALLEL
+  done #| parallel -j$PARALLEL
 }
 
 function main {
   #convert_inputs
   #run_pastri
-  get_F_and_C
+  #get_F_and_C
   convert_outputs
 }
 

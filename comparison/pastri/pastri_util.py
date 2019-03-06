@@ -1,13 +1,10 @@
-import argparse
 from io import StringIO
 import numpy as np
 
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 import inputparser
-import evalutil
 
 class UnexpectedShapeError(Exception):
   pass
@@ -156,50 +153,14 @@ def convert_results(sampid, prelim_trees, variant_clusters, outdir):
       phis.append(F)
       clusterings.append(clusters)
 
-  assert len(adjms) == len(llhs) == len(clusterings)
+  assert len(adjms) == len(llhs) == len(clusterings) == len(phis)
+  # PASTRI has some phis > 1 (e.g., 1.00079953). Ugh.
+  phis = np.minimum(1, phis)
   return (adjms, llhs, phis, clusterings)
 
-def write_results(sampid, params_fn, trees_fn, tree_weights, trees_mutrel_fn, mutphi_fn):
+def load_results(sampid, params_fn, trees_fn):
   params = inputparser.load_params(params_fn)
   outdir = os.path.dirname(trees_fn)
   prelim_trees = load_prelim_trees(trees_fn)
 
-  adjms, llhs, phis, clusterings = convert_results(sampid, prelim_trees, params['clusters'], outdir)
-  if len(adjms) == 0:
-    return
-
-  if trees_mutrel_fn is not None:
-    # On occasion, PASTRI won't assign mutations to all clusters -- it can have
-    # empty clusters. This will cause some of the assertions in my parsing code
-    # to fail, which is fine -- we just won't use its results in those cases.
-    mrel = evalutil.calc_mutrel_from_trees(adjms, llhs, clusterings, tree_weights)
-    mrel = evalutil.add_garbage(mrel, params['garbage'])
-    evalutil.save_sorted_mutrel(mrel, trees_mutrel_fn)
-
-  if mutphi_fn is not None:
-    # PASTRI has some phis > 1 (e.g., 1.00079953). Ugh.
-    phis = np.minimum(1, phis)
-    mphi = evalutil.calc_mutphi(phis, llhs, clusterings, tree_weights)
-    evalutil.save_mutphi(mphi, mutphi_fn)
-
-def main():
-  parser = argparse.ArgumentParser(
-    description='LOL HI THERE',
-    formatter_class=argparse.ArgumentDefaultsHelpFormatter
-  )
-  parser.add_argument('--weight-trees-by', choices=('llh', 'uniform'), default='uniform')
-  # This takes Pairtree rather than PWGS inputs, which seems a little weird,
-  # but it's okay -- the PWGS inputs are the supervariants, ut we need to know
-  # hich variants correspond to each cluster in the original Pairtree inputs.
-  parser.add_argument('--trees-mutrel', dest='mutrelfn')
-  parser.add_argument('--phi', dest='mutphifn')
-  parser.add_argument('sampid')
-  parser.add_argument('pairtree_params_fn')
-  parser.add_argument('trees_fn')
-  args = parser.parse_args()
-
-  if args.mutrelfn is not None:
-    write_results(args.sampid, args.pairtree_params_fn, args.trees_fn, args.weight_trees_by, args.mutrelfn, args.mutphifn)
-
-if __name__ == '__main__':
-  main()
+  return convert_results(sampid, prelim_trees, params['clusters'], outdir)
