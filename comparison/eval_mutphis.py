@@ -7,14 +7,14 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import numpy as np
 import inputparser
 import common
-import evalutil
+import mutphi
 
 def load_mutphis(mphi_args):
   mutphis = {}
-  for phi_arg in phi_args:
-    name, phi_path = phi_arg.split('=', 1)
+  for mphi_arg in mphi_args:
+    name, mphi_path = mphi_arg.split('=', 1)
     assert name not in mutphis
-    if os.path.exists(phi_path):
+    if os.path.exists(mphi_path):
       mutphis[name] = mutphi.load_mutphi(mphi_path)
     else:
       mutphis[name] = None
@@ -31,8 +31,10 @@ def score(logprobs):
 def compare(mutphis):
   names = list(mutphis.keys())
   scores = {}
-  vids = mutphis[names[0]].vids
-  assays = mutphis[names[0]].assays
+  present = [N for N in names if mutphis[N] is not None]
+  first_present = present[0]
+  vids = mutphis[first_present].vids
+  assays = mutphis[first_present].assays
 
   for name in names:
     mphi = mutphis[name]

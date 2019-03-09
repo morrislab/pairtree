@@ -1,7 +1,7 @@
 import argparse
 import numpy as np
 
-import evalutil
+import mutphi
 
 import os
 import sys
@@ -28,8 +28,11 @@ def main():
   assert np.all(0 <= mle_phi)
   mle_phi = np.minimum(1, mle_phi)
 
-  mutphi = evalutil.Mutphi(phi=mle_phi, vids=vids)
-  evalutil.save_mutphi(mutphi, args.mutphi_fn)
+  clusters = [[V] for V in vids]
+  llh = 0
+  weight_trees_by = 'uniform'
+  mphi = mutphi.calc_mutphi([mle_phi], [llh], [clusters], weight_trees_by, args.ssm_fn)
+  mutphi.write_mutphi(mphi, args.mutphi_fn)
 
 if __name__ == '__main__':
   main()

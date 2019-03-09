@@ -5,13 +5,7 @@ import numpy as np
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-import evalutil
-
-def write_mutphi(cluster_phi, clusters, mutphifn):
-  vids, membership = evalutil.make_membership_mat(clusters)
-  mphi = np.dot(membership, cluster_phi)
-  mutphi = evalutil.Mutphi(vids=vids, phi=mphi)
-  evalutil.save_mutphi(mutphi, mutphifn)
+import mutphi
 
 def main():
   parser = argparse.ArgumentParser(
@@ -19,6 +13,7 @@ def main():
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('sim_data_fn')
+  parser.add_argument('ssm_fn')
   parser.add_argument('mutphi_fn')
   args = parser.parse_args()
 
@@ -26,7 +21,10 @@ def main():
     simdata = pickle.load(dataf)
   clusters = [[]] + simdata['clusters']
 
-  write_mutphi(simdata['phi'], clusters, args.mutphi_fn)
+  llh = 0
+  weight_trees_by = 'uniform'
+  mphi = mutphi.calc_mutphi([simdata['phi']], [llh], [clusters], weight_trees_by, args.ssm_fn)
+  mutphi.write_mutphi(mphi, args.mutphi_fn)
 
 if __name__ == '__main__':
   main()
