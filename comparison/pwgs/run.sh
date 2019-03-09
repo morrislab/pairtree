@@ -94,7 +94,7 @@ function convert_outputs {
     cmd+=">  $OUTDIR/$runid.results.stdout "
     cmd+="2> $OUTDIR/$runid.results.stderr "
     for tree_weights in uniform llh; do
-      cmd+="&& python3 $BASEDIR/comparison/pwgs/convert_outputs.py "
+      cmd+="&& python3 $BASEDIR/comparison/pwgs/make_mutrel_and_mutphi.py "
       if [[ $OUTDIR =~ supervars ]]; then
         cmd+="--use-supervars "
       fi
@@ -102,6 +102,7 @@ function convert_outputs {
       cmd+="--trees-mutrel $OUTDIR/${results_base}_${tree_weights}.mutrel.npz "
       cmd+="--phi $OUTDIR/${results_base}_${tree_weights}.mutphi.npz "
       cmd+="--pairtree-params $PAIRTREE_INPUTS_DIR/$runid.params.json "
+      cmd+="--pairtree-ssms $PAIRTREE_INPUTS_DIR/$runid.ssm "
       cmd+="$OUTDIR/$json_base.{summ.json.gz,muts.json.gz,mutass.zip} "
       cmd+=">>  $OUTDIR/$runid.results.stdout "
       cmd+="2>> $OUTDIR/$runid.results.stderr"
