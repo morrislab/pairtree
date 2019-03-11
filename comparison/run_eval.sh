@@ -163,7 +163,7 @@ function plot_comparison {
   export SIM_PARAMS="GKMST"
   production=false
 
-  if [[ production == true ]]; then
+  if [[ $production == true ]]; then
     gunicorn -w 4 -b 0.0.0.0:8000 plot_comparison:server
   else
     python3 plot_comparison.py

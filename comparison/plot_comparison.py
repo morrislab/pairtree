@@ -39,7 +39,7 @@ def augment(results):
     return results
   simparams = defaultdict(list)
   sim_param_names = ''.join(SIM_PARAMS)
-  for rid in results.runid:
+  for rid in results.index:
     for token in re.findall(rf'([{sim_param_names}]\d+)', rid):
       K, V = token[0], token[1:]
       simparams[K].append(int(V))
@@ -53,36 +53,26 @@ def augment(results):
   return results
 
 def get_method_names(results):
-  methnames = [K for K in results.keys() if K != 'runid' and K not in SIM_PARAMS]
+  methnames = [K for K in results.columns if K not in SIM_PARAMS and 'uniform' not in K]
   return methnames
 
-def init_content(method_names, sim_param_vals, result_types):
-  method_names = sorted(method_names)
+def init_content(result_types):
   controls = []
 
   controls.append(html.Label(children='Result type'))
   controls.append(dcc.Dropdown(
     id = 'result_type',
     options = [{'label': rt, 'value': rt} for rt in result_types],
-    value = result_types[0],
+    value = list(result_types)[0],
   ))
 
-  for axis, default_val in (('x', method_names[0]), ('y', method_names[1])):
+  for axis in ('x', 'y'):
     controls.append(html.Label(children=f'Method {axis.upper()}'))
-    controls.append(dcc.Dropdown(
-      id = 'method_%s' % axis,
-      options = [{'label': N, 'value': N} for N in method_names],
-      value = default_val,
-    ))
+    controls.append(dcc.Dropdown(id = 'method_%s' % axis))
 
   for param_name in SIM_PARAMS:
     controls.append(html.Label(children=SIM_PARAM_LABELS[param_name]))
-    controls.append(dcc.Dropdown(
-      id = f'{param_name}_chooser',
-      options = [{'label': V, 'value': V} for V in sim_param_vals[param_name]],
-      value = sim_param_vals[param_name],
-      multi = True,
-    ))
+    controls.append(dcc.Dropdown(id = f'{param_name}_chooser', multi=True))
 
   controls.append(html.Label(children='Jitter'))
   # Note that `values` must be specified, or I get a weird exception concerning
@@ -101,7 +91,7 @@ def init_content(method_names, sim_param_vals, result_types):
       {'label': 'Show missing data', 'value': 'show_missing'},
       {'label': 'Make Quaid happy', 'value': 'make_quaid_happy'},
     ],
-    values = ['show_missing'],
+    values = [],
   ))
 
   plot = dcc.Graph(
@@ -134,43 +124,36 @@ def jitter_points(P, magnitude=0.01):
   return P + noise
       
 def update_plot(plot_type, methx, methy, results, jitter, toggleable_options, *simparams):
+  if methx is None or methy is None or None in simparams:
+    return
   show_missing = 'show_missing' in toggleable_options
   make_quaid_happy = 'make_quaid_happy' in toggleable_options
-  plot_padding = 1.05
 
-  filters = [len(results)*[True]]
+  filters = [np.array(len(results)*[True])]
   for param_name, param_vals in zip(SIM_PARAMS, simparams):
-    filters.append(results[param_name].isin(param_vals))
+    filters.append(np.array(results[param_name].isin(param_vals)))
   visible = results[np.logical_and.reduce(filters)]
-  visible = visible[np.logical_not(np.logical_and(visible[methx] == -1, visible[methy] == -1))]
+  visible = visible[np.logical_not(np.logical_and(np.isnan(visible[methx]), np.isnan(visible[methy])))]
 
+  total = len(visible)
+  present_X = total - np.sum(np.isnan(visible[methx]))
+  present_Y = total - np.sum(np.isnan(visible[methy]))
+  if not show_missing:
+    visible = visible[np.logical_not(np.logical_or(np.isnan(visible[methx]), np.isnan(visible[methy])))]
   X = np.copy(visible[methx])
   Y = np.copy(visible[methy])
+  L = np.copy(visible.index)
   assert np.logical_not(np.any(np.logical_or(np.isinf(X), np.isinf(Y))))
-
-  if show_missing:
-    X[X == -1] = 0
-    Y[Y == -1] = 0
-  else:
-    missing = np.logical_or(X == -1, Y == -1)
-    present = np.logical_not(missing)
-    X = X[present]
-    Y = Y[present]
 
   if len(X) > 0 and len(Y) > 0:
     threshold = 0.01
     Y_gt_X = np.sum((Y - X) > threshold) / float(len(X))
     X_gt_Y = np.sum((X - Y) > threshold) / float(len(X))
     Y_approx_X = np.sum(np.abs(Y - X) <= threshold) / float(len(X))
-    missing_X_prop = np.sum(visible[methx] == -1) / float(len(visible))
-    missing_Y_prop = np.sum(visible[methy] == -1) / float(len(visible))
   else:
     Y_gt_X = 0
     X_gt_Y = 0
     Y_approx_X = 0
-    missing_X_prop = 0
-    missing_Y_prop = 0
-
 
   X_orig = X
   Y_orig = Y
@@ -184,19 +167,23 @@ def update_plot(plot_type, methx, methy, results, jitter, toggleable_options, *s
     max_val = 1
 
   marker = { 'size': 14 }
-  if plot_type == 'mutrel':
-    axis_range = (-0.1, 1.1)
-  elif plot_type == 'mutphi':
-    axis_range = (-0.5, plot_padding * max_val)
-  else:
-    axis_range = None
   if len(X) == 0:
     diag_topright = 1
+  else:
+    diag_topright = np.min([np.max(X), np.max(Y)])
+
+  if total > 0:
+    present_X_ratio = present_X / total
+    present_Y_ratio = present_Y / total
+  else:
+    present_X_ratio = 0
+    present_Y_ratio = 0
 
   if make_quaid_happy:
     axis_label = {
       'mutrel': 'Average pairwise score for %s',
-      'mutphi': 'Error of %s (bits',
+      'mutphi': 'Error of %s (bits)',
+      'merged': 'Something',
     }[plot_type]
     xtitle = axis_label % HAPPY_METHOD_NAMES.get(methx, methx)
     ytitle = axis_label % HAPPY_METHOD_NAMES.get(methy, methy)
@@ -209,9 +196,9 @@ def update_plot(plot_type, methx, methy, results, jitter, toggleable_options, *s
       plot_type,
       methy,
       methx,
-      len(X),
-      1 - missing_X_prop,
-      1 - missing_Y_prop,
+      len(visible),
+      present_X / total,
+      present_Y / total,
       Y_approx_X,
       Y_gt_X,
       X_gt_Y,
@@ -227,9 +214,10 @@ def update_plot(plot_type, methx, methy, results, jitter, toggleable_options, *s
     marker['color'] = density
     marker['colorscale'] = 'Viridis'
 
-  diag_topright = plot_padding * max_val
-  labels = [f'{runid}<br>orig=({xorig:.2f}, {yorig:.2f})' for runid, xorig, yorig in zip(visible['runid'], X_orig, Y_orig)]
+  assert len(L) == len(X_orig) == len(Y_orig)
+  labels = [f'{runid}<br>orig=({xorig:.2f}, {yorig:.2f})' for runid, xorig, yorig in zip(L, X_orig, Y_orig)]
 
+  axis_range = None
   plot = {
     'data': [go.Scatter(
       x = X,
@@ -265,6 +253,29 @@ def update_plot(plot_type, methx, methy, results, jitter, toggleable_options, *s
   return plot
 
 def create_callbacks(results):
+  for target in ('method_x', 'method_y'):
+    app.callback(
+      dash.dependencies.Output(target, 'options'),
+      [dash.dependencies.Input('result_type', 'value')]
+    )(lambda rt: [{'label': M, 'value': M} for M in get_method_names(results[rt])])
+    app.callback(
+      dash.dependencies.Output(target, 'value'),
+      [dash.dependencies.Input(target, 'options')]
+    )(lambda opts: opts[0]['value'])
+
+  def _make_param_val_cb(P):
+    return lambda rt: [{'label': V, 'value': V} for V in sorted(results[rt][P].unique())]
+  for P in SIM_PARAMS:
+    target = f'{P}_chooser'
+    app.callback(
+      dash.dependencies.Output(target, 'options'),
+      [dash.dependencies.Input('result_type', 'value')]
+    )(_make_param_val_cb(P))
+    app.callback(
+      dash.dependencies.Output(target, 'value'),
+      [dash.dependencies.Input(target, 'options')],
+    )(lambda opts: [opt['value'] for opt in opts])
+
   fig_inputs = [
     dash.dependencies.Input('result_type', 'value'),
     dash.dependencies.Input('method_x', 'value'),
@@ -274,10 +285,12 @@ def create_callbacks(results):
   ]
   fig_inputs += [dash.dependencies.Input(f'{P}_chooser', 'value') for P in SIM_PARAMS]
 
+  def _update_plot(result_type, methx, methy, jitter, show_missing, *simparams):
+    return update_plot(result_type, methx, methy, results[result_type], jitter, show_missing, *simparams)
   app.callback(
     dash.dependencies.Output('results_plot', 'figure'),
     fig_inputs,
-  )(lambda result_type, methx, methy, jitter, show_missing, *simparams: update_plot(result_type, methx, methy, results[result_type], jitter, show_missing, *simparams))
+  )(_update_plot)
 
 def load_results(*result_types):
   results = {}
@@ -285,6 +298,27 @@ def load_results(*result_types):
     env_name = '%s_RESULTS' % K.upper()
     if env_name in os.environ:
       results[K] = pd.read_csv(os.environ[env_name])
+      results[K] = results[K].set_index('runid')
+    results[K][results[K] == -1] = np.nan
+
+  if 'mutphi' in results and 'truth' in results['mutphi']:
+    for M in get_method_names(results['mutphi']):
+      if M == 'truth':
+        continue
+      results['mutphi'][M] -= results['mutphi']['truth']
+
+  if len(results) > 1:
+    to_merge = []
+    for rt, R in results.items():
+      namemap = {C: '%s_%s' % (C, rt) for C in R.columns}
+      R = R.rename(axis='columns', mapper=namemap)
+      to_merge.append(R)
+
+    while len(to_merge) > 1:
+      other = to_merge.pop()
+      to_merge[0] = to_merge[0].join(other=other, how='outer')
+    results['merged'] = to_merge[0]
+
   return results
 
 def run():
@@ -293,30 +327,19 @@ def run():
 
   results = load_results('mutrel', 'mutphi')
   assert len(results) > 0
-  result_types = list(results.keys())
-  first_result_type = result_types[0]
 
-  all_methods = set([M for K in results for M in get_method_names(results[K])])
   for K in results:
-    methods = set(get_method_names(results[K]))
-    assert methods.issubset(all_methods)
-    for missing in all_methods - methods:
-      results[K][missing] = -1
-
-    assert np.all(results[K].runid == results[first_result_type].runid)
     results[K] = augment(results[K])
-
-    for M in all_methods:
+    for M in get_method_names(results[K]):
       inf_idxs = np.isinf(results[K][M])
       if np.any(inf_idxs):
         # Sometimes the LLH may be -inf. (Thanks, PASTRI.) Consider this to be a
         # failed run.
         print('%s %s has %s infs' % (K, M, np.sum(inf_idxs)))
-        results[K].loc[inf_idxs,M] = -1
+        results[K].loc[inf_idxs,M] = np.nan
 
+  content = init_content(results.keys())
   app.title = 'Pairtree simulation results'
-  sim_param_vals = {K: sorted(results[first_result_type][K].unique()) for K in SIM_PARAMS}
-  content = init_content(all_methods, sim_param_vals, result_types)
   app.layout = html.Div(children=content, className='container-fluid')
   create_callbacks(results)
 
