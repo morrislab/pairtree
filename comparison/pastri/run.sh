@@ -3,13 +3,17 @@ command -v parallel > /dev/null || module load gnu-parallel
 
 BASEDIR=~/work/pairtree
 SCRIPTDIR=$(dirname "$(readlink -f "$0")")
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
-BATCH=sims.pastri.informative
-INDIR=$BASEDIR/scratch/inputs/$BATCH
-OUTDIR=$BASEDIR/scratch/results/$BATCH
 PARALLEL=40
 NUM_ITERS=10000
 PASTRI_DIR=$HOME/.apps/pastri
+
+#BATCH=sims.pastri.informative
+#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+BATCH=steph.xeno.pastri.hbclusters
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+
+INDIR=$BASEDIR/scratch/inputs/$BATCH
+OUTDIR=$BASEDIR/scratch/results/$BATCH
 
 function convert_inputs {
   mkdir -p $INDIR
@@ -104,7 +108,7 @@ function convert_outputs {
 function main {
   #convert_inputs
   #run_pastri
-  #get_F_and_C
+  get_F_and_C
   convert_outputs
 }
 

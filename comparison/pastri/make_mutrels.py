@@ -6,12 +6,14 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 import evalutil
 import pastri_util
+import inputparser
 
 def write_mutrels(sampid, params_fn, trees_fn, weight_trees_by, trees_mutrel_fn):
   adjms, llhs, phis, clusterings = pastri_util.load_results(sampid, params_fn, trees_fn)
   if len(adjms) == 0:
     return
 
+  params = inputparser.load_params(params_fn)
   # On occasion, PASTRI won't assign mutations to all clusters -- it can have
   # empty clusters. This will cause some of the assertions in my parsing code
   # to fail, which is fine -- we just won't use its results in those cases.
