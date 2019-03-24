@@ -14,17 +14,28 @@ def make_parents(K):
       parents.append(len(parents))
     else:
       parents.append(np.random.randint(0, idx + 1))
-  return parents
+  return np.array(parents)
 
-def make_adjm(K):
-  parents = make_parents(K)
+def make_adjm(K, tree_type):
+  assert tree_type in (None, 'monoprimary', 'polyprimary')
+  while True:
+    parents = make_parents(K)
+    root_children = np.sum(parents == 0)
+    if tree_type is None:
+      break
+    elif tree_type == 'monoprimary' and root_children == 1:
+      assert parents[0] == 0 and not np.any(parents[1:] == 0)
+      break
+    elif tree_type == 'polyprimary' and root_children > 1:
+      break
+
   # Make adjacency matrix from parents vector.
   adjm = np.eye(K)
   adjm[parents, range(1, K)] = 1
   return adjm
 
-def generate_tree(K, S):
-  adjm = make_adjm(K) # KxK
+def generate_tree(K, S, tree_type):
+  adjm = make_adjm(K, tree_type) # KxK
   #leaves = np.flatnonzero(np.sum(adjm, axis=1) == 0)
   Z = common.make_ancestral_from_adj(adjm) # KXK
 
@@ -92,13 +103,13 @@ def make_variants(V, T, omega_v):
     variants[variant['id']] = variant
   return variants
 
-def generate_data(K, S, T, M, G):
+def generate_data(K, S, T, M, G, tree_type):
   # K: number of clusters (excluding normal root)
   # S: number of samples
   # T: reads per mutation
   # M: total number of mutations
   # G: number of (additional) garbage mutations
-  adjm, phi = generate_tree(K + 1, S)
+  adjm, phi = generate_tree(K + 1, S, tree_type)
   # Add 1 to each mutation's assignment to account for normal root.
   mutass = choose_mutass(K, M) + 1 # Mx1
   clusters = make_clusters(mutass)

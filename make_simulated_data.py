@@ -28,6 +28,7 @@ def main():
   )
   parser.add_argument('--seed', dest='seed', type=int)
   parser.add_argument('--write-clusters', action='store_true')
+  parser.add_argument('--tree-type', choices=('monoprimary', 'polyprimary'))
   parser.add_argument('-K', dest='K', type=int, default=4, help='Number of clusters')
   parser.add_argument('-S', dest='S', type=int, default=3, help='Number of samples')
   parser.add_argument('-T', dest='T', type=int, default=4000, help='Total reads per mutation')
@@ -44,7 +45,7 @@ def main():
     seed = args.seed
   np.random.seed(args.seed)
 
-  data = simulator.generate_data(args.K, args.S, args.T, args.M, args.G)
+  data = simulator.generate_data(args.K, args.S, args.T, args.M, args.G, args.tree_type)
   data['seed'] = seed
   write_data(data, args.datafn, args.paramsfn, args.ssmfn, args.write_clusters)
 

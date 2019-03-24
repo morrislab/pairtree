@@ -30,7 +30,7 @@ def load_matrices(matfn, dtype=np.float, check_shapes=True):
       else:
         mats[matname] += line + '\n'
 
-  for matname in mats:
+  for matname in list(mats.keys()):
     mats[matname] = np.loadtxt(StringIO(mats[matname]), dtype=dtype)
 
     # If the matrix is `Rx1`, the parsing code will actually have loaded it as
@@ -134,6 +134,11 @@ def convert_results(sampid, prelim_trees, variant_clusters, outdir):
       # Sometimes the stated shape of the matrix is `Kx1`, but PASTRI gives us
       # `kx1`, where `k < K`. Ignore these cases.
       continue
+    except ValueError:
+      # Occurs when one of the frequencies is just ".", presumably because it
+      # was "1." and PASTRI's NumPy array-to-text code mistakenly chopped off
+      # the "1".
+      continue
     assert len(freqs) == 1
     F = next(iter(freqs.values()))
 
@@ -144,7 +149,6 @@ def convert_results(sampid, prelim_trees, variant_clusters, outdir):
 
     treefn = _makefn(tidx, 'labeled_trees')
     tree_adjms = load_final_trees(treefn)
-    assert len(tree_adjms) > 0
     for A in tree_adjms:
       adjms.append(A)
       # There are multiple possible permutations of tree nodes within this
