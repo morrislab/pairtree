@@ -17,22 +17,18 @@ def _convert_adjm_to_adjlist(adjm):
   return adjl
 
 def _prepare_inputs(adjm, phi, var_phi):
-  # order='F' means to flatten in column-major order, which Bei's code needs.
-  _arr2floatstr = lambda arr: ' '.join([f'{E:.10f}' for E in np.array(arr).flatten(order='C')])
-  _arr2intstr = lambda arr: ' '.join([f'{E:d}' for E in np.array(arr).flatten(order='C')])
-
-  phi[:] = 0.3
-  phi[-1,:] = 0.2
-  var_phi[:] = 0.01
-  adjm[:,2] = np.array([0, 1, 1, 0])
+  _arr2floatstr = lambda arr: ' '.join([f'{E:.10f}' for E in np.array(arr).flatten()])
+  _arr2intstr = lambda arr: ' '.join([f'{E:d}' for E in np.array(arr).flatten()])
 
   M, S = phi.shape
+  assert var_phi.shape == (M, S)
+  assert M >= 1 and S == 1
+
   prec_sqrt = np.sqrt(1 / var_phi)
   phi = np.insert(phi, 0, 1, axis=0)
   prec_sqrt = np.insert(prec_sqrt, 0, 1e3, axis=0)
-  prec_sqrt = np.mean(prec_sqrt, axis=1)
   prec_sqrt /= np.max(prec_sqrt)
-  assert prec_sqrt.shape == (M+1,)
+  assert prec_sqrt.shape == (M+1, 1)
 
   root = 0
   adjl = _convert_adjm_to_adjlist(adjm)
@@ -53,8 +49,19 @@ def _prepare_inputs(adjm, phi, var_phi):
   ]
 
   joined = '\n'.join(calcphi_input)
-  print(joined)
   return joined
+
+def _fit_phi_S(adj, phi_hat_S, var_phi_hat_S):
+  calcphi_input = _prepare_inputs(adj, phi_hat_S[:,np.newaxis], var_phi_hat_S[:,np.newaxis])
+
+  result = subprocess.run(['calcphi'], input=calcphi_input, capture_output=True, encoding='UTF-8')
+  result.check_returncode()
+  lines = result.stdout.strip().split('\n')
+  assert len(lines) == 2
+  cost = float(lines[0])
+  eta_S = np.array([float(E) for E in lines[1].split(' ')])
+
+  return eta_S
 
 def fit_phis(adj, superclusters, supervars, iterations, parallel):
   svids = common.extract_vids(supervars)
@@ -63,25 +70,21 @@ def fit_phis(adj, superclusters, supervars, iterations, parallel):
   T = R + V
   omega = np.array([supervars[svid]['omega_v'] for svid in svids])
   M, S = T.shape
-  print(M, S)
 
   phi_hat = V / (omega * T)
   var_phi_hat = V*(1 - V/T) / (T*omega)**2
   var_phi_hat = np.maximum(1e-2, var_phi_hat)
-  calcphi_input = _prepare_inputs(adj, phi_hat, var_phi_hat)
 
-  result = subprocess.run(['calcphi'], input=calcphi_input, capture_output=True, encoding='UTF-8')
-  result.check_returncode()
-  lines = result.stdout.strip().split('\n')
-  assert len(lines) == 2
-  cost = float(lines[0])
-  eta = np.array([float(E) for E in lines[1].split(' ')])
-  print(eta)
-  eta = eta.reshape((S, M+1)).T
-  print(eta)
-  import sys
-  sys.exit()
+  #phi_hat[:] = 0.3
+  #phi_hat[-1,:] = 0.2
+  #var_phi_hat[:] = 0.01
 
+  eta = np.zeros((M+1, S))
+  for sidx in range(S):
+    eta[:,sidx] = _fit_phi_S(adj, phi_hat[:,sidx], var_phi_hat[:,sidx])
   Z = common.make_ancestral_from_adj(adj)
   phi = np.dot(Z, eta)
+  #print()
+  #print(phi_hat)
+  #print(phi)
   return (phi, eta)
