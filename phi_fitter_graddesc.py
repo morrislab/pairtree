@@ -1,7 +1,9 @@
 import numpy as np
 import scipy.stats
 import common
+import binom
 from progressbar import progressbar
+from numba import njit
 
 # Matrices: M mutations, K clusters, S samples
 #   adj: KxK, adjacency matrix -- adj[a,b]=1 iff a is parent of b (with 1 on diagonal)
@@ -10,6 +12,7 @@ from progressbar import progressbar
 #   phi: Kx1, per-cluster phis
 #   mut_phi: Mx1, per-mutation phis
 
+@njit
 def calc_mut_p(A, Z, psi):
   eta = softmax(psi) # Kx1
   phi = np.dot(Z, eta) # Kx1
@@ -19,15 +22,16 @@ def calc_mut_p(A, Z, psi):
 
   # Avoid numerical issues.
   delta = 1e-30
-  mut_p[np.isclose(mut_p, 0)]   += delta
-  mut_p[np.isclose(mut_p, 0.5)] -= delta
+  mut_p[binom.isclose(mut_p, 0)]   += delta
+  mut_p[binom.isclose(mut_p, 0.5)] -= delta
 
   return mut_p
 
+@njit
 def calc_llh(var_reads, ref_reads, A, Z, psi):
   total_reads = var_reads + ref_reads
   mut_p = calc_mut_p(A, Z, psi)
-  mut_probs = scipy.stats.binom.logpmf(var_reads, total_reads, mut_p)
+  mut_probs = binom.logpmf(var_reads, total_reads, mut_p)
   return np.sum(mut_probs)
 
 def fit_phis(adj, superclusters, supervars, iterations, parallel):
@@ -53,6 +57,7 @@ def _fit_phis(adj, superclusters, supervars, iterations, parallel):
 
   return fit_all_phis(adj, A, ref_reads, var_reads, iterations, parallel)
 
+@njit
 def fit_phi_S(eta_S, var_reads_S, ref_reads_S, A, Z, iterations):
   eta_S = np.maximum(common._EPSILON, eta_S)
   psi_S = np.log(eta_S)
@@ -97,6 +102,14 @@ def fit_all_phis(adj, A, ref_reads, var_reads, iterations, parallel):
   phi = np.dot(Z, eta.T)
   return (phi, eta.T)
 
+@njit
+def _tile_rows(vec, repeats):
+  assert vec.ndim == 1
+  mat = np.empty((repeats, len(vec)))
+  mat[:] = vec
+  return mat
+
+@njit
 def calc_grad(var_reads, ref_reads, A, Z, psi):
   M, K = A.shape
   AZ = np.dot(A, Z) # MxK
@@ -106,12 +119,12 @@ def calc_grad(var_reads, ref_reads, A, Z, psi):
   assert len(binom_grad) == M
 
   eta = softmax(psi)
-  eta_rows = np.tile(eta, (K, 1))
+  eta_rows = _tile_rows(eta, K)
   softmax_grad = eta_rows * (np.eye(K) - eta_rows.T) # KxK
 
   grad_elem = np.zeros((M, K))
   for m in range(M):
-    active_b = softmax_grad * np.tile(AZ[m], (K, 1))
+    active_b = softmax_grad * _tile_rows(AZ[m], K)
     grad_elem[m] = binom_grad[m] * np.sum(active_b, axis=1)
 
   grad = 0.5 * np.sum(grad_elem, axis=0) / M
@@ -127,14 +140,15 @@ def calc_grad_numerical(var_reads, ref_reads, A, Z, psi):
     grad[k] = (calc_llh(var_reads, ref_reads, A, Z, P) - calc_llh(var_reads, ref_reads, A, Z, psi)) / delta
   return grad
 
+@njit
 def grad_desc(var_reads, ref_reads, A, Z, psi, iterations, convergence_threshold=1e-30):
   learn_rate = 1e-4
 
   K = len(Z)
   M = len(var_reads)
 
-  last_llh = -float('inf')
-  last_psi = None
+  last_llh = -np.inf
+  last_psi = psi
 
   for I in range(iterations):
     grad = calc_grad(var_reads, ref_reads, A, Z, psi)
@@ -160,6 +174,7 @@ def grad_desc(var_reads, ref_reads, A, Z, psi, iterations, convergence_threshold
 
   return psi
 
+@njit
 def softmax(X):
   b = np.max(X)
   logS = X - (b + np.log(np.sum(np.exp(X - b))))
