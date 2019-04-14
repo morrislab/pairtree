@@ -5,6 +5,7 @@ import scipy.integrate
 import warnings
 import random
 import multiprocessing
+import sys
 
 import common
 import pairwise
@@ -15,7 +16,7 @@ import resultserializer
 import plotter
 
 def main():
-  np.set_printoptions(linewidth=400, precision=3, threshold=np.nan, suppress=True)
+  np.set_printoptions(linewidth=400, precision=3, threshold=sys.maxsize, suppress=True)
   np.seterr(divide='raise', invalid='raise')
   warnings.simplefilter('ignore', category=scipy.integrate.IntegrationWarning)
 
@@ -31,6 +32,7 @@ def main():
   parser.add_argument('--trees-per-chain', dest='trees_per_chain', type=int, default=2000)
   parser.add_argument('--tree-chains', dest='tree_chains', type=int, default=None)
   parser.add_argument('--phi-iterations', dest='phi_iterations', type=int, default=10000)
+  parser.add_argument('--phi-fitter', dest='phi_fitter', choices=('graddesc', 'projection'), default='graddesc')
   parser.add_argument('--tree_perturbations', dest='tree_perturbations', type=int, default=100)
   parser.add_argument('ssm_fn')
   parser.add_argument('results_fn')
@@ -99,6 +101,7 @@ def main():
         args.trees_per_chain,
         args.burnin_per_chain,
         tree_chains,
+        args.phi_fitter,
         args.phi_iterations,
         args.tree_perturbations,
         seed,
@@ -112,6 +115,7 @@ def main():
         adjm,
         supervars,
         superclusters,
+        args.phi_fitter,
         args.phi_iterations,
         parallel
       )

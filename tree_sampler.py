@@ -3,7 +3,6 @@ import scipy.stats
 import common
 import mutrel
 from progressbar import progressbar
-import phi_fitter
 Models = common.Models
 debug = common.debug
 
@@ -163,18 +162,19 @@ def _run_metropolis(nsamples, init_cluster_adj, _calc_llh, _calc_phi, _sample_ad
 
   return (cluster_adj, phi, llh)
 
-def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_iterations, tree_perturbations, seed, progress_queue=None):
+def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_fitter, phi_iterations, tree_perturbations, seed, progress_queue=None):
   # Ensure each chain gets a new random state. I add chain index to initial
   # random seed to seed a new chain, so I must ensure that the seed is still in
   # the valid range [0, 2**32).
   np.random.seed(seed % 2**32)
+  pf = _resolve_phi_fitter(phi_fitter)
 
   assert nsamples > 0
   K = len(superclusters)
   alpha, beta = calc_beta_params(supervars)
 
   def __calc_phi(adj):
-    phi, eta = phi_fitter.fit_phis(adj, superclusters, supervars, iterations=phi_iterations, parallel=0)
+    phi, eta = pf.fit_phis(adj, superclusters, supervars, iterations=phi_iterations, parallel=0)
     return phi
   def __calc_phi_noop(adj):
     return None
@@ -205,7 +205,16 @@ def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_iterations, 
     progress_queue.put(0)
   return _run_metropolis(nsamples, init_cluster_adj, __calc_llh_phi, __calc_phi, __permute_adj_multistep, progress_queue)
 
-def use_existing_structure(adjm, supervars, superclusters, phi_iterations, parallel=0):
+def _resolve_phi_fitter(phi_fitter):
+  assert phi_fitter in ('graddesc', 'projection')
+  if phi_fitter == 'graddesc':
+    import phi_fitter_graddesc as P
+  else:
+    import phi_fitter_projection as P
+  return P
+
+def use_existing_structure(adjm, supervars, superclusters, phi_fitter, phi_iterations, parallel=0):
+  pf = _resolve_phi_fitter(phi_fitter)
   phi, eta = phi_fitter.fit_phis(adjm, superclusters, supervars, iterations=phi_iterations, parallel=parallel)
   alpha, beta = calc_beta_params(supervars)
   llh = _calc_llh_phi(phi, alpha, beta)
@@ -220,7 +229,7 @@ def choose_best_tree(adj, llh):
       best_idx = idx
   return best_idx
 
-def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_per_chain, nchains, phi_iterations, tree_perturbations, seed, parallel):
+def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_per_chain, nchains, phi_fitter, phi_iterations, tree_perturbations, seed, parallel):
   assert nchains > 0
   jobs = []
   total_per_chain = trees_per_chain + burnin_per_chain
@@ -240,7 +249,7 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_
         for C in range(nchains):
           # Ensure each chain's random seed is different from the seed used to
           # seed the initial Pairtree invocation, yet nonetheless reproducible.
-          jobs.append(ex.submit(_run_chain, data_mutrel, supervars, superclusters, total_per_chain, phi_iterations, tree_perturbations, seed + C + 1, progress_queue))
+          jobs.append(ex.submit(_run_chain, data_mutrel, supervars, superclusters, total_per_chain, phi_fitter, phi_iterations, tree_perturbations, seed + C + 1, progress_queue))
 
         # Exactly `total` items will be added to the queue. Once we've
         # retrieved that many items from the queue, we can assume that our
@@ -255,7 +264,7 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_
   else:
     results = []
     for C in range(nchains):
-      results.append(_run_chain(data_mutrel, supervars, superclusters, total_per_chain, phi_iterations, tree_perturbations, seed + C + 1))
+      results.append(_run_chain(data_mutrel, supervars, superclusters, total_per_chain, phi_fitter, phi_iterations, tree_perturbations, seed + C + 1))
 
   merged_adj = []
   merged_phi = []
