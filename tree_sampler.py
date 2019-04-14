@@ -8,15 +8,16 @@ debug = common.debug
 
 MIN_FLOAT = np.finfo(np.float).min
 
-def _calc_llh_phi(phi, alpha, beta):
+def _calc_llh_phi(phi, V, N, omega_v):
   K, S = phi.shape
-  assert alpha.shape == beta.shape == (K-1, S)
-  assert np.allclose(1, phi[0])
-  phi_llh = scipy.stats.beta.logpdf(phi[1:,:], alpha, beta)
-  phi_llh = np.sum(phi_llh)
+  for arr in V, N, omega_v:
+    assert arr.shape == (K-1, S)
 
-  # I had NaNs creep into my LLH when my alpha and beta params were invalid
-  # (i.e., when I had elements of beta that were <= 0).
+  assert np.allclose(1, phi[0])
+  P = omega_v * phi[1:]
+
+  phi_llh = scipy.stats.binom.logpmf(V, N, P)
+  phi_llh = np.sum(phi_llh)
   assert not np.isnan(phi_llh)
   # Prevent LLH of -inf.
   phi_llh = np.maximum(phi_llh, MIN_FLOAT)
@@ -101,20 +102,15 @@ def _permute_adj(adj):
   np.fill_diagonal(adj, 1)
   return adj
 
-def calc_beta_params(supervars):
+def calc_binom_params(supervars):
   svids = common.extract_vids(supervars)
   V = np.array([supervars[svid]['var_reads'] for svid in svids])
   R = np.array([supervars[svid]['ref_reads'] for svid in svids])
   omega_v = np.array([supervars[svid]['omega_v'] for svid in svids])
   assert np.all(omega_v == 0.5)
 
-  # Since these are supervars, we can just take 2*V and disregard omega_v, since
-  # supervariants are always diploid (i.e., omega_v = 0.5).
-  alpha = 2*V + 1
-  # Must ensure beta is > 0.
-  beta = np.maximum(1, R - V + 1)
-  assert np.all(alpha > 0) and np.all(beta > 0)
-  return (alpha, beta)
+  N = V + R
+  return (V, N, omega_v)
 
 def _find_parents(adj):
   adj = np.copy(adj)
@@ -171,7 +167,7 @@ def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_fitter, phi_
 
   assert nsamples > 0
   K = len(superclusters)
-  alpha, beta = calc_beta_params(supervars)
+  V, N, omega_v = calc_binom_params(supervars)
 
   def __calc_phi(adj):
     phi, eta = pf.fit_phis(adj, superclusters, supervars, iterations=phi_iterations, parallel=0)
@@ -179,7 +175,7 @@ def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_fitter, phi_
   def __calc_phi_noop(adj):
     return None
   def __calc_llh_phi(adj, phi):
-    return _calc_llh_phi(phi, alpha, beta)
+    return _calc_llh_phi(phi, V, N, omega_v)
   def __calc_llh_mutrel(adj, phi):
     return _calc_llh_mutrel(adj, data_mutrel, superclusters)
   def __permute_adj_multistep(oldadj, nsteps=tree_perturbations):
