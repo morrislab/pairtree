@@ -5,6 +5,7 @@ import scipy.integrate
 import numpy as np
 import util
 import warnings
+import binom
 
 def generate_logprob_phi(N):
   prob = {}
@@ -147,8 +148,8 @@ def _calc_garbage_dumb(V1, V2):
     logP = []
     for V in (V1, V2):
       phi = scipy.stats.uniform.rvs(loc=0, scale=1, size=mcsamps)
-      binom = scipy.stats.binom.logpmf(V.var_reads[sidx], V.total_reads[sidx], V.omega_v[sidx]*phi)
-      logP.append(scipy.special.logsumexp(binom) - np.log(mcsamps))
+      B = scipy.stats.binom.logpmf(V.var_reads[sidx], V.total_reads[sidx], V.omega_v[sidx]*phi)
+      logP.append(scipy.special.logsumexp(B) - np.log(mcsamps))
     evidence[sidx] = np.sum(logP)
 
   return evidence
@@ -205,24 +206,15 @@ def _make_upper(phi1, midx):
   }[midx]
   return np.broadcast_to(ret, np.array(phi1).shape)
 
-# SciPy's implementation is really slow. This is called hundreds of thousands
-# of times, so I need something fast.
-def binom_logpmf(X, N, P):
-  assert 0 <= X <= N and 0 <= P <= 1, ('bad_binom X=%s N=%s P=%s' % (X, N, P))
-  if np.isclose(0, P):
-    if X == 0:
-      return 0
-    else:
-      return -np.inf
-  if np.isclose(1, P):
-    if X == N:
-      return 0
-    else:
-      return -np.inf
-  return util.log_N_choose_K(N, X) + X*np.log(P) + (N - X)*np.log(1 - P)
+def binom_logpmf_scalar(X, N, P):
+  return binom.logpmf(
+    np.array([X]),
+    np.array([N]),
+    np.array([P]),
+  )[0]
 
 def _integral_separate_clusters(phi1, V1, V2, sidx, midx, logsub=0):
-  logP = binom_logpmf(
+  logP = binom_logpmf_scalar(
     V1.var_reads[sidx],
     V1.total_reads[sidx],
     V1.omega_v[sidx]*phi1
@@ -242,8 +234,15 @@ def _integral_separate_clusters(phi1, V1, V2, sidx, midx, logsub=0):
   return np.exp(logP)
 
 def _integral_same_cluster(phi1, V1, V2, sidx, logsub=0):
-  binom = [binom_logpmf(V.var_reads[sidx], V.total_reads[sidx], V.omega_v[sidx]*phi1) for V in (V1, V2)]
-  logP = binom[0] + binom[1]
+  binom_params = [(
+    V.var_reads[sidx],
+    V.total_reads[sidx],
+    V.omega_v[sidx]*phi1,
+  ) for V in (V1, V2)]
+  X, N, P = [np.array(A) for A in zip(*binom_params)]
+
+  B = binom.logpmf(X, N, P)
+  logP = B[0] + B[1]
   logP -= logsub
   return np.exp(logP)
 
