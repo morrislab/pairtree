@@ -8,6 +8,7 @@ from collections import defaultdict
 import numpy as np
 import scipy.stats
 import os
+import sys
 
 SIM_PARAM_LABELS = {
   'G': 'Garbage mutations',
@@ -168,9 +169,11 @@ def update_plot(plot_type, methx, methy, results, jitter, toggleable_options, *s
 
   marker = { 'size': 14 }
   if len(X) == 0:
-    diag_topright = 1
+    diag_topright = 1.
+    diag_bottomleft = 0.
   else:
     diag_topright = np.min([np.max(X), np.max(Y)])
+    diag_bottomleft = np.max((np.min(X), np.min(Y)))
 
   if total > 0:
     present_X_ratio = present_X / total
@@ -238,8 +241,8 @@ def update_plot(plot_type, methx, methy, results, jitter, toggleable_options, *s
         'type': 'line',
         'xref': 'x',
         'yref': 'y',
-        'x0': 0,
-        'y0': 0,
+        'x0': diag_bottomleft,
+        'y0': diag_bottomleft,
         'x1': diag_topright,
         'y1': diag_topright,
         'opacity': 0.3,
@@ -322,7 +325,7 @@ def load_results(*result_types):
   return results
 
 def run():
-  np.set_printoptions(linewidth=400, precision=3, threshold=np.nan, suppress=True)
+  np.set_printoptions(linewidth=400, precision=3, threshold=sys.maxsize, suppress=True)
   np.seterr(all='raise')#divide='raise', invalid='raise')
 
   results = load_results('mutrel', 'mutphi')
