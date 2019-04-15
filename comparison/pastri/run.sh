@@ -16,6 +16,7 @@ INDIR=$BASEDIR/scratch/inputs/$BATCH
 OUTDIR=$BASEDIR/scratch/results/$BATCH
 
 function convert_inputs {
+  source $HOME/.bash_host_specific
   mkdir -p $INDIR
 
   for ssmfn in $PAIRTREE_INPUTS_DIR/*.ssm; do
@@ -30,19 +31,19 @@ function convert_inputs {
 }
 
 function run_pastri {
-  mkdir -p $OUTDIR
-
+  source $HOME/.bash_host_specific
   for countsfn in $INDIR/*.counts; do
     runid=$(basename $countsfn | cut -d. -f1)
-    jobname="steph_pastri_${runid}"
+    jobname="pastri_${runid}"
+    outpath=$OUTDIR/$runid
+    mkdir -p $output
 
     [[ -f $OUTDIR/$runid.trees ]] && continue
 
     (
       # Must source ~/.bash_host_specific to get PATH set properly for
       # Miniconda.
-      echo "source $HOME/.bash_host_specific && " \
-        "cd $OUTDIR && " \
+      echo "cd $outpath && " \
         "python2 $PASTRI_DIR/src/RunPASTRI.py" \
         "--output_prefix $runid" \
         "--num_iters $NUM_ITERS" \
@@ -55,52 +56,53 @@ function run_pastri {
 }
 
 function get_F_and_C {
-  for treesfn in $OUTDIR/*.trees; do
+  source $HOME/.bash_host_specific
+  for treesfn in $OUTDIR/*/*.trees; do
     runid=$(basename $treesfn | cut -d. -f1)
+    outpath=$(dirname $treesfn)
     # Trees in $treesfn are ranked by likelihood. `get_F_and_C.py` takes tree
     # rank as a parameter. Thus, if we count N trees with LH > 0, we know their
     # ranks are [0, 1, ..., N-1].
     valid_count=$(cat $treesfn | grep '^>' | grep -v -- '-inf$' | wc -l)
     for idx in $(seq $valid_count); do
-      echo "source $HOME/.bash_host_specific && " \
-        "cd $OUTDIR && " \
+      echo "cd $outpath && " \
         "python2 $PASTRI_DIR/src/get_F_and_C.py" \
         "-i $idx" \
-        "-o $OUTDIR/$runid" \
+        "-o $outpath/$runid" \
         "$INDIR/${runid}.counts" \
         "$treesfn" \
-        "$OUTDIR/${runid}.fsamples" \
-        "> $OUTDIR/${runid}.${idx}.output_conversion.stdout" \
-        "2>$OUTDIR/${runid}.${idx}.output_conversion.stderr"
+        "$outpath/${runid}.fsamples" \
+        "> $outpath/${runid}.${idx}.output_conversion.stdout" \
+        "2>$outpath/${runid}.${idx}.output_conversion.stderr"
     done
   done | parallel -j$PARALLEL
 }
 
 function convert_outputs {
+  source $HOME/.bash_host_specific
   for tree_weights in llh uniform; do
-    for treesfn in $OUTDIR/*.trees; do
+    for treesfn in $OUTDIR/*/*.trees; do
       runid=$(basename $treesfn | cut -d. -f1)
-      echo "source $HOME/.bash_host_specific && " \
-        "cd $OUTDIR && " \
+      outpath=$(dirname $treesfn)
+      echo "cd $outpath && " \
         "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_mutrels.py" \
         "--weight-trees-by $tree_weights" \
         "$runid" \
         "$PAIRTREE_INPUTS_DIR/$runid.params.json" \
         "$treesfn" \
-        "${OUTDIR}/${runid}.pastri_trees_${tree_weights}.mutrel.npz" #\
-        #"> $OUTDIR/${runid}.mutrel_output_conversion.stdout" \
-        #"2>$OUTDIR/${runid}.mutrel_output_conversion.stderr"
-      echo "source $HOME/.bash_host_specific && " \
-        "cd $OUTDIR && " \
+        "${outpath}/${runid}.pastri_trees_${tree_weights}.mutrel.npz" #\
+        #"> $outpath/${runid}.mutrel_output_conversion.stdout" \
+        #"2>$outpath/${runid}.mutrel_output_conversion.stderr"
+      echo "cd $outpath && " \
         "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_mutphis.py" \
         "--weight-trees-by $tree_weights" \
         "$runid" \
         "${PAIRTREE_INPUTS_DIR}/${runid}.ssm" \
         "${PAIRTREE_INPUTS_DIR}/${runid}.params.json" \
         "$treesfn" \
-        "${OUTDIR}/${runid}.pastri_trees_${tree_weights}.mutphi.npz" #\
-        #"> $OUTDIR/${runid}.mutphi_output_conversion.stdout" \
-        #"2>$OUTDIR/${runid}.mutphi_output_conversion.stderr"
+        "${outpath}/${runid}.pastri_trees_${tree_weights}.mutphi.npz" #\
+        #"> $outpath/${runid}.mutphi_output_conversion.stdout" \
+        #"2>$outpath/${runid}.mutphi_output_conversion.stderr"
     done
   done #| parallel -j$PARALLEL
 }

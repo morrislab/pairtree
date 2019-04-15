@@ -1,14 +1,22 @@
 #!/bin/bash
 #set -euo pipefail
-command -v parallel || module load gnu-parallel
+command -v parallel > /dev/null || module load gnu-parallel
 
 BASEDIR=~/work/pairtree
 JOBDIR=/tmp
-INDIR=$BASEDIR/scratch/inputs/sims.pwgs.supervars
-OUTBASE=$BASEDIR/scratch/results/sims.pwgs.supervars
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
 PWGS_PATH=~/.apps/phylowgs
 PARALLEL=40
+
+#BATCH=sims.pwgs.supervars
+#INDIR=$BASEDIR/scratch/inputs/$BATCH
+#OUTBASE=$BASEDIR/scratch/results/$BATCH
+#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+
+#BATCH=steph.pwgs.supervars
+BATCH=steph.pwgs.allvars
+INDIR=$BASEDIR/scratch/inputs/$BATCH
+OUTBASE=$BASEDIR/scratch/results/$BATCH
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 
 function convert_inputs {
   mkdir -p $INDIR
@@ -64,7 +72,6 @@ function run_pwgs {
 }
 
 function convert_outputs {
-  #USE_MULTICHAIN=true
   USE_MULTICHAIN=$1
 
   cd $OUTBASE

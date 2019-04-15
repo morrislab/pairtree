@@ -45,13 +45,16 @@ function run_pairtree {
       echo "#SBATCH --mail-type=NONE"
 
       echo "cd $PAIRTREE_RESULTS_DIR && " \
-        "OMP_NUM_THREADS=1 python3 $PROTDIR/basic.py" \
+        "OMP_NUM_THREADS=1 " \
+        "PATH=$HOME/tmp/jose:$PATH " \
+        "python3 $PROTDIR/basic.py" \
         "--seed 1" \
         "--parallel $PARALLEL" \
         "--tree-chains $TREE_CHAINS" \
         "--trees-per-chain $TREES_PER_CHAIN" \
         "--burnin-per-chain $BURNIN_PER_CHAIN" \
         "--phi-iterations $PHI_ITERATIONS" \
+        "--phi-fitter projection" \
         "--params $PAIRTREE_INPUTS_DIR/${runid}.params.json" \
         "$PAIRTREE_INPUTS_DIR/$runid.ssm" \
         "$resultsfn" \
