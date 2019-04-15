@@ -155,23 +155,6 @@ function compile_scores {
   #cat $outfn | curl -F c=@- https://ptpb.pw >&2
 }
 
-function plot_comparison {
-  # To redirect port 80 to 8000:
-  #   iptables -A PREROUTING -t nat -i eth0 -p tcp --dport 80 -j REDIRECT --to-port 8000
-  cd $SCRIPTDIR
-
-  export MUTREL_RESULTS=$SCORESDIR/$BATCH.mutrel.txt
-  export MUTPHI_RESULTS=$SCORESDIR/$BATCH.mutphi.txt
-  export SIM_PARAMS="GKMST"
-  production=false
-
-  if [[ $production == true ]]; then
-    gunicorn -w 4 -b 0.0.0.0:8000 plot_comparison:server
-  else
-    python3 plot_comparison.py
-  fi
-}
-
 function plot_individual {
   cd $SCORESDIR
   for ptype in mutphi mutrel; do
@@ -200,11 +183,10 @@ function run_batch {
   #[[ $BATCH == "sims" ]] && make_sims_truth
   #make_mle_mutphis
 
-  #(eval_mutrels; eval_mutphis) | parallel -j$PARALLEL --halt 1
-  #compile_scores mutrel
-  #compile_scores mutphi
-  #plot_individual | parallel -j$PARALLEL --halt 1
-  plot_comparison
+  (eval_mutrels; eval_mutphis) | parallel -j$PARALLEL --halt 1
+  compile_scores mutrel
+  compile_scores mutphi
+  plot_individual | parallel -j$PARALLEL --halt 1
 }
 
 function main {
