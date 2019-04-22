@@ -34,19 +34,7 @@ def calc_llh(var_reads, ref_reads, A, Z, psi):
   mut_probs = binom.logpmf(var_reads, total_reads, mut_p)
   return np.sum(mut_probs)
 
-def fit_phis(adj, superclusters, supervars, iterations, parallel):
-  key = (hash(adj.tobytes()), iterations)
-  if key not in fit_phis.cache:
-    fit_phis.cache[key] = _fit_phis(adj, superclusters, supervars, iterations, parallel)
-    fit_phis.cache_misses += 1
-  else:
-    fit_phis.cache_hits += 1
-  return fit_phis.cache[key]
-fit_phis.cache = {}
-fit_phis.cache_hits = 0
-fit_phis.cache_misses = 0
-
-def _fit_phis(adj, superclusters, supervars, iterations, parallel):
+def fit_phis(adj, superclusters, supervars, method, iterations, parallel):
   svids = common.extract_vids(supervars)
   ref_reads = np.array([supervars[svid]['ref_reads'] for svid in svids])
   var_reads = np.array([supervars[svid]['var_reads'] for svid in svids])
@@ -55,17 +43,26 @@ def _fit_phis(adj, superclusters, supervars, iterations, parallel):
   assert len(supervars) == len(adj) - 1
   A = np.insert(np.eye(len(supervars)), 0, 0, axis=1)
 
-  return fit_all_phis(adj, A, ref_reads, var_reads, iterations, parallel)
+  return fit_all_phis(adj, A, ref_reads, var_reads, method, iterations, parallel)
 
 @njit
-def fit_phi_S(eta_S, var_reads_S, ref_reads_S, A, Z, iterations):
+def fit_phi_S(eta_S, var_reads_S, ref_reads_S, A, Z, method, iterations):
   eta_S = np.maximum(common._EPSILON, eta_S)
   psi_S = np.log(eta_S)
-  psi_S = grad_desc(var_reads_S, ref_reads_S, A, Z, psi_S, iterations)
+
+  if method == 'graddesc':
+    psi_S = grad_desc(var_reads_S, ref_reads_S, A, Z, psi_S, iterations)
+  elif method == 'rprop':
+    psi_S = rprop(var_reads_S, ref_reads_S, A, Z, psi_S, iterations)
+  else:
+    raise Exception('Unknown psi fitter')
+
   eta_S = softmax(psi_S)
   return eta_S
 
-def fit_all_phis(adj, A, ref_reads, var_reads, iterations, parallel):
+def fit_all_phis(adj, A, ref_reads, var_reads, method, iterations, parallel):
+  # TODO: I can probably rip out all the parallelism machinery, since I don't
+  # use this any longer.
   Z = common.make_ancestral_from_adj(adj)
   M, K = A.shape
   _, S = ref_reads.shape
@@ -88,7 +85,7 @@ def fit_all_phis(adj, A, ref_reads, var_reads, iterations, parallel):
         # starting point, then run the optimizer.
         if np.any(eta[s] < 0):
           modified_samples.append(s)
-          futures.append(ex.submit(fit_phi_S, eta[s], var_reads[:,s], ref_reads[:,s], A, Z, iterations))
+          futures.append(ex.submit(fit_phi_S, eta[s], var_reads[:,s], ref_reads[:,s], A, Z, method, iterations))
       with progressbar(total=len(futures), desc='Fitting phis', unit='sample', dynamic_ncols=True) as pbar:
         for F in concurrent.futures.as_completed(futures):
           pbar.update()
@@ -97,7 +94,7 @@ def fit_all_phis(adj, A, ref_reads, var_reads, iterations, parallel):
   else:
     for s in range(S):
       if np.any(eta[s] < 0):
-        eta[s] = fit_phi_S(eta[s], var_reads[:,s], ref_reads[:,s], A, Z, iterations)
+        eta[s] = fit_phi_S(eta[s], var_reads[:,s], ref_reads[:,s], A, Z, method, iterations)
 
   phi = np.dot(Z, eta.T)
   return (phi, eta.T)
@@ -143,10 +140,6 @@ def calc_grad_numerical(var_reads, ref_reads, A, Z, psi):
 @njit
 def grad_desc(var_reads, ref_reads, A, Z, psi, iterations, convergence_threshold=1e-30):
   learn_rate = 1e-4
-
-  K = len(Z)
-  M = len(var_reads)
-
   last_llh = -np.inf
   last_psi = psi
 
@@ -171,6 +164,30 @@ def grad_desc(var_reads, ref_reads, A, Z, psi, iterations, convergence_threshold
       llh = last_llh
       psi = last_psi
       learn_rate *= 0.5
+
+  return psi
+
+@njit
+def rprop(var_reads, ref_reads, A, Z, psi, iterations, convergence_threshold=1e-6):
+  # For explanation of `rprop`, see
+  # http://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf.
+  step = 1e-4 * np.ones(psi.shape)
+  last_sign = np.ones(psi.shape)
+
+  for T in range(iterations):
+    grad = calc_grad(var_reads, ref_reads, A, Z, psi)
+    if np.max(np.abs(grad)) < convergence_threshold:
+      break
+    sign = np.ones(psi.shape)
+    sign[grad < 0] = -1
+    sign_agree = sign == last_sign
+    sign_disagree = np.logical_not(sign_agree)
+    last_sign = sign
+
+    delta = 1.2*sign_agree + 0.5*sign_disagree
+    delta = np.minimum(50, delta)
+    step *= delta
+    psi += sign * step
 
   return psi
 

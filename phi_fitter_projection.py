@@ -63,7 +63,7 @@ def _fit_phi_S(adj, phi_hat_S, var_phi_hat_S):
 
   return eta_S
 
-def fit_phis(adj, superclusters, supervars, iterations, parallel):
+def fit_phis(adj, superclusters, supervars):
   svids = common.extract_vids(supervars)
   R = np.array([supervars[svid]['ref_reads'] for svid in svids])
   V = np.array([supervars[svid]['var_reads'] for svid in svids])
