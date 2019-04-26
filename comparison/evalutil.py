@@ -7,6 +7,8 @@ import mutrel
 import common
 from common import Models
 
+np.seterr(divide='raise', invalid='raise')
+
 def _fix_rounding_errors(mat):
   # Floating point error means that some entires can slightly exceed 1, even if
   # constituents of average obey the constraint `0 <= entry <= 1`. Ensure this

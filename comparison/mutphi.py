@@ -37,6 +37,13 @@ def calc_mutphi(cluster_phis, llhs, clusterings, weight_trees_by, ssmsfn):
   logprobs = None
 
   for (cluster_phi, clustering, weight) in zip(cluster_phis, clusterings, weights):
+    # Note: 0*-np.inf is NaN. So, if we have a weight of zero (because the
+    # tree's LLH was really bad) and a logprob of -inf for a mutation in a
+    # sample (beause the phi assigned there was super bad), we get NaNs in our
+    # output. Avoid this by skipping trees with zero weight.
+    if np.isclose(0, weight):
+      continue
+
     cluster_phi = evalutil._fix_rounding_errors(cluster_phi)
     assert np.all(0 <= cluster_phi) and np.all(cluster_phi <= 1)
     V, membership = evalutil.make_membership_mat(clustering)
@@ -49,7 +56,9 @@ def calc_mutphi(cluster_phis, llhs, clusterings, weight_trees_by, ssmsfn):
       logprobs = np.zeros(mphi.shape)
 
     # TODO: should I be doing something like logsumexp?
-    logprobs += weight * _calc_logprob(mphi, vids, variants)
+    weighted = weight * _calc_logprob(mphi, vids, variants)
+    assert not np.any(np.isnan(weighted))
+    logprobs += weighted
 
   return Mutphi(vids=vids, assays=assays, logprobs=logprobs)
 
