@@ -28,9 +28,9 @@ def logpmf(X, N, P):
   X_equals_N = X == N
   special = [
     (np.logical_and(P_isclose_0, X_equals_0), 0),
-    (np.logical_and(P_isclose_0, X_equals_N), -np.inf),
-    (np.logical_and(P_isclose_1, X_equals_0), -np.inf),
+    (np.logical_and(P_isclose_0, np.logical_not(X_equals_0)), -np.inf),
     (np.logical_and(P_isclose_1, X_equals_N), 0),
+    (np.logical_and(P_isclose_1, np.logical_not(X_equals_N)), -np.inf),
   ]
 
   result = np.full_like(P, np.nan)
