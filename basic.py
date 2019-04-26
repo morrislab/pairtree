@@ -13,7 +13,6 @@ import inputparser
 import tree_sampler
 import clustermaker
 import resultserializer
-import plotter
 
 def main():
   np.set_printoptions(linewidth=400, precision=3, threshold=sys.maxsize, suppress=True)
