@@ -9,13 +9,28 @@ import inputparser
 import common
 import mutphi
 
+MISSING = -1
+
 def load_mutphis(mphi_args):
   mutphis = {}
   for mphi_arg in mphi_args:
     name, mphi_path = mphi_arg.split('=', 1)
     assert name not in mutphis
     if os.path.exists(mphi_path):
-      mutphis[name] = mutphi.load_mutphi(mphi_path)
+      mphi = mutphi.load_mutphi(mphi_path)
+      # Sometimes, an atrociously bad phi for a mutation will result in it
+      # getting a mutphi score of -inf. If the corresponding tree is assigned
+      # an LLH of > -inf, then it will "pollute" the mutphis for *every* treein
+      # a run for that mutation/sample, making all of them -inf. That of course
+      # renders the overall mutphi score for that run -inf. In such instances,
+      # consider the run as having failed.
+      if np.any(np.isinf(mphi.logprobs)):
+        print('%.5f of mphis in %s are inf' % (
+          np.sum(np.isinf(mphi.logprobs)) / mphi.logprobs.size,
+          mphi_path,
+        ), file=sys.stderr)
+        mphi = None
+      mutphis[name] = mphi
     else:
       mutphis[name] = None
   return mutphis
@@ -39,7 +54,7 @@ def compare(mutphis):
   for name in names:
     mphi = mutphis[name]
     if mphi is None:
-      scores[name] = -1
+      scores[name] = MISSING
       continue
     assert np.array_equal(mphi.vids, vids)
     assert np.array_equal(mphi.assays, assays)
