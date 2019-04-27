@@ -168,7 +168,7 @@ def grad_desc(var_reads, ref_reads, A, Z, psi, iterations, convergence_threshold
   return psi
 
 @njit
-def rprop(var_reads, ref_reads, A, Z, psi, iterations, convergence_threshold=1e-6):
+def rprop(var_reads, ref_reads, A, Z, psi, iterations, convergence_threshold=1e-4):
   # For explanation of `rprop`, see
   # http://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf.
   step = 1e-4 * np.ones(psi.shape)
