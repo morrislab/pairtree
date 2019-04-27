@@ -3,6 +3,7 @@ import common
 import ctypes
 import ctypes.util
 import numpy.ctypeslib as npct
+import subprocess
 
 def _convert_adjm_to_adjlist(adjm):
   adjm = np.copy(adjm)
@@ -28,15 +29,16 @@ def fit_phis(adj, superclusters, supervars):
 
   phi_hat = V / (omega * T)
   var_phi_hat = V*(1 - V/T) / (T*omega)**2
-  #var_phi_hat = np.maximum(1e-2, var_phi_hat)
 
-  #phi_hat[:] = 0.3
-  #phi_hat[-1,:] = 0.2
-  #var_phi_hat[:] = 0.01
+  phi_hat = np.insert(phi_hat, 0, 1, axis=0)
+  var_phi_hat = np.maximum(1e-8, var_phi_hat)
+  prec_sqrt = np.sqrt(1 / var_phi_hat)
+  prec_sqrt = np.insert(prec_sqrt, 0, 1e3, axis=0)
+  assert prec_sqrt.shape == (M+1, S)
 
   eta = np.zeros((M+1, S))
   for sidx in range(S):
-    eta[:,sidx] = _fit_phi_S(adj, phi_hat[:,sidx], var_phi_hat[:,sidx])
+    eta[:,sidx] = _fit_phi_S(adj, phi_hat[:,sidx], prec_sqrt[:,sidx])
   assert np.allclose(0, eta[eta < 0])
   eta[eta < 0] = 0
 
@@ -128,18 +130,57 @@ def _init_project_ppm():
   _project_ppm.tree_cost_projection = func
 _init_project_ppm()
 
-def _fit_phi_S(adj, phi_hat, var_phi_hat):
-  assert phi_hat.ndim == var_phi_hat.ndim == 1
+def _fit_phi_S_ctypes(adj, phi_hat, prec_sqrt):
+  assert phi_hat.ndim == prec_sqrt.ndim == 1
   M = len(phi_hat)
   assert M >= 1
-  assert var_phi_hat.shape == (M,)
-
-  phi_hat = np.insert(phi_hat, 0, 1, axis=0)
-  var_phi_hat = np.maximum(1e-8, var_phi_hat)
-  prec_sqrt = np.sqrt(1 / var_phi_hat)
-  prec_sqrt = np.insert(prec_sqrt, 0, 1e3, axis=0)
-  assert prec_sqrt.shape == (M+1,)
+  assert prec_sqrt.shape == (M,)
 
   root = 0
   eta = _project_ppm(adj, phi_hat, prec_sqrt, root)
   return eta
+
+def _prepare_subprocess_inputs(adjm, phi, prec_sqrt):
+  _arr2floatstr = lambda arr: ' '.join([f'{E:.10f}' for E in np.array(arr).flatten()])
+  _arr2intstr = lambda arr: ' '.join([f'{E:d}' for E in np.array(arr).flatten()])
+
+  assert phi.ndim == prec_sqrt.ndim == 1
+  M = len(phi)
+  assert prec_sqrt.shape == (M,)
+  assert M >= 1
+
+  root = 0
+  adjl = _convert_adjm_to_adjlist(adjm)
+  deg = [len(children) for children in adjl]
+  should_calc_eta = 1
+
+  calcphi_input = [
+    _arr2intstr((M, 1)),
+    _arr2floatstr(phi),
+    _arr2floatstr(prec_sqrt),
+    str(root),
+    _arr2intstr(deg),
+  ]
+  calcphi_input += [_arr2intstr(row) for row in adjl]
+  calcphi_input += [
+    str(should_calc_eta),
+    ''
+  ]
+
+  joined = '\n'.join(calcphi_input)
+  return joined
+
+def _fit_phi_S_subprocess(adj, phi_hat_S, prec_sqrt_S):
+  calcphi_input = _prepare_subprocess_inputs(adj, phi_hat_S, prec_sqrt_S)
+
+  result = subprocess.run(['projectppm'], input=calcphi_input, capture_output=True, encoding='UTF-8')
+  result.check_returncode()
+  lines = result.stdout.strip().split('\n')
+  assert len(lines) == 2
+  cost = float(lines[0])
+  eta_S = np.array([float(E) for E in lines[1].split(' ')])
+  assert len(eta_S) == len(phi_hat_S)
+
+  return eta_S
+
+_fit_phi_S = _fit_phi_S_ctypes
