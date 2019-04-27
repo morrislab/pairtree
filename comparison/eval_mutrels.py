@@ -8,6 +8,8 @@ import mutrel
 import inputparser
 from common import Models
 
+MISSING = -1
+
 def load_mutrels(mutrel_args):
   mutrels = {}
   for mutrel_arg in mutrel_args:
@@ -53,7 +55,7 @@ def compare(mutrels):
   for name in names:
     mrel = mutrels[name]
     if mrel is None:
-      scores[name] = -1
+      scores[name] = MISSING
       continue
 
     assert mrel.rels.shape == (M, M, num_models)

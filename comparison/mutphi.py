@@ -36,6 +36,7 @@ def calc_mutphi(cluster_phis, llhs, clusterings, weight_trees_by, ssmsfn):
   assays = None
   logprobs = None
 
+  assert not np.allclose(0, weights)
   for (cluster_phi, clustering, weight) in zip(cluster_phis, clusterings, weights):
     # Note: 0*-np.inf is NaN. So, if we have a weight of zero (because the
     # tree's LLH was really bad) and a logprob of -inf for a mutation in a
