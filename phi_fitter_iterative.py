@@ -34,7 +34,7 @@ def calc_llh(var_reads, ref_reads, A, Z, psi):
   mut_probs = binom.logpmf(var_reads, total_reads, mut_p)
   return np.sum(mut_probs)
 
-def fit_phis(adj, superclusters, supervars, method, iterations, parallel):
+def fit_etas(adj, superclusters, supervars, method, iterations, parallel):
   svids = common.extract_vids(supervars)
   ref_reads = np.array([supervars[svid]['ref_reads'] for svid in svids])
   var_reads = np.array([supervars[svid]['var_reads'] for svid in svids])
@@ -43,10 +43,10 @@ def fit_phis(adj, superclusters, supervars, method, iterations, parallel):
   assert len(supervars) == len(adj) - 1
   A = np.insert(np.eye(len(supervars)), 0, 0, axis=1)
 
-  return fit_all_phis(adj, A, ref_reads, var_reads, method, iterations, parallel)
+  return _fit_etas(adj, A, ref_reads, var_reads, method, iterations, parallel)
 
 @njit
-def fit_phi_S(eta_S, var_reads_S, ref_reads_S, A, Z, method, iterations):
+def fit_eta_S(eta_S, var_reads_S, ref_reads_S, A, Z, method, iterations):
   eta_S = np.maximum(common._EPSILON, eta_S)
   psi_S = np.log(eta_S)
 
@@ -60,7 +60,7 @@ def fit_phi_S(eta_S, var_reads_S, ref_reads_S, A, Z, method, iterations):
   eta_S = softmax(psi_S)
   return eta_S
 
-def fit_all_phis(adj, A, ref_reads, var_reads, method, iterations, parallel):
+def _fit_etas(adj, A, ref_reads, var_reads, method, iterations, parallel):
   # TODO: I can probably rip out all the parallelism machinery, since I don't
   # use this any longer.
   Z = common.make_ancestral_from_adj(adj)
@@ -85,7 +85,7 @@ def fit_all_phis(adj, A, ref_reads, var_reads, method, iterations, parallel):
         # starting point, then run the optimizer.
         if np.any(eta[s] < 0):
           modified_samples.append(s)
-          futures.append(ex.submit(fit_phi_S, eta[s], var_reads[:,s], ref_reads[:,s], A, Z, method, iterations))
+          futures.append(ex.submit(fit_eta_S, eta[s], var_reads[:,s], ref_reads[:,s], A, Z, method, iterations))
       with progressbar(total=len(futures), desc='Fitting phis', unit='sample', dynamic_ncols=True) as pbar:
         for F in concurrent.futures.as_completed(futures):
           pbar.update()
@@ -94,10 +94,9 @@ def fit_all_phis(adj, A, ref_reads, var_reads, method, iterations, parallel):
   else:
     for s in range(S):
       if np.any(eta[s] < 0):
-        eta[s] = fit_phi_S(eta[s], var_reads[:,s], ref_reads[:,s], A, Z, method, iterations)
+        eta[s] = fit_eta_S(eta[s], var_reads[:,s], ref_reads[:,s], A, Z, method, iterations)
 
-  phi = np.dot(Z, eta.T)
-  return (phi, eta.T)
+  return eta.T
 
 @njit
 def _tile_rows(vec, repeats):

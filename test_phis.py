@@ -129,8 +129,11 @@ def main():
     print_init(supervars, adj)
     for method in ('projection', 'rprop', 'graddesc'):
       phi, eta = phi_fitter._fit_phis(adj, superclusters, supervars, method, iterations, parallel)
+      # Sometimes the `projection` fitter will return zeros, which result in an
+      # LLH of -inf if the number of variant reads `V` is non-zero, since
+      # `Binom(X=V > 0, | N=V+R, p=0) = 0`. To avoid this, set a floor of 1e-6
+      # on phi values.
       phi = np.maximum(1e-6, phi)
-      #phi = np.minimum(1 - 1e-6, phi)
       print_method(method, phi, supervars)
       print()
 

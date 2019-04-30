@@ -20,7 +20,7 @@ def _convert_adjm_to_adjlist(adjm):
 
   return adjl
 
-def fit_phis(adj, superclusters, supervars):
+def fit_etas(adj, superclusters, supervars):
   svids = common.extract_vids(supervars)
   R = np.array([supervars[svid]['ref_reads'] for svid in svids])
   V = np.array([supervars[svid]['var_reads'] for svid in svids])
@@ -39,17 +39,15 @@ def fit_phis(adj, superclusters, supervars):
 
   eta = np.zeros((M+1, S))
   for sidx in range(S):
-    eta[:,sidx] = _fit_phi_S(adj, phi_hat[:,sidx], prec_sqrt[:,sidx])
+    eta[:,sidx] = _fit_eta_S(adj, phi_hat[:,sidx], prec_sqrt[:,sidx])
   assert np.allclose(0, eta[eta < 0])
   eta[eta < 0] = 0
 
-  Z = common.make_ancestral_from_adj(adj)
-  phi = np.dot(Z, eta)
-  return (phi, eta)
+  return eta
 
 def _project_ppm(adjm, phi_hat, prec_sqrt, root):
   assert phi_hat.ndim == prec_sqrt.ndim == 1
-  inner_flag = 1
+  inner_flag = 0
   compute_eta = 1
   M = len(phi_hat)
   S = 1
@@ -131,24 +129,28 @@ def _init_project_ppm():
   _project_ppm.tree_cost_projection = func
 _init_project_ppm()
 
-def _fit_phi_S_ctypes(adj, phi_hat, prec_sqrt):
+def _fit_eta_S_ctypes(adj, phi_hat, prec_sqrt):
   assert phi_hat.ndim == prec_sqrt.ndim == 1
   M = len(phi_hat)
   assert M >= 1
   assert prec_sqrt.shape == (M,)
   root = 0
 
+  # sim_K100_S100_T50_M1000_G100_run1 revealed a weird issue where a particular
+  # call to _project_ppm() will return NaNs. This is reproducible insofar as
+  # running Pairtree again with the same seed ("1") will cause this failure at
+  # exactly the same point for exactly the same tree sample. In this instance,
+  # 101 of the 10,000 entries of the `eta` matrix will be NaN. However, calling
+  # _project_ppm() immediately after with the same inputs will work fine.  Out
+  # of 705 simulations, each of which sampled 3000 trees (meaning >2M trees
+  # sampled), this was the only case where I saw this failure.
+  #
+  # To work around this, if the first call to _project_ppm() returns NaNs, make
+  # two additional attempts.
   max_attempts = 3
   for attempt in range(max_attempts):
     eta = _project_ppm(adj, phi_hat, prec_sqrt, root)
     if np.any(np.isnan(eta)):
-      #import pickle
-      #with open('bad.pickle', 'wb') as F:
-      #  pickle.dump({
-      #    'adj': adj,
-      #    'phi_hat': phi_hat,
-      #    'prec_sqrt': prec_sqrt,
-      #  }, F)
       print('eta contains NaN, retrying ...', file=sys.stderr)
       continue
     else:
@@ -187,7 +189,7 @@ def _prepare_subprocess_inputs(adjm, phi, prec_sqrt):
   joined = '\n'.join(calcphi_input)
   return joined
 
-def _fit_phi_S_subprocess(adj, phi_hat_S, prec_sqrt_S):
+def _fit_eta_S_subprocess(adj, phi_hat_S, prec_sqrt_S):
   calcphi_input = _prepare_subprocess_inputs(adj, phi_hat_S, prec_sqrt_S)
 
   result = subprocess.run(['projectppm'], input=calcphi_input, capture_output=True, encoding='UTF-8')
@@ -200,4 +202,4 @@ def _fit_phi_S_subprocess(adj, phi_hat_S, prec_sqrt_S):
 
   return eta_S
 
-_fit_phi_S = _fit_phi_S_ctypes
+_fit_eta_S = _fit_eta_S_ctypes
