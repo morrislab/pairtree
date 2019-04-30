@@ -4,6 +4,7 @@ import ctypes
 import ctypes.util
 import numpy.ctypeslib as npct
 import subprocess
+import sys
 
 def _convert_adjm_to_adjlist(adjm):
   adjm = np.copy(adjm)
@@ -135,9 +136,25 @@ def _fit_phi_S_ctypes(adj, phi_hat, prec_sqrt):
   M = len(phi_hat)
   assert M >= 1
   assert prec_sqrt.shape == (M,)
-
   root = 0
-  eta = _project_ppm(adj, phi_hat, prec_sqrt, root)
+
+  max_attempts = 3
+  for attempt in range(max_attempts):
+    eta = _project_ppm(adj, phi_hat, prec_sqrt, root)
+    if np.any(np.isnan(eta)):
+      #import pickle
+      #with open('bad.pickle', 'wb') as F:
+      #  pickle.dump({
+      #    'adj': adj,
+      #    'phi_hat': phi_hat,
+      #    'prec_sqrt': prec_sqrt,
+      #  }, F)
+      print('eta contains NaN, retrying ...', file=sys.stderr)
+      continue
+    else:
+      break
+  else:
+    raise Exception('eta still contains NaN after %s attempt(s)' % max_attempts)
   return eta
 
 def _prepare_subprocess_inputs(adjm, phi, prec_sqrt):
@@ -164,7 +181,7 @@ def _prepare_subprocess_inputs(adjm, phi, prec_sqrt):
   calcphi_input += [_arr2intstr(row) for row in adjl]
   calcphi_input += [
     str(should_calc_eta),
-    ''
+    '' # There will be a trailing newline, as B&J's code requires.
   ]
 
   joined = '\n'.join(calcphi_input)
