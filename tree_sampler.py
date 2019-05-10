@@ -7,21 +7,20 @@ import phi_fitter
 Models = common.Models
 debug = common.debug
 
-MIN_FLOAT = np.finfo(np.float).min
-
-def _calc_llh_phi(phi, V, N, omega_v):
+def _calc_llh_phi(phi, V, N, omega_v, epsilon=1e-5):
   K, S = phi.shape
   for arr in V, N, omega_v:
     assert arr.shape == (K-1, S)
 
   assert np.allclose(1, phi[0])
   P = omega_v * phi[1:]
+  P = np.maximum(P, epsilon)
+  P = np.minimum(P, 1 - epsilon)
 
   phi_llh = scipy.stats.binom.logpmf(V, N, P)
   phi_llh = np.sum(phi_llh)
   assert not np.isnan(phi_llh)
-  # Prevent LLH of -inf.
-  phi_llh = np.maximum(phi_llh, MIN_FLOAT)
+  assert not np.isinf(phi_llh)
   return phi_llh
 
 def _calc_llh_mutrel(cluster_adj, data_mutrel, superclusters):
