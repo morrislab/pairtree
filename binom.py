@@ -20,6 +20,8 @@ def isclose(arr, V, tol=1e-6):
 @njit
 def logpmf(X, N, P):
   assert X.shape == N.shape == P.shape
+  # Limit to one-dimension arrays, as indexing an array using a boolean array
+  # of >1D (as I do with `results[idxs] = val`) is not supported by Numba.
   assert X.ndim == N.ndim == P.ndim == 1
 
   P_isclose_0 = isclose(0, P)
@@ -45,5 +47,6 @@ def logpmf(X, N, P):
   Xu = X[unfilled]
   Pu = P[unfilled]
   result[unfilled] = _log_N_choose_K(Nu, Xu) + Xu*np.log(Pu) + (Nu - Xu)*np.log(1 - Pu)
+  assert not np.any(np.isnan(result))
 
   return result
