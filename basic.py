@@ -31,7 +31,7 @@ def main():
   parser.add_argument('--trees-per-chain', dest='trees_per_chain', type=int, default=2000)
   parser.add_argument('--tree-chains', dest='tree_chains', type=int, default=None)
   parser.add_argument('--phi-iterations', dest='phi_iterations', type=int, default=10000)
-  parser.add_argument('--phi-fitter', dest='phi_fitter', choices=('graddesc', 'projection', 'rprop'), default='graddesc')
+  parser.add_argument('--phi-fitter', dest='phi_fitter', choices=('graddesc', 'rprop', 'projection', 'proj_rprop'), default='rprop')
   parser.add_argument('--tree_perturbations', dest='tree_perturbations', type=int, default=100)
   parser.add_argument('ssm_fn')
   parser.add_argument('results_fn')

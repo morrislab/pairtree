@@ -34,7 +34,7 @@ def calc_llh(var_reads, ref_reads, A, Z, psi):
   mut_probs = binom.logpmf(var_reads, total_reads, mut_p)
   return np.sum(mut_probs)
 
-def fit_etas(adj, superclusters, supervars, method, iterations, parallel):
+def fit_etas(adj, superclusters, supervars, method, iterations, parallel, eta_init=None):
   svids = common.extract_vids(supervars)
   ref_reads = np.array([supervars[svid]['ref_reads'] for svid in svids])
   var_reads = np.array([supervars[svid]['var_reads'] for svid in svids])
@@ -43,7 +43,7 @@ def fit_etas(adj, superclusters, supervars, method, iterations, parallel):
   assert len(supervars) == len(adj) - 1
   A = np.insert(np.eye(len(supervars)), 0, 0, axis=1)
 
-  return _fit_etas(adj, A, ref_reads, var_reads, method, iterations, parallel)
+  return _fit_etas(adj, A, ref_reads, var_reads, method, iterations, parallel, eta_init)
 
 @njit
 def fit_eta_S(eta_S, var_reads_S, ref_reads_S, A, Z, method, iterations):
@@ -60,18 +60,21 @@ def fit_eta_S(eta_S, var_reads_S, ref_reads_S, A, Z, method, iterations):
   eta_S = softmax(psi_S)
   return eta_S
 
-def _fit_etas(adj, A, ref_reads, var_reads, method, iterations, parallel):
+def _fit_etas(adj, A, ref_reads, var_reads, method, iterations, parallel, eta_init=None):
   # TODO: I can probably rip out all the parallelism machinery, since I don't
   # use this any longer.
   Z = common.make_ancestral_from_adj(adj)
   M, K = A.shape
   _, S = ref_reads.shape
 
-  phi_implied = 2*(var_reads / (ref_reads + var_reads))
-  # Make first row 1 to account for normal root.
-  phi_implied = np.insert(phi_implied, 0, 1, axis=0)
-  # Since phi = Z.eta, we have eta = (Z^-1)phi.
-  eta = np.dot(np.linalg.inv(Z), phi_implied).T
+  if eta_init is None:
+    phi_implied = 2*(var_reads / (ref_reads + var_reads))
+    # Make first row 1 to account for normal root.
+    phi_implied = np.insert(phi_implied, 0, 1, axis=0)
+    # Since phi = Z.eta, we have eta = (Z^-1)phi.
+    eta = np.dot(np.linalg.inv(Z), phi_implied).T
+  else:
+    eta = eta_init.T
   assert eta.shape == (S, K)
 
   if parallel > 0:
