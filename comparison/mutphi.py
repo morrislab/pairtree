@@ -11,17 +11,18 @@ import common
 
 Mutphi = namedtuple('Mutphi', ('vids', 'assays', 'logprobs'))
 
-def _calc_logprob(mphi, vids, variants):
+def _calc_logprob(mphi, vids, variants, epsilon=1e-5):
   def _extract_arr(K):
     return np.array([variants[V][K] for V in vids])
   vardata = {K: _extract_arr(K) for K in ('var_reads', 'total_reads', 'omega_v')}
   assert len(set([V.shape for V in vardata.values()] + [mphi.shape])) == 1
 
-  log_px = scipy.stats.binom.logpmf(
-    vardata['var_reads'],
-    vardata['total_reads'],
-    vardata['omega_v'] * mphi,
-  )
+  P = vardata['omega_v'] * mphi
+  P = np.maximum(P, epsilon)
+  P = np.minimum(P, 1 - epsilon)
+  log_px = scipy.stats.binom.logpmf(vardata['var_reads'], vardata['total_reads'], P)
+  assert not np.any(np.isnan(log_px))
+  assert not np.any(np.isinf(log_px))
   assert np.all(log_px <= 0)
   return log_px
 
