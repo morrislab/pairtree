@@ -51,9 +51,9 @@ def fit_eta_S(eta_S, var_reads_S, ref_reads_S, A, Z, method, iterations):
   psi_S = np.log(eta_S)
 
   if method == 'graddesc':
-    psi_S = grad_desc(var_reads_S, ref_reads_S, A, Z, psi_S, iterations)
+    psi_S = grad_desc(var_reads_S, ref_reads_S, A, Z, psi_S, iterations, convergence_threshold=1e-30)
   elif method == 'rprop':
-    psi_S = rprop(var_reads_S, ref_reads_S, A, Z, psi_S, iterations)
+    psi_S = rprop(var_reads_S, ref_reads_S, A, Z, psi_S, iterations, convergence_threshold=1e-4)
   else:
     raise Exception('Unknown psi fitter')
 
@@ -137,7 +137,7 @@ def calc_grad_numerical(var_reads, ref_reads, A, Z, psi):
   return grad
 
 @njit
-def grad_desc(var_reads, ref_reads, A, Z, psi, iterations, convergence_threshold=1e-30):
+def grad_desc(var_reads, ref_reads, A, Z, psi, iterations, convergence_threshold):
   learn_rate = 1e-4
   last_llh = -np.inf
   last_psi = psi
@@ -167,7 +167,7 @@ def grad_desc(var_reads, ref_reads, A, Z, psi, iterations, convergence_threshold
   return psi
 
 @njit
-def rprop(var_reads, ref_reads, A, Z, psi, iterations, convergence_threshold=1e-4):
+def rprop(var_reads, ref_reads, A, Z, psi, iterations, convergence_threshold):
   # For explanation of `rprop`, see
   # http://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf.
   step = 1e-4 * np.ones(psi.shape)
