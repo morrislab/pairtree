@@ -2,22 +2,6 @@ import json
 import numpy as np
 import common
 
-def convert_adj_matrix_to_adj_list(adjm):
-  adjm = np.copy(adjm)
-  np.fill_diagonal(adjm, 0)
-  adjl = {}
-
-  for parent, child in zip(*np.nonzero(adjm)):
-    # JSON keys must be strings.
-    parent = str(parent)
-    # Must convert from NumPy ints to Python ints. Ugh.
-    child = int(child)
-    if parent not in adjl:
-      adjl[parent] = []
-    adjl[parent].append(child)
-
-  return adjl
-
 def generate_treesumm(sampnames, clusters, adjmats, llh, phi):
   clusters = [[]] + clusters.tolist()
   assert len(adjmats) == len(llh) == len(phi)
@@ -41,7 +25,7 @@ def generate_treesumm(sampnames, clusters, adjmats, llh, phi):
     result['trees'][str(tidx)] = {
       'llh': L,
       'populations': pops,
-      'structure': convert_adj_matrix_to_adj_list(adjmat),
+      'structure': common.convert_adj_matrix_to_json_adjlist(adjmat),
       'root': 0,
     }
 

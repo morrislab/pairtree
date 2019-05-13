@@ -47,8 +47,7 @@ def load_params(paramsfn):
   with open(paramsfn) as P:
     return json.load(P)
 
-def load_structure(params):
-  adjlist = params['structure']
+def load_structure(adjlist):
   adjlist = {int(P): C for P, C in adjlist.items()}
   return adjlist
 

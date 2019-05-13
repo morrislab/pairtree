@@ -67,6 +67,22 @@ def convert_adjlist_to_adjmatrix(adjlist):
 
   return adjm
 
+def convert_adj_matrix_to_json_adjlist(adjm):
+  adjm = np.copy(adjm)
+  np.fill_diagonal(adjm, 0)
+  adjl = {}
+
+  for parent, child in zip(*np.nonzero(adjm)):
+    # JSON keys must be strings.
+    parent = str(parent)
+    # Must convert from NumPy ints to Python ints. Ugh.
+    child = int(child)
+    if parent not in adjl:
+      adjl[parent] = []
+    adjl[parent].append(child)
+
+  return adjl
+
 def agglo_children_to_adjlist(children, nleaves):
   assert len(children) == nleaves - 1
   adjlist = {}
