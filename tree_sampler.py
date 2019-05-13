@@ -202,8 +202,8 @@ def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_method, phi_
 
 def use_existing_structure(adjm, supervars, superclusters, phi_method, phi_iterations, parallel=0):
   phi, eta = phi_fitter.fit_phis(adjm, superclusters, supervars, method=phi_method, iterations=phi_iterations, parallel=parallel)
-  alpha, beta = calc_beta_params(supervars)
-  llh = _calc_llh_phi(phi, alpha, beta)
+  V, N, omega_v = calc_binom_params(supervars)
+  llh = _calc_llh_phi(phi, V, N, omega_v)
   return ([adjm], [phi], [llh])
 
 def choose_best_tree(adj, llh):
