@@ -1,0 +1,14 @@
+diff --git a/src/traces/box/cross_trace_calc.js b/src/traces/box/cross_trace_calc.js
+index a13f701c4..c14843772 100644
+--- a/src/traces/box/cross_trace_calc.js
++++ b/src/traces/box/cross_trace_calc.js
+@@ -100,7 +100,8 @@ function setPositionOffset(traceType, gd, boxList, posAxis) {
+ 
+         if(width) {
+             dPos = bdPos = wHover = width / 2;
+-            bPos = 0;
++            var intragroup_offset = parseFloat((new URL(window.location)).searchParams.get('intragroupoffset'));
++            bPos = t.num * intragroup_offset;
+         } else {
+             dPos = dPos0;
+ 
