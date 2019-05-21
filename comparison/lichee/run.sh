@@ -33,7 +33,7 @@ function run_lichee {
     runid=$(basename $snvfn | cut -d. -f1)
     echo "module load java && " \
       "cd $OUTDIR &&" \
-      "TIMEFORMAT='%R'; time (java -jar $LICHEE_DIR/lichee.jar" \
+      "TIMEFORMAT='%R %U %S'; time (java -jar $LICHEE_DIR/lichee.jar" \
       "-build" \
       "-i $INDIR/$runid.snv" \
       "-o $OUTDIR/$runid.trees" \
@@ -47,9 +47,26 @@ function run_lichee {
   done
 }
 
+function convert_outputs {
+  cd $OUTDIR
+  for treesfn in $OUTDIR/*.trees; do
+    runid=$(basename $treesfn | cut -d. -f1)
+    cmd="python3 $SCRIPTDIR/convert_outputs.py "
+    cmd+="--weight-trees-by llh "
+    if ! [[ $runid =~ K30 || $runid =~ K100 ]]; then
+      cmd+="--mutrel $OUTDIR/$runid.mutrel.npz "
+    fi
+    cmd+="--structures $OUTDIR/$runid.params.json "
+    cmd+="$OUTDIR/$runid.trees "
+    cmd+="$PAIRTREE_INPUTS_DIR/$runid.params.json "
+    echo $cmd
+  done
+}
+
 function main {
   #convert_inputs
-  run_lichee
+  #run_lichee
+  convert_outputs
 }
 
 main
