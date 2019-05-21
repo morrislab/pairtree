@@ -200,11 +200,17 @@ def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_method, phi_
     progress_queue.put(0)
   return _run_metropolis(nsamples, init_cluster_adj, __calc_llh_phi, __calc_phi, __permute_adj_multistep, progress_queue)
 
-def use_existing_structure(adjm, supervars, superclusters, phi_method, phi_iterations, parallel=0):
-  phi, eta = phi_fitter.fit_phis(adjm, superclusters, supervars, method=phi_method, iterations=phi_iterations, parallel=parallel)
+def use_existing_structures(adjms, supervars, superclusters, phi_method, phi_iterations, parallel=0):
   V, N, omega_v = calc_binom_params(supervars)
-  llh = _calc_llh_phi(phi, V, N, omega_v)
-  return ([adjm], [phi], [llh])
+  phis = []
+  llhs = []
+
+  for adjm in adjms:
+    phi, eta = phi_fitter.fit_phis(adjm, superclusters, supervars, method=phi_method, iterations=phi_iterations, parallel=parallel)
+    llh = _calc_llh_phi(phi, V, N, omega_v)
+    phis.append(phi)
+    llhs.append(llh)
+  return (np.array(adjms), np.array(phis), np.array(llhs))
 
 def choose_best_tree(adj, llh):
   best_llh = -np.inf

@@ -96,7 +96,7 @@ def main():
   superclusters.insert(0, [])
 
   if 'adjm' not in results:
-    if 'structure' not in params:
+    if 'structures' not in params:
       results['adjm'], results['phi'], results['llh'] = tree_sampler.sample_trees(
         results['clustrel_posterior'],
         supervars,
@@ -112,10 +112,10 @@ def main():
       )
       resultserializer.save(results, args.results_fn)
     else:
-      adjlist = inputparser.load_structure(params['structure'])
-      adjm = common.convert_adjlist_to_adjmatrix(adjlist)
-      results['adjm'], results['phi'], results['llh'] = tree_sampler.use_existing_structure(
-        adjm,
+      adjls = [inputparser.load_structure(struct) for struct in params['structures']]
+      adjms = [common.convert_adjlist_to_adjmatrix(adjl) for adjl in adjls]
+      results['adjm'], results['phi'], results['llh'] = tree_sampler.use_existing_structures(
+        adjms,
         supervars,
         superclusters,
         args.phi_fitter,
