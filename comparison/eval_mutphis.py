@@ -63,11 +63,18 @@ def compare(mutphis):
   print(*names, sep=',')
   print(*[scores[name] for name in names], sep=',')
 
-def check_complete(mutphis, clustered):
-  for name, mphi in mutphis.items():
-    if mphi is None:
+def check_incomplete(mutphis, clustered):
+  names = list(mutphis.keys())
+  for name in names:
+    if mutphis[name] is None:
       continue
-    assert set(mphi.vids) == clustered
+    vids = set(mutphis[name].vids)
+    assert vids.issubset(clustered)
+    if vids != clustered:
+      missing = clustered - vids
+      msg = '%s lacks fraction=%s variants (%s)' % (name, len(missing) / len(clustered), missing)
+      mutphis[name] = None
+      raise Exception(msg)
 
 def remove_garbage(mutphis, garbage):
   # Remove garbage if present. Some mutphis have it (e.g., PWGS run on all
@@ -100,7 +107,7 @@ def main():
 
   mutphis = load_mutphis(args.mutphis)
   mutphis = remove_garbage(mutphis, params['garbage'])
-  check_complete(mutphis, clustered)
+  check_incomplete(mutphis, clustered)
   compare(mutphis)
 
 if __name__ == '__main__':
