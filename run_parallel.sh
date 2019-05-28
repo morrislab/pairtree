@@ -15,4 +15,4 @@ module load gnu-parallel
 # DIRECTORY TO RUN - $SLURM_SUBMIT_DIR is the directory from which the job was submitted
 cd $SLURM_SUBMIT_DIR
 HOSTS=$(scontrol show hostnames $SLURM_NODELIST | tr '\n' ,)
-cat $jobsfn | parallel --halt 1 --joblog $logfn -j $SLURM_NTASKS_PER_NODE -S $HOSTS --wd $PWD
+cat $jobsfn | parallel --halt 1 --resume --joblog $logfn -j $SLURM_NTASKS_PER_NODE -S $HOSTS --wd $PWD
