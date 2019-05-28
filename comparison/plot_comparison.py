@@ -328,7 +328,8 @@ def run():
   np.set_printoptions(linewidth=400, precision=3, threshold=sys.maxsize, suppress=True)
   np.seterr(all='raise')#divide='raise', invalid='raise')
 
-  results = load_results('mutrel', 'mutphi')
+  result_types = [K.rsplit('_', 1)[0].lower() for K in os.environ.keys() if K.endswith('_RESULTS')]
+  results = load_results(*result_types)
   assert len(results) > 0
 
   for K in results:
