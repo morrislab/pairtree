@@ -6,17 +6,18 @@ BASEDIR=~/work/pairtree
 JOBDIR=/tmp
 PWGS_PATH=~/.apps/phylowgs
 PARALLEL=40
+NUM_CHAINS=40
 
-#BATCH=sims.pwgs.supervars
-#INDIR=$BASEDIR/scratch/inputs/$BATCH
-#OUTBASE=$BASEDIR/scratch/results/$BATCH
-#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+BATCH=sims.pwgs.supervars
+INDIR=$BASEDIR/scratch/inputs/sims.pwgs.supervars
+OUTBASE=$BASEDIR/scratch/results/$BATCH
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
 
 #BATCH=steph.pwgs.supervars
-BATCH=steph.pwgs.allvars
-INDIR=$BASEDIR/scratch/inputs/$BATCH
-OUTBASE=$BASEDIR/scratch/results/$BATCH
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+#BATCH=steph.pwgs.allvars
+#INDIR=$BASEDIR/scratch/inputs/$BATCH
+#OUTBASE=$BASEDIR/scratch/results/$BATCH
+#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 
 function convert_inputs {
   mkdir -p $INDIR
@@ -58,13 +59,14 @@ function run_pwgs {
         "module load gsl &&" \
         "mkdir -p $OUTDIR &&" \
         "cd $OUTDIR && " \
-        "python2 $PWGS_PATH/multievolve.py" \
-        "--num-chains $PARALLEL" \
+        "TIMEFORMAT='%R %U %S' && " \
+        "time (OMP_NUM_THREADS=1 python2 $PWGS_PATH/multievolve.py" \
+        "--num-chains $NUM_CHAINS" \
         "--ssms $INDIR/${runid}.ssm" \
         "--cnvs $INDIR/empty.cnv" \
         "--params $INDIR/${runid}.params.json" \
         ">$runid.stdout" \
-        "2>$runid.stderr"
+        "2>$runid.stderr) 2>$runid.time"
     ) #> $jobfn
     #sbatch $jobfn
     rm $jobfn
@@ -78,7 +80,7 @@ function convert_outputs {
   for runid in *; do
     OUTDIR=$OUTBASE/$runid
     multichain_treefn=$OUTDIR/chains/trees.zip
-    [[ -f $multichain_treefn ]] || continue
+    [[ -f $multichain_treefn ]] && continue
 
     if [ "$USE_MULTICHAIN" = true ]; then
       json_base=$runid.multichain
@@ -100,13 +102,15 @@ function convert_outputs {
     cmd+="$OUTDIR/$json_base.{summ.json.gz,muts.json.gz,mutass.zip} "
     cmd+=">  $OUTDIR/$runid.results.stdout "
     cmd+="2> $OUTDIR/$runid.results.stderr "
-    for tree_weights in uniform llh; do
-      cmd+="&& python3 $BASEDIR/comparison/pwgs/make_mutrel_and_mutphi.py "
+    for tree_weights in llh; do
+      cmd+="&& OMP_NUM_THREADS=1 python3 $BASEDIR/comparison/pwgs/make_mutrel_and_mutphi.py "
       if [[ $OUTDIR =~ supervars ]]; then
         cmd+="--use-supervars "
       fi
       cmd+="--weight-trees-by $tree_weights "
-      cmd+="--trees-mutrel $OUTDIR/${results_base}_${tree_weights}.mutrel.npz "
+      if ! [[ $runid =~ K30 || $runid =~ K100 ]]; then
+        cmd+="--trees-mutrel $OUTDIR/${results_base}_${tree_weights}.mutrel.npz "
+      fi
       cmd+="--phi $OUTDIR/${results_base}_${tree_weights}.mutphi.npz "
       cmd+="--pairtree-params $PAIRTREE_INPUTS_DIR/$runid.params.json "
       cmd+="--pairtree-ssms $PAIRTREE_INPUTS_DIR/$runid.ssm "
@@ -115,13 +119,13 @@ function convert_outputs {
       cmd+="2>> $OUTDIR/$runid.results.stderr"
     done
     echo $cmd
-  done #| parallel -j$PARALLEL --halt 1
+  done
 }
 
 function main {
   #convert_inputs
   #run_pwgs
-  convert_outputs true
+  #convert_outputs true
   convert_outputs false
 }
 

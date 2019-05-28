@@ -27,7 +27,7 @@ def extract_phi(pops):
   phi = [pops[C]['cellular_prevalence'] for C in sorted(pops.keys())]
   return np.array(phi)
 
-def calc_mutrel_and_mutphi(results, base_clusters, weight_trees_by, use_supervars, pairtree_ssm_fn):
+def convert_results(results, base_clusters, use_supervars):
   tidxs = sorted(results.tree_summary.keys())
   llhs = np.array([results.tree_summary[tidx]['llh'] for tidx in tidxs])
   adjms = []
@@ -48,10 +48,7 @@ def calc_mutrel_and_mutphi(results, base_clusters, weight_trees_by, use_supervar
     phis.append(phi)
     clusterings.append(pwgs_clusters)
 
-  return (
-    evalutil.calc_mutrel_from_trees(adjms, llhs, clusterings, weight_trees_by),
-    mutphi.calc_mutphi(phis, llhs, clusterings, weight_trees_by, pairtree_ssm_fn),
-  )
+  return (adjms, llhs, phis, clusterings)
 
 def main():
   parser = argparse.ArgumentParser(
@@ -82,13 +79,16 @@ def main():
   else:
     base_clusters = None
 
-  mrel, mphi = calc_mutrel_and_mutphi(results, base_clusters, args.weight_trees_by, args.use_supervars, args.pairtree_ssm_fn)
-  if args.use_supervars:
-    mrel = evalutil.add_garbage(mrel, params['garbage'])
+  adjms, llhs, phis, clusterings = convert_results(results, base_clusters, args.use_supervars)
 
   if args.trees_mutrel is not None:
+    mrel = evalutil.calc_mutrel_from_trees(adjms, llhs, clusterings, args.weight_trees_by)
+    if args.use_supervars:
+      mrel = evalutil.add_garbage(mrel, params['garbage'])
     evalutil.save_sorted_mutrel(mrel, args.trees_mutrel)
+
   if args.mutphifn is not None:
+    mphi = mutphi.calc_mutphi(phis, llhs, clusterings, args.weight_trees_by, args.pairtree_ssm_fn)
     mutphi.write_mutphi(mphi, args.mutphifn)
 
 if __name__ == '__main__':
