@@ -12,7 +12,6 @@ function make_sims_truth {
 
   for datafn in $PAIRTREE_INPUTS_DIR/*.data.pickle; do
     runid=$(basename $datafn | cut -d. -f1)
-    [[ $BATCH == sims && ($runid =~ K30 || $runid =~ K100) ]] && continue
 
     cmd="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_truth_mutrel.py "
     if [[ $BATCH == "sims" && !($runid =~ K30 || $runid =~ K100) ]]; then
@@ -35,7 +34,7 @@ function make_mle_mutphis {
 
   for ssmfn in $PAIRTREE_INPUTS_DIR/*.ssm; do
     runid=$(basename $ssmfn | cut -d. -f1)
-    [[ $runid =~ K30 || $runid =~ K100 ]] && continue
+    [[ $runid =~ K30 || $runid =~ K100 ]] || continue
 
     echo "python3 $SCRIPTDIR/make_mle_mutphis.py" \
       "$ssmfn" \
@@ -70,20 +69,12 @@ function make_results_paths {
     paths+="pwgs_supervars_multi_llh=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_llh.$result_type.npz "
   elif [[ $BATCH == sims ]]; then
     paths+="truth=${TRUTH_DIR}/$runid.$result_type.npz "
-    paths+="pairtree_trees_llh=${BATCH}.pairtree.fixedclusters/${runid}.pairtree_trees.all.llh.$result_type.npz "
-    paths+="pairtree_trees_uniform=${BATCH}.pairtree.fixedclusters/${runid}.pairtree_trees.all.uniform.$result_type.npz "
-    paths+="singlepairtree_trees_llh=${BATCH}.pairtree.fixedclusters/${runid}.pairtree_trees.subset.llh.$result_type.npz "
-    paths+="singlepairtree_trees_uniform=${BATCH}.pairtree.fixedclusters/${runid}.pairtree_trees.subset.uniform.$result_type.npz "
-    paths+="pairtree_clustrel=${BATCH}.pairtree.fixedclusters/$runid.pairtree_clustrel.$result_type.npz "
-    paths+="pwgs_supervars_single_llh=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
-    paths+="pwgs_supervars_single_uniform=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_single_uniform.$result_type.npz "
-    paths+="pwgs_supervars_multi_llh=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_llh.$result_type.npz "
-    paths+="pwgs_supervars_multi_uniform=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_uniform.$result_type.npz "
-    paths+="pastri_trees_llh=${BATCH}.pastri.informative/$runid/$runid.pastri_trees_llh.$result_type.npz "
-    paths+="pastri_trees_uniform=${BATCH}.pastri.informative/$runid/$runid.pastri_trees_uniform.$result_type.npz "
-
-    paths+="pairtree_graddesc_llh=${BATCH}.pairtree.binomllh.graddesc/${runid}.pairtree_trees.all.llh.$result_type.npz "
-    paths+="pairtree_projection_llh=${BATCH}.pairtree.binomllh.projection/${runid}.pairtree_trees.all.llh.$result_type.npz "
+    paths+="pwgs_supervars_single_llh=sims.pwgs.supervars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
+    paths+="pastri_llh=${BATCH}.pastri.informative/$runid/$runid.pastri_trees_llh.$result_type.npz "
+    paths+="pairtree_proj_single_llh=sims.pairtree.projection.singlechain/${runid}.pairtree_trees.all.llh.$result_type.npz "
+    paths+="pairtree_proj_multi_llh=sims.pairtree.projection.multichain/${runid}.pairtree_trees.all.llh.$result_type.npz "
+    paths+="pairtree_clustrel=sims.pairtree.onlytensor/$runid.pairtree_clustrel.$result_type.npz "
+    paths+="lichee_llh=sims.lichee/$runid.llh.$result_type.npz "
   fi
 
   echo $paths
@@ -116,7 +107,7 @@ function eval_mutphis {
   cd $RESULTSDIR
   mkdir -p $SCORESDIR/$BATCH
 
-  for mutphifn in $(ls $MLE_MUTPHIS_DIR/*.mutphi.npz | sort --random-sort); do
+  for mutphifn in $(ls $TRUTH_DIR/*.mutphi.npz | sort --random-sort); do
     runid=$(basename $mutphifn | cut -d. -f1)
     mutphis=$(make_results_paths $runid mutphi)
 
@@ -155,26 +146,65 @@ function compile_scores {
   #cat $outfn | curl -F c=@- https://ptpb.pw >&2
 }
 
+function partition_by_K {
+  threshold=10
+
+  for ptype in mutphi mutrel; do
+    srcfn=$SCORESDIR/$BATCH.$ptype.txt
+    dstfn_bigK=$SCORESDIR/$BATCH.$ptype.bigK.txt
+    dstfn_smallK=$SCORESDIR/$BATCH.$ptype.smallK.txt
+
+    header=$(head -n1 $srcfn)
+    for dstfn in $dstfn_bigK $dstfn_smallK; do
+      echo $header > $dstfn
+    done
+
+    tail -n+2 $srcfn | while read line; do
+      runid=$(echo $line | cut -d, -f1)
+      K=$(echo $runid | egrep --only-matching 'K[[:digit:]]+' | cut -c2-)
+      if [[ $K -le $threshold ]]; then
+        dstfn=$dstfn_smallK
+      else
+        dstfn=$dstfn_bigK
+      fi
+      echo $line >> $dstfn
+    done
+  done
+}
+
 function plot_individual {
   cd $SCORESDIR
   for ptype in mutphi mutrel; do
-    cmd="python3 $SCRIPTDIR/plot_individual.py "
-    cmd+="--template plotly_white "
-    cmd+="--plot-type $ptype "
-    cmd+="--hide-method truth "
-    cmd+="--hide-method mle_unconstrained "
-    cmd+="--hide-method pairtree_handbuilt "
-    cmd+="--hide-method pairtree_clustrel "
-    if [[ $ptype == "mutphi" && $BATCH == "sims" ]]; then
-      cmd+="--baseline truth "
-    fi
-    if [[ $ptype == "mutphi" && $BATCH == "steph" ]]; then
-      cmd+="--baseline pairtree_handbuilt "
-    fi
-    cmd+="$( [[ $BATCH == sims ]] && echo --partition-by-samples) "
-    cmd+="$SCORESDIR/$BATCH.$ptype.txt "
-    cmd+="$SCORESDIR/$BATCH.$ptype.html"
-    echo $cmd
+    for ktype in bigK smallK; do
+      basefn="$SCORESDIR/$BATCH.$ptype.$ktype"
+      infn=$basefn.txt
+      outfn=$basefn.html
+
+      if [[ $(cat $infn | wc -l) -le 1 ]]; then
+        # Since we don't generate mutrel for bigK, it will be an empty file
+        # with just the header.
+        continue
+      fi
+
+      cmd="python3 $SCRIPTDIR/plot_individual.py "
+      cmd+="--template plotly_white "
+      cmd+="--score-type $ptype "
+      if [[ $ptype == "mutrel" ]]; then
+        cmd+="--plot-type violin "
+      fi
+      cmd+="--score-type $ptype "
+      cmd+="--S-threshold 10 "
+      cmd+="--bandwidth 1 "
+      if [[ $ptype == "mutphi" && $BATCH == "sims" ]]; then
+        cmd+="--baseline truth "
+      fi
+      if [[ $ptype == "mutphi" && $BATCH == "steph" ]]; then
+        cmd+="--baseline pairtree_handbuilt "
+      fi
+      cmd+="$( [[ $BATCH == sims ]] && echo --partition-by-samples) "
+      cmd+="$infn $outfn "
+      echo $cmd
+    done
   done
 }
 
@@ -183,9 +213,10 @@ function run_batch {
   #[[ $BATCH == "sims" ]] && make_sims_truth
   #make_mle_mutphis
 
-  (eval_mutrels; eval_mutphis) | parallel -j$PARALLEL --halt 1
+  (eval_mutrels; eval_mutphis) | parallel -j$PARALLEL --halt 1 2>$SCRATCH/tmp/eval.log
   compile_scores mutrel
   compile_scores mutphi
+  partition_by_K
   plot_individual | parallel -j$PARALLEL --halt 1
 }
 
