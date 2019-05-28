@@ -7,10 +7,10 @@ PARALLEL=40
 NUM_ITERS=10000
 PASTRI_DIR=$HOME/.apps/pastri
 
-#BATCH=sims.pastri.informative
-#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
-BATCH=steph.xeno.pastri.hbclusters
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+BATCH=sims.pastri.informative
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+#BATCH=steph.xeno.pastri.hbclusters
+#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 
 INDIR=$BASEDIR/scratch/inputs/$BATCH
 OUTDIR=$BASEDIR/scratch/results/$BATCH
@@ -34,9 +34,10 @@ function run_pastri {
   source $HOME/.bash_host_specific
   for countsfn in $INDIR/*.counts; do
     runid=$(basename $countsfn | cut -d. -f1)
+
     jobname="pastri_${runid}"
     outpath=$OUTDIR/$runid
-    mkdir -p $output
+    mkdir -p $outpath
 
     [[ -f $OUTDIR/$runid.trees ]] && continue
 
@@ -44,13 +45,14 @@ function run_pastri {
       # Must source ~/.bash_host_specific to get PATH set properly for
       # Miniconda.
       echo "cd $outpath && " \
+        "TIMEFORMAT='%R %U %S'; time (OMP_NUM_THREADS=1 " \
         "python2 $PASTRI_DIR/src/RunPASTRI.py" \
         "--output_prefix $runid" \
         "--num_iters $NUM_ITERS" \
         "$INDIR/${runid}.counts" \
         "$INDIR/${runid}.proposal" \
         ">$runid.stdout" \
-        "2>$runid.stderr"
+        "2>$runid.stderr) 2>$runid.time"
     ) 
   done #| parallel -j$PARALLEL --joblog $SCRATCH/tmp/$BATCH.log
 }
@@ -104,13 +106,13 @@ function convert_outputs {
         #"> $outpath/${runid}.mutphi_output_conversion.stdout" \
         #"2>$outpath/${runid}.mutphi_output_conversion.stderr"
     done
-  done #| parallel -j$PARALLEL
+  done | parallel -j$PARALLEL
 }
 
 function main {
   #convert_inputs
   #run_pastri
-  get_F_and_C
+  #get_F_and_C
   convert_outputs
 }
 
