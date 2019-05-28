@@ -12,6 +12,8 @@ PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
 INDIR=$BASEDIR/scratch/inputs/$BATCH
 OUTDIR=$BASEDIR/scratch/results/$BATCH
 
+export OMP_NUM_THREADS=1
+
 function convert_inputs {
   mkdir -p $INDIR
 
@@ -31,6 +33,7 @@ function run_lichee {
 
   for snvfn in $INDIR/*.snv; do
     runid=$(basename $snvfn | cut -d. -f1)
+
     echo "module load java && " \
       "cd $OUTDIR &&" \
       "TIMEFORMAT='%R %U %S'; time (java -jar $LICHEE_DIR/lichee.jar" \
@@ -51,11 +54,20 @@ function convert_outputs {
   cd $OUTDIR
   for treesfn in $OUTDIR/*.trees; do
     runid=$(basename $treesfn | cut -d. -f1)
+    for weight_trees_by in llh; do
+      cmd="python3 $SCRIPTDIR/convert_outputs.py "
+      cmd+="--weight-trees-by $weight_trees_by "
+      cmd+="--mutrel $OUTDIR/$runid.$weight_trees_by.mutrel.npz "
+      cmd+="$OUTDIR/$runid.trees "
+      cmd+="$PAIRTREE_INPUTS_DIR/$runid.params.json "
+
+      # Only output mutrels for `K <= 10`.
+      if ! [[ $runid =~ K30 || $runid =~ K100 ]]; then
+        echo $cmd
+      fi
+    done
+
     cmd="python3 $SCRIPTDIR/convert_outputs.py "
-    cmd+="--weight-trees-by llh "
-    if ! [[ $runid =~ K30 || $runid =~ K100 ]]; then
-      cmd+="--mutrel $OUTDIR/$runid.mutrel.npz "
-    fi
     cmd+="--structures $OUTDIR/$runid.params.json "
     cmd+="$OUTDIR/$runid.trees "
     cmd+="$PAIRTREE_INPUTS_DIR/$runid.params.json "
@@ -63,10 +75,61 @@ function convert_outputs {
   done
 }
 
+function compute_phis {
+  cd $OUTDIR
+  for structfn in $OUTDIR/*.params.json; do
+    runid=$(basename $structfn | cut -d. -f1)
+    resultsfn=$OUTDIR/$runid.results.npz
+
+    cmd="LD_LIBRARY_PATH=$HOME/tmp/jose/bin:$LD_LIBRARY_PATH "
+    cmd+="python3 $BASEDIR/basic.py "
+    cmd+="--seed 1 "
+    cmd+="--phi-fitter projection "
+    cmd+="--parallel 0 "
+    cmd+="--params $structfn "
+    cmd+="$PAIRTREE_INPUTS_DIR/$runid.ssm "
+    cmd+="$resultsfn "
+
+    cmd+="&& python3 $SCRIPTDIR/replace_llh.py "
+    cmd+="$structfn "
+    cmd+="$resultsfn "
+
+    echo $cmd
+  done
+}
+
+function compute_mutphis {
+  cd $OUTDIR
+
+  for resultsfn in $OUTDIR/*.results.npz; do
+    runid=$(basename $resultsfn | cut -d. -f1)
+    ssmfn=${PAIRTREE_INPUTS_DIR}/${runid}.ssm 
+
+    for weight_trees_by in llh; do
+      mutphifn=$OUTDIR/$runid.$weight_trees_by.mutphi.npz
+
+      cmd="python3 $BASEDIR/comparison/pairtree/make_mutphis.py "
+      cmd+="--weight-trees-by $weight_trees_by "
+      cmd+="--ssms $ssmfn "
+      cmd+="$resultsfn "
+      cmd+="$mutphifn "
+
+      cmd+="&& python3 $BASEDIR/comparison/impute_missing_mutphis.py "
+      cmd+="$ssmfn "
+      cmd+="$PAIRTREE_INPUTS_DIR/${runid}.params.json "
+      cmd+="$mutphifn "
+
+      echo $cmd
+    done
+  done
+}
+
 function main {
   #convert_inputs
   #run_lichee
-  convert_outputs
+  #convert_outputs
+  #compute_phis
+  compute_mutphis
 }
 
 main

@@ -118,11 +118,12 @@ def find_garbage(lichee_clusters, true_clusters):
   garbage = true_clustered - lichee_clustered
   return common.sort_vids(garbage)
 
-def write_params(clusters, garbage, adjls, sampnames, params_fn):
+def write_params(clusters, garbage, adjls, sampnames, scores, params_fn):
   params = {
     'clusters': clusters,
     'garbage': garbage,
     'structures': adjls,
+    'scores': scores,
     'samples': sampnames,
   }
   with open(params_fn, 'w') as F:
@@ -154,6 +155,7 @@ def main():
       true_garbage + lichee_garbage,
       adjls,
       params['samples'],
+      scores,
       args.struct_fn,
     )
 
