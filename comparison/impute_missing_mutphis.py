@@ -21,29 +21,22 @@ def sort_mutphi(mphi):
   )
 
 def impute(ssmfn, params, mphi):
-  _, S = mphi.logprobs.shape
-  
   clustered = set([V for C in params['clusters'] for V in C])
   mphi_vids = set(mphi.vids)
   missing = list(clustered - mphi_vids)
   if len(missing) == 0:
     sys.exit()
 
-  # Incorrectly declaring a mutation as garbage is tantamount to not putting it
-  # in the tree, meaning it should get a phi of zero.
-  missing_phi = np.zeros((1, S))
-  missing_mutphi = mutphi.calc_mutphi(
-    [missing_phi],
-    llhs = [0],
-    clusterings = [[missing]],
-    weight_trees_by = 'llh',
-    ssmsfn = ssmfn,
-  )
+  variants = inputparser.load_ssms(ssmfn)
+  missing_reads = np.array([variants[V]['total_reads'] for V in missing]).astype(np.float)
+  assert np.all(missing_reads >= 1)
+  # Assign uniform probability based on total read count.
+  missing_logprobs = np.log(1 / missing_reads)
 
   combined = mutphi.Mutphi(
-    vids = list(mphi.vids) + list(missing),
+    vids = list(mphi.vids) + missing,
     assays = mphi.assays,
-    logprobs = np.vstack((mphi.logprobs, missing_mutphi.logprobs)),
+    logprobs = np.vstack((mphi.logprobs, missing_logprobs)),
   )
   return combined
 
