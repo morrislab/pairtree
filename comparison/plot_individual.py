@@ -310,7 +310,7 @@ def main():
         raise Exception('Unknown plot type %s' % args.plot_type)
 
       score_traces.append(score_trace)
-      completion_traces.append(make_bar_trace(methods, complete, total, name=group))
+      completion_traces.append(make_bar_trace(methods, complete, total, name=names[group]))
   #else:
   #  parted = partition(results, methods, key=None)
 
