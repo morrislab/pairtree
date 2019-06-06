@@ -9,6 +9,7 @@ import inputparser
 
 def write_snvs(variants, sampnames, garbage, snv_fn, normal_vaf=0.0):
   sampnames = ['Normal'] + sampnames
+  snv_indices = {}
 
   with open(snv_fn, 'w') as F:
     print('#chr', 'position', 'description', *sampnames, sep='\t', file=F)
@@ -21,13 +22,16 @@ def write_snvs(variants, sampnames, garbage, snv_fn, normal_vaf=0.0):
       vaf = (variants[vid]['var_reads'] / variants[vid]['total_reads']).tolist()
       vaf = [normal_vaf] + vaf
       print('1', idx, vid, *vaf, sep='\t', file=F)
+      snv_indices[vid] = idx
       idx += 1
+
+  return snv_indices
 
 def extract_mat(variants, key):
   mat = np.array([V[key] for V in variants])
   return mat
 
-def write_clusters(variants, clusters, cluster_fn, normal_vaf=0.0):
+def write_clusters(variants, clusters, snv_indices, cluster_fn, normal_vaf=0.0):
   rows = []
   for cluster in clusters:
     cvars = [variants[V] for V in cluster]
@@ -37,7 +41,7 @@ def write_clusters(variants, clusters, cluster_fn, normal_vaf=0.0):
     cvaf = [normal_vaf] + cvaf
 
     sampmask = '0' + (len(cvaf) - 1)*'1'
-    snv_idxs = [str(int(V[1:]) + 1) for V in common.sort_vids(cluster)]
+    snv_idxs = [str(snv_indices[V]) for V in common.sort_vids(cluster)]
 
     rows.append([sampmask] + cvaf + [','.join(snv_idxs)])
 
@@ -63,8 +67,8 @@ def main():
   clusters = params['clusters']
   garbage = set(params['garbage'])
 
-  write_snvs(variants, sampnames, garbage, args.lichee_snv_fn)
-  write_clusters(variants, clusters, args.lichee_cluster_fn)
+  snv_indices = write_snvs(variants, sampnames, garbage, args.lichee_snv_fn)
+  write_clusters(variants, clusters, snv_indices, args.lichee_cluster_fn)
 
 if __name__ == '__main__':
   main()

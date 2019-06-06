@@ -6,8 +6,10 @@ SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 LICHEE_DIR=$HOME/.apps/lichee/LICHeE/release
 NUM_TREES=3000
 
-BATCH=sims.lichee
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+#BATCH=sims.lichee
+#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+BATCH=steph.xeno.lichee
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 
 INDIR=$BASEDIR/scratch/inputs/$BATCH
 OUTDIR=$BASEDIR/scratch/results/$BATCH
@@ -34,7 +36,7 @@ function run_lichee {
   for snvfn in $INDIR/*.snv; do
     runid=$(basename $snvfn | cut -d. -f1)
 
-    echo "module load java && " \
+    echo "(command -v java > /dev/null || module load java) && " \
       "cd $OUTDIR &&" \
       "TIMEFORMAT='%R %U %S'; time (java -jar $LICHEE_DIR/lichee.jar" \
       "-build" \
@@ -58,6 +60,7 @@ function convert_outputs {
       cmd="python3 $SCRIPTDIR/convert_outputs.py "
       cmd+="--weight-trees-by $weight_trees_by "
       cmd+="--mutrel $OUTDIR/$runid.$weight_trees_by.mutrel.npz "
+      cmd+="$INDIR/$runid.snv "
       cmd+="$OUTDIR/$runid.trees "
       cmd+="$PAIRTREE_INPUTS_DIR/$runid.params.json "
 
@@ -69,6 +72,7 @@ function convert_outputs {
 
     cmd="python3 $SCRIPTDIR/convert_outputs.py "
     cmd+="--structures $OUTDIR/$runid.params.json "
+    cmd+="$INDIR/$runid.snv "
     cmd+="$OUTDIR/$runid.trees "
     cmd+="$PAIRTREE_INPUTS_DIR/$runid.params.json "
     echo $cmd

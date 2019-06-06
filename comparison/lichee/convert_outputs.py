@@ -21,7 +21,7 @@ def write_mutrels(adjls, scores, clusters, lichee_garbage, true_garbage, weight_
   mrel = evalutil.add_garbage(mrel, true_garbage)
   evalutil.save_sorted_mutrel(mrel, mutrel_fn)
 
-def _parse_node(line):
+def _parse_node(line, snv_indices):
   tokens = line.split('\t')
   nidx, vaf_mask, vaf_present = tokens[:3]
   nidx = int(nidx)
@@ -44,7 +44,8 @@ def _parse_node(line):
   cluster = []
   for mut in muts:
     assert mut.startswith('snv')
-    cluster.append('s%s' % (int(mut[3:]) - 1))
+    snvidx = int(mut[3:])
+    cluster.append(snv_indices[snvidx])
 
   return (nidx, vaf, cluster)
 
@@ -79,14 +80,14 @@ def _parse_tree(F):
 
   return (tidx, adjl, score)
 
-def _parse_nodes(F):
+def _parse_nodes(F, snv_indices):
   assert next(F).strip() == 'Nodes:'
   nodes = []
   for line in F:
     line = line.strip()
     if line == '':
       break
-    nodes.append(_parse_node(line))
+    nodes.append(_parse_node(line, snv_indices))
   else:
     raise Exception('Premature EOF')
   return nodes
@@ -99,9 +100,9 @@ def _parse_trees(F):
       return trees
     trees.append(tree)
 
-def load_results(results_fn):
+def load_results(results_fn, snv_indices):
   with open(results_fn) as F:
-    nodes = _parse_nodes(F)
+    nodes = _parse_nodes(F, snv_indices)
     trees = _parse_trees(F)
 
   nidxs, vafs, clusters = zip(*nodes)
@@ -129,6 +130,17 @@ def write_params(clusters, garbage, adjls, sampnames, scores, params_fn):
   with open(params_fn, 'w') as F:
     json.dump(params, F)
 
+def parse_snv_indices(snvfn):
+  snv_indices = {}
+  with open(snvfn) as F:
+    header = next(F)
+    for idx, line in enumerate(F):
+      tokens = line.split()
+      # `desc` is the VID.
+      chrom, pos, desc = tokens[:3]
+      snv_indices[idx + 1] = desc
+  return snv_indices
+
 def main():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
@@ -137,11 +149,13 @@ def main():
   parser.add_argument('--weight-trees-by', choices=('llh', 'uniform'), default='uniform')
   parser.add_argument('--mutrel', dest='mutrel_fn')
   parser.add_argument('--structures', dest='struct_fn')
+  parser.add_argument('lichee_snv_fn')
   parser.add_argument('trees_fn')
   parser.add_argument('pairtree_params_fn')
   args = parser.parse_args()
 
-  clusters, adjls, scores = load_results(args.trees_fn)
+  snv_indices = parse_snv_indices(args.lichee_snv_fn)
+  clusters, adjls, scores = load_results(args.trees_fn, snv_indices)
   params = inputparser.load_params(args.pairtree_params_fn)
   true_clusters = params['clusters']
   true_garbage = params['garbage']
