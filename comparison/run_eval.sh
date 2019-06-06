@@ -7,6 +7,10 @@ RESULTSDIR=$BASEDIR/scratch/results
 SCORESDIR=$BASEDIR/scratch/scores
 PARALLEL=40
 
+function para {
+  parallel -j$PARALLEL --halt 1
+}
+
 function make_sims_truth {
   mkdir -p $TRUTH_DIR
 
@@ -146,65 +150,102 @@ function compile_scores {
   #cat $outfn | curl -F c=@- https://ptpb.pw >&2
 }
 
-function partition_by_K {
-  threshold=10
+function eval_runtime {
+  for datafn in $PAIRTREE_INPUTS_DIR/*.data.pickle; do
+    runid=$(basename $datafn | cut -d. -f1)
 
-  for ptype in mutphi mutrel; do
-    srcfn=$SCORESDIR/$BATCH.$ptype.txt
-    dstfn_bigK=$SCORESDIR/$BATCH.$ptype.bigK.txt
-    dstfn_smallK=$SCORESDIR/$BATCH.$ptype.smallK.txt
-
-    header=$(head -n1 $srcfn)
-    for dstfn in $dstfn_bigK $dstfn_smallK; do
-      echo $header > $dstfn
-    done
-
-    tail -n+2 $srcfn | while read line; do
-      runid=$(echo $line | cut -d, -f1)
-      K=$(echo $runid | egrep --only-matching 'K[[:digit:]]+' | cut -c2-)
-      if [[ $K -le $threshold ]]; then
-        dstfn=$dstfn_smallK
-      else
-        dstfn=$dstfn_bigK
-      fi
-      echo $line >> $dstfn
+    for timetype in cpu wall; do
+      cmd="python3 $SCRIPTDIR/eval_runtime.py "
+      cmd+="--time-type $timetype "
+      cmd+="lichee=$RESULTSDIR/sims.lichee/$runid.time "
+      cmd+="pairtree_tensor=$RESULTSDIR/sims.pairtree.onlytensor/$runid.time "
+      cmd+="pairtree_single=$RESULTSDIR/sims.pairtree.projection.singlechain/$runid.time "
+      cmd+="pairtree_multi=$RESULTSDIR/sims.pairtree.projection.multichain/$runid.time "
+      cmd+="pastri=$RESULTSDIR/sims.pastri.informative.complete/$runid/$runid.time "
+      cmd+="pwgs=$RESULTSDIR/sims.pwgs.supervars/$runid/$runid.time "
+      cmd+="> $SCORESDIR/$BATCH/$runid.${timetype}time.txt "
+      echo $cmd
     done
   done
 }
 
+function compile_runtime {
+  for timetype in cpu wall; do
+    outfn=$SCORESDIR/$BATCH.${timetype}time.txt
+    methods=$(head -n1 $(ls $SCORESDIR/$BATCH/*.${timetype}time.txt | head -n1))
+    (
+      echo 'runid,'$methods
+      for foo in $SCORESDIR/$BATCH/*.${timetype}time.txt; do
+        if [[ $(head -n1 $foo) != $methods ]]; then
+          echo "Methods in $foo don't match expected $methods" >&2
+          exit 1
+        fi
+        runid=$(basename $foo | cut -d. -f1)
+        echo $runid,$(tail -n+2 $foo)
+      done
+    ) > $outfn
+  done
+}
+
+function partition_by_K {
+  ptype=$1
+  threshold=10
+
+  srcfn=$SCORESDIR/$BATCH.$ptype.txt
+  dstfn_bigK=$SCORESDIR/$BATCH.$ptype.bigK.txt
+  dstfn_smallK=$SCORESDIR/$BATCH.$ptype.smallK.txt
+
+  header=$(head -n1 $srcfn)
+  for dstfn in $dstfn_bigK $dstfn_smallK; do
+    echo $header > $dstfn
+  done
+
+  tail -n+2 $srcfn | while read line; do
+    runid=$(echo $line | cut -d, -f1)
+    K=$(echo $runid | egrep --only-matching 'K[[:digit:]]+' | cut -c2-)
+    if [[ $K -le $threshold ]]; then
+      dstfn=$dstfn_smallK
+    else
+      dstfn=$dstfn_bigK
+    fi
+    echo $line >> $dstfn
+  done
+}
+
 function plot_individual {
+  ptype=$1
+  plot_type=$2
+
   cd $SCORESDIR
-  for ptype in mutphi mutrel; do
-    for ktype in bigK smallK; do
-      basefn="$SCORESDIR/$BATCH.$ptype.$ktype"
-      infn=$basefn.txt
-      outfn=$basefn.html
+  for ktype in bigK smallK; do
+    basefn="$SCORESDIR/$BATCH.$ptype.$ktype"
+    infn=$basefn.txt
+    outfn=$basefn.html
 
-      if [[ $(cat $infn | wc -l) -le 1 ]]; then
-        # Since we don't generate mutrel for bigK, it will be an empty file
-        # with just the header.
-        continue
-      fi
+    if [[ $(cat $infn | wc -l) -le 1 ]]; then
+      # Since we don't generate mutrel for bigK, it will be an empty file
+      # with just the header.
+      continue
+    fi
 
-      cmd="python3 $SCRIPTDIR/plot_individual.py "
-      cmd+="--template plotly_white "
-      cmd+="--score-type $ptype "
-      if [[ $ptype == "mutrel" ]]; then
-        cmd+="--plot-type violin "
-      fi
-      cmd+="--score-type $ptype "
-      cmd+="--S-threshold 10 "
-      cmd+="--bandwidth 1 "
-      if [[ $ptype == "mutphi" && $BATCH == "sims" ]]; then
-        cmd+="--baseline truth "
-      fi
-      if [[ $ptype == "mutphi" && $BATCH == "steph" ]]; then
-        cmd+="--baseline pairtree_handbuilt "
-      fi
-      cmd+="$( [[ $BATCH == sims ]] && echo --partition-by-samples) "
-      cmd+="$infn $outfn "
-      echo $cmd
-    done
+    cmd="python3 $SCRIPTDIR/plot_individual.py "
+    cmd+="--template plotly_white "
+    cmd+="--score-type $ptype "
+    cmd+="--plot-type $plot_type "
+    cmd+="--S-threshold 10 "
+    cmd+="--bandwidth 0.07 "
+    if [[ $ptype == "mutphi" && $BATCH == "sims" ]]; then
+      cmd+="--baseline truth "
+    fi
+    if [[ $ptype == "mutphi" && $BATCH == "steph" ]]; then
+      cmd+="--baseline pairtree_handbuilt "
+    fi
+    if [[ $ptype =~ time$ ]]; then
+      cmd+="--log-y-axis "
+    fi
+    cmd+="$( [[ $BATCH == sims ]] && echo --partition-by-samples) "
+    cmd+="$infn $outfn "
+    echo $cmd
   done
 }
 
@@ -213,11 +254,18 @@ function run_batch {
   #[[ $BATCH == "sims" ]] && make_sims_truth
   #make_mle_mutphis
 
-  (eval_mutrels; eval_mutphis) | parallel -j$PARALLEL --halt 1 2>$SCRATCH/tmp/eval.log
-  compile_scores mutrel
-  compile_scores mutphi
-  partition_by_K
-  plot_individual | parallel -j$PARALLEL --halt 1
+  #(eval_mutrels; eval_mutphis) | para 2>$SCRATCH/tmp/eval.log
+  #compile_scores mutrel
+  #compile_scores mutphi
+  #partition_by_K mutrel
+  #partition_by_K mutphi
+  #(plot_individual mutrel violin; plot_individual mutphi box) | para
+
+  #eval_runtime | para
+  #compile_runtime
+  #partition_by_K cputime
+  #partition_by_K walltime
+  (plot_individual cputime violin; plot_individual walltime violin) | para
 }
 
 function main {

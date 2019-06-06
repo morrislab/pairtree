@@ -8,7 +8,8 @@ import numpy as np
 import sys
 import os
 
-HAPPY_METHOD_NAMES = (
+MISSING = -1
+HAPPY_METHOD_NAMES = [
   ('truth', 'Truth'),
   ('pairtree_handbuilt', 'Pairtree (manually constructed trees)'),
   ('pairtree_proj_single_llh', 'Pairtree (single-chain)'),
@@ -21,14 +22,25 @@ HAPPY_METHOD_NAMES = (
   ('pwgs_allvars_single_llh', 'PhyloWGS (unclustered)'),
   ('pairtree_clustrel', 'Pairs tensor'),
   ('mle_unconstrained', 'MLE lineage frequencies'),
-)
-METHOD_ORDER = {M: idx for idx, (M, M_full) in enumerate(HAPPY_METHOD_NAMES)}
-HAPPY_METHOD_NAMES = {M: M_full for (M, M_full) in HAPPY_METHOD_NAMES}
-MISSING = -1
+]
 
 for name, synonym in (
+  ('pairtree_single', 'pairtree_proj_single_llh'),
+  ('pairtree_multi', 'pairtree_proj_multi_llh'),
+  ('pastri', 'pastri_llh'),
+  ('lichee', 'lichee_llh'),
+  ('pwgs', 'pwgs_supervars_single_llh'),
+  ('pairtree_tensor', 'pairtree_clustrel'),
 ):
-  HAPPY_METHOD_NAMES[name] = HAPPY_METHOD_NAMES[synonym]
+  for K, V in HAPPY_METHOD_NAMES:
+    if K == synonym:
+      HAPPY_METHOD_NAMES.append((name, V))
+      break
+  else:
+    raise Exception('No match for %s, which is aliased to %s' % (name, synonym))
+
+METHOD_ORDER = {M: idx for idx, (M, M_full) in enumerate(HAPPY_METHOD_NAMES)}
+HAPPY_METHOD_NAMES = {M: M_full for (M, M_full) in HAPPY_METHOD_NAMES}
 
 def augment(results, param_names):
   if len(param_names) < 1:
@@ -158,8 +170,29 @@ def make_box_trace(vals, group=None, name=None):
 
   return trace
 
-def make_fig(traces, template, ytitle, max_y=None, layout_options=None):
+def make_ticks(traces):
+  Y = np.array([val for T in traces for val in T['y']])
+  minY = np.floor(np.min(Y))
+  maxY = np.ceil(np.max(Y))
+  steps = maxY - minY
+  for N in range(4, int(steps) + 1):
+    if steps % N == 0:
+      break
+  else:
+    raise Exception('lol should not get here')
+  tickvals = np.linspace(minY, maxY, num=(N+1))
+  ticktext = 10**tickvals
+  return (tickvals, ticktext)
+
+def make_fig(traces, template, ytitle, max_y=None, layout_options=None, log_y_axis=False):
   yaxis = {'title': ytitle}
+
+  if log_y_axis:
+    for T in traces:
+      T['y'] = np.log10(T['y'])
+    yaxis['tickmode'] = 'array'
+    yaxis['tickvals'], yaxis['ticktext'] = make_ticks(traces)
+
   if max_y is not None:
     yaxis['range'] = (0, max_y)
   fig = {
@@ -244,6 +277,8 @@ def make_score_ytitle(score_type, plot_fn):
     else:
       ytitle = 'Frequency reconstruction error'
     ytitle += '<br>(Δbits / mutation / assay)'
+  elif score_type in ('cputime', 'walltime'):
+    ytitle = 'Runtime (seconds)'
   else:
     raise Exception('Unknown score type %s' % score_type)
   return ytitle
@@ -257,10 +292,11 @@ def main():
   parser.add_argument('--S-threshold', type=int)
   parser.add_argument('--template', default='seaborn')
   parser.add_argument('--max-y')
-  parser.add_argument('--score-type', required=True, choices=('mutrel', 'mutphi'))
+  parser.add_argument('--score-type', required=True, choices=('mutrel', 'mutphi', 'cputime', 'walltime'))
   parser.add_argument('--baseline')
   parser.add_argument('--bandwidth', type=float)
   parser.add_argument('--plot-type', choices=('box', 'violin'), default='box')
+  parser.add_argument('--log-y-axis', action='store_true')
   parser.add_argument('results_fn')
   parser.add_argument('plot_fn')
   args = parser.parse_args()
@@ -321,11 +357,12 @@ def main():
       args.template,
       make_score_ytitle(args.score_type, args.plot_fn),
       args.max_y,
+      log_y_axis = args.log_y_axis,
       layout_options = {
         'boxmode': 'group',
         'violinmode': 'overlay',
-        #'violingap': 0.0,
-        #'violingroupgap': 0.0,
+        'violingap': 0.0,
+        'violingroupgap': 0.0,
       },
     ),
     make_fig(
