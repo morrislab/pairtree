@@ -73,12 +73,12 @@ function make_results_paths {
     paths+="pwgs_supervars_multi_llh=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_llh.$result_type.npz "
   elif [[ $BATCH == sims ]]; then
     paths+="truth=${TRUTH_DIR}/$runid.$result_type.npz "
-    paths+="pwgs_supervars_single_llh=sims.pwgs.supervars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
-    paths+="pastri_llh=${BATCH}.pastri.informative/$runid/$runid.pastri_trees_llh.$result_type.npz "
-    paths+="pairtree_proj_single_llh=sims.pairtree.projection.singlechain/${runid}.pairtree_trees.all.llh.$result_type.npz "
-    paths+="pairtree_proj_multi_llh=sims.pairtree.projection.multichain/${runid}.pairtree_trees.all.llh.$result_type.npz "
-    paths+="pairtree_clustrel=sims.pairtree.onlytensor/$runid.pairtree_clustrel.$result_type.npz "
-    paths+="lichee_llh=sims.lichee/$runid.llh.$result_type.npz "
+    paths+="pwgs=sims.pwgs.supervars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
+    paths+="pastri=${BATCH}.pastri.informative/$runid/$runid.pastri_trees_llh.$result_type.npz "
+    paths+="pairtree_single=sims.pairtree.projection.singlechain/${runid}.pairtree_trees.all.llh.$result_type.npz "
+    paths+="pairtree_multi=sims.pairtree.projection.multichain/${runid}.pairtree_trees.all.llh.$result_type.npz "
+    paths+="pairtree_tensor=sims.pairtree.onlytensor/$runid.pairtree_clustrel.$result_type.npz "
+    paths+="lichee=sims.lichee/$runid.llh.$result_type.npz "
   fi
 
   echo $paths
@@ -161,7 +161,7 @@ function eval_runtime {
       cmd+="pairtree_tensor=$RESULTSDIR/sims.pairtree.onlytensor/$runid.time "
       cmd+="pairtree_single=$RESULTSDIR/sims.pairtree.projection.singlechain/$runid.time "
       cmd+="pairtree_multi=$RESULTSDIR/sims.pairtree.projection.multichain/$runid.time "
-      cmd+="pastri=$RESULTSDIR/sims.pastri.informative.complete/$runid/$runid.time "
+      cmd+="pastri=$RESULTSDIR/sims.pastri.informative/$runid/$runid.time "
       cmd+="pwgs=$RESULTSDIR/sims.pwgs.supervars/$runid/$runid.time "
       cmd+="> $SCORESDIR/$BATCH/$runid.${timetype}time.txt "
       echo $cmd
@@ -233,7 +233,11 @@ function plot_individual {
     cmd+="--score-type $ptype "
     cmd+="--plot-type $plot_type "
     cmd+="--S-threshold 10 "
-    cmd+="--bandwidth 0.07 "
+    if [[ $ptype == "mutrel" ]]; then
+      cmd+="--bandwidth 1 "
+    elif [[ $ptype =~ time$ ]]; then
+      cmd+="--bandwidth 0.07 "
+    fi
     if [[ $ptype == "mutphi" && $BATCH == "sims" ]]; then
       cmd+="--baseline truth "
     fi
@@ -249,22 +253,35 @@ function plot_individual {
   done
 }
 
-function run_batch {
+function remove_missing {
+  basefn=$SCORESDIR/$BATCH
+  for ttype in cputime walltime; do
+    cmd="python3 $SCRIPTDIR/intersect_scores.py "
+    cmd+="$basefn.$ttype.txt "
+    cmd+="$basefn.mutphi.txt "
+    echo $cmd
+  done | bash
+}
+
+function plot_mutrel_and_mutphi {
   export MLE_MUTPHIS_DIR=$RESULTSDIR/${BATCH}.mle_unconstrained
   #[[ $BATCH == "sims" ]] && make_sims_truth
   #make_mle_mutphis
 
-  #(eval_mutrels; eval_mutphis) | para 2>$SCRATCH/tmp/eval.log
-  #compile_scores mutrel
-  #compile_scores mutphi
-  #partition_by_K mutrel
-  #partition_by_K mutphi
-  #(plot_individual mutrel violin; plot_individual mutphi box) | para
+  (eval_mutrels; eval_mutphis) | para 2>$SCRATCH/tmp/eval.log
+  compile_scores mutrel
+  compile_scores mutphi
+  partition_by_K mutrel
+  partition_by_K mutphi
+  (plot_individual mutrel violin; plot_individual mutphi box) | para
+}
 
-  #eval_runtime | para
-  #compile_runtime
-  #partition_by_K cputime
-  #partition_by_K walltime
+function plot_runtime {
+  eval_runtime | para
+  compile_runtime
+  remove_missing
+  partition_by_K cputime
+  partition_by_K walltime
   (plot_individual cputime violin; plot_individual walltime violin) | para
 }
 
@@ -272,12 +289,13 @@ function main {
   export BATCH=sims
   export PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
   export TRUTH_DIR=$RESULTSDIR/sims.truth
-  run_batch
+  plot_mutrel_and_mutphi
+  plot_runtime
 
   #export BATCH=steph
   #export PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
   #export TRUTH_DIR=$RESULTSDIR/steph.pairtree.hbstruct
-  #run_batch
+  #plot_mutrel_and_mutphi
 }
 
 main
