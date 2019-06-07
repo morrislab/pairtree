@@ -40,6 +40,14 @@ def impute(ssmfn, params, mphi):
   )
   return combined
 
+def score(logprobs):
+  assert np.all(logprobs <= 0)
+  score = -np.sum(logprobs)
+  score /= logprobs.size
+  # Convert to bits.
+  score /= np.log(2)
+  return score
+
 def main():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
@@ -55,6 +63,9 @@ def main():
   mphi = impute(args.ssm_fn, params, orig_mphi)
   mphi = sort_mutphi(mphi)
   mutphi.write_mutphi(mphi, args.mutphi_fn)
+
+  old, new = score(orig_mphi.logprobs), score(mphi.logprobs)
+  print('score_cmp', old, new, new - old, (new - old) > 0)
 
 if __name__ == '__main__':
   main()
