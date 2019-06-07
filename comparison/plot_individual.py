@@ -115,12 +115,13 @@ def make_bar_trace(methods, complete, total, name):
   methods = sort_methods(methods)
   complete = np.array([complete[M] for M in methods])
   total = np.array([total[M] for M in methods])
-  frac_complete = 100*(complete / total)
+  missing = total - complete
+  frac_missing = 100*(missing / total)
 
   trace = {
     'type': 'bar',
     'x': [HAPPY_METHOD_NAMES.get(M, M) for M in methods],
-    'y': frac_complete,
+    'y': frac_missing,
     'name': name,
   }
   return trace
@@ -174,12 +175,7 @@ def make_ticks(traces):
   Y = np.array([val for T in traces for val in T['y']])
   minY = np.floor(np.min(Y))
   maxY = np.ceil(np.max(Y))
-  steps = maxY - minY
-  for N in range(4, int(steps) + 1):
-    if steps % N == 0:
-      break
-  else:
-    raise Exception('lol should not get here')
+  N = int(maxY - minY)
   tickvals = np.linspace(minY, maxY, num=(N+1))
   ticktext = 10**tickvals
   return (tickvals, ticktext)
@@ -368,7 +364,7 @@ def main():
     make_fig(
       completion_traces,
       args.template,
-      'Proportion of successful runs',
+      'Proportion of failed runs',
       max_y = None,
       layout_options = {'barmode': 'group'},
     ),
