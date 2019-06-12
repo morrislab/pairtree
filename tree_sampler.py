@@ -117,88 +117,109 @@ def _find_parents(adj):
   np.fill_diagonal(adj, 0)
   return np.argmax(adj[:,1:], axis=0)
 
-def _run_metropolis(nsamples, init_cluster_adj, _calc_llh, _calc_phi, _sample_adj, progress_queue=None):
-  cluster_adj = [init_cluster_adj]
-  phi = [_calc_phi(init_cluster_adj)]
-  llh = [_calc_llh(init_cluster_adj, phi[0])]
+def _run_inner_mh_chain(init_adj, nsamples, data_mutrel, superclusters):
+  def _calc_llh(adj):
+    return _calc_llh_mutrel(adj, data_mutrel, superclusters)
 
+  cluster_adj = [init_adj]
+  llh = [_calc_llh(cluster_adj[0])]
+
+  assert nsamples > 0
   for I in range(1, nsamples):
-    if progress_queue is not None:
-      progress_queue.put(I)
-    old_llh, old_adj, old_phi = llh[-1], cluster_adj[-1], phi[-1]
-    new_adj = _sample_adj(old_adj)
-    new_phi = _calc_phi(new_adj)
-    new_llh = _calc_llh(new_adj, new_phi)
+    old_llh, old_adj = llh[-1], cluster_adj[-1]
+    new_adj = _permute_adj(old_adj)
+    new_llh = _calc_llh(new_adj)
 
     U = np.random.uniform()
     if new_llh - old_llh >= np.log(U):
-      # Accept.
-      cluster_adj.append(new_adj)
-      phi.append(new_phi)
-      llh.append(new_llh)
       action = 'accept'
+      cluster_adj.append(new_adj)
+      llh.append(new_llh)
     else:
-      # Reject.
-      cluster_adj.append(old_adj)
-      phi.append(old_phi)
-      llh.append(old_llh)
       action = 'reject'
-    debug(
-      _calc_llh.__name__,
-      I,
-      action,
-      old_llh,
-      new_llh,
-      new_llh - old_llh,
-      U,
-      _find_parents(old_adj),
-      _find_parents(new_adj),
-      sep='\t'
-    )
+      cluster_adj.append(old_adj)
+      llh.append(old_llh)
+    #debug(
+    #  'mh_inner',
+    #  I,
+    #  action,
+    #  old_llh,
+    #  new_llh,
+    #  new_llh - old_llh,
+    #  U,
+    #  _find_parents(old_adj),
+    #  _find_parents(new_adj),
+    #  sep='\t'
+    #)
 
-  return (cluster_adj, phi, llh)
+  # Before, I called `choose_best_tree` to choose the tree to return from the
+  # inner loop. Now, I just select the last tree sampled, on the assumption
+  # this is a valid sample from the posterior (i.e., the chain has burned in).
+  #
+  # Before, when choosing the tree with the highest likelihood, I would often
+  # always propose the same tree, missing reasonable structures altogether.
+  return cluster_adj[-1]
 
-def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_method, phi_iterations, tree_perturbations, seed, progress_queue=None):
+def _run_outer_mh_chain(data_mutrel, supervars, superclusters, nsamples, phi_method, phi_iterations, tree_perturbations, seed, progress_queue=None):
   # Ensure each chain gets a new random state. I add chain index to initial
   # random seed to seed a new chain, so I must ensure that the seed is still in
   # the valid range [0, 2**32).
   np.random.seed(seed % 2**32)
 
-  assert nsamples > 0
+  if progress_queue is not None:
+    progress_queue.put(0)
   K = len(superclusters)
   V, N, omega_v = calc_binom_params(supervars)
 
-  def __calc_phi(adj):
+  def _calc_phi(adj):
     phi, eta = phi_fitter.fit_phis(adj, superclusters, supervars, method=phi_method, iterations=phi_iterations, parallel=0)
     return phi
-  def __calc_phi_noop(adj):
-    return None
-  def __calc_llh_phi(adj, phi):
+  def _calc_llh(adj, phi):
     return _calc_llh_phi(phi, V, N, omega_v)
-  def __calc_llh_mutrel(adj, phi):
-    return _calc_llh_mutrel(adj, data_mutrel, superclusters)
-  def __permute_adj_multistep(oldadj, nsteps=tree_perturbations):
-    adj, phi, llh = _run_metropolis(nsteps, oldadj, __calc_llh_mutrel, __calc_phi_noop, _permute_adj)
-    # Before, I called `choose_best_tree` to choose this index. Now, I just
-    # select the last tree sampled, on the assumption this is a valid sample
-    # from the posterior (i.e., the chain has burned in).
-    #
-    # Before, when choosing the tree with the highest likelihood, I would often
-    # always propose the same tree, missing reasonable structures altogether.
-    chosen_idx = len(adj) - 1
-    chosen_adj, chosen_llh = adj[chosen_idx], llh[chosen_idx]
-    debug('chosen_proposal', _find_parents(chosen_adj), chosen_llh)
-    return chosen_adj
+
   # Particularly since clusters may not be ordered by mean VAF, a branching
   # tree in which every node comes off the root is the least biased
   # initialization, as it doesn't require any steps that "undo" bad choices, as
   # in the linear or random (which is partly linear, given that later clusters
   # aren't allowed to be parents of earlier ones) cases.
-  init_cluster_adj = _init_cluster_adj_branching(K)
+  cluster_adj = [_init_cluster_adj_branching(K)]
+  phi = [_calc_phi(cluster_adj[0])]
+  llh = [_calc_llh(cluster_adj[0], phi[0])]
 
-  if progress_queue is not None:
-    progress_queue.put(0)
-  return _run_metropolis(nsamples, init_cluster_adj, __calc_llh_phi, __calc_phi, __permute_adj_multistep, progress_queue)
+  assert nsamples > 0
+  for I in range(1, nsamples):
+    if progress_queue is not None:
+      progress_queue.put(I)
+    old_llh, old_adj, old_phi = llh[-1], cluster_adj[-1], phi[-1]
+    new_adj = _run_inner_mh_chain(old_adj, tree_perturbations, data_mutrel, superclusters)
+    new_phi = _calc_phi(new_adj)
+    new_llh = _calc_llh(new_adj, new_phi)
+
+    U = np.random.uniform()
+    if new_llh - old_llh >= np.log(U):
+      action = 'accept'
+      cluster_adj.append(new_adj)
+      phi.append(new_phi)
+      llh.append(new_llh)
+    else:
+      action = 'reject'
+      cluster_adj.append(old_adj)
+      phi.append(old_phi)
+      llh.append(old_llh)
+    #debug(
+    #  'mh_outer',
+    #  I,
+    #  action,
+    #  old_llh,
+    #  new_llh,
+    #  new_llh - old_llh,
+    #  U,
+    #  _find_parents(old_adj),
+    #  _find_parents(new_adj),
+    #  sep='\t'
+    #)
+
+  return (cluster_adj, phi, llh)
 
 def use_existing_structures(adjms, supervars, superclusters, phi_method, phi_iterations, parallel=0):
   V, N, omega_v = calc_binom_params(supervars)
@@ -241,7 +262,7 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_
         for C in range(nchains):
           # Ensure each chain's random seed is different from the seed used to
           # seed the initial Pairtree invocation, yet nonetheless reproducible.
-          jobs.append(ex.submit(_run_chain, data_mutrel, supervars, superclusters, total_per_chain, phi_method, phi_iterations, tree_perturbations, seed + C + 1, progress_queue))
+          jobs.append(ex.submit(_run_outer_mh_chain, data_mutrel, supervars, superclusters, total_per_chain, phi_method, phi_iterations, tree_perturbations, seed + C + 1, progress_queue))
 
         # Exactly `total` items will be added to the queue. Once we've
         # retrieved that many items from the queue, we can assume that our
@@ -256,7 +277,7 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_
   else:
     results = []
     for C in range(nchains):
-      results.append(_run_chain(data_mutrel, supervars, superclusters, total_per_chain, phi_method, phi_iterations, tree_perturbations, seed + C + 1))
+      results.append(_run_outer_mh_chain(data_mutrel, supervars, superclusters, total_per_chain, phi_method, phi_iterations, tree_perturbations, seed + C + 1))
 
   merged_adj = []
   merged_phi = []
