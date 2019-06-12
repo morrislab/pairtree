@@ -58,27 +58,26 @@ function make_results_paths {
   if [[ $BATCH == steph ]]; then
     truth_path="${BATCH}.pairtree.hbstruct/${runid}.pairtree_trees.all.llh.${result_type}.npz"
     paths+="truth=$truth_path "
-    paths+="pairtree_trees_llh=${BATCH}.xeno.withgarb.pairtree/${runid}.pairtree_trees.all.llh.$result_type.npz "
-    paths+="pairtree_trees_uniform=${BATCH}.xeno.withgarb.pairtree/${runid}.pairtree_trees.all.uniform.$result_type.npz "
-    paths+="singlepairtree_trees_llh=${BATCH}.xeno.withgarb.pairtree/${runid}.pairtree_trees.subset.llh.$result_type.npz "
-    paths+="singlepairtree_trees_uniform=${BATCH}.xeno.withgarb.pairtree/${runid}.pairtree_trees.subset.uniform.$result_type.npz "
-    paths+="pairtree_handbuilt=$truth_path "
-    paths+="pwgs_allvars_single_uniform=${BATCH}.pwgs.allvars/$runid/$runid.pwgs_trees_single_uniform.$result_type.npz "
-    paths+="pwgs_allvars_single_llh=${BATCH}.pwgs.allvars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
-    paths+="pwgs_allvars_multi_uniform=${BATCH}.pwgs.allvars/$runid/$runid.pwgs_trees_multi_uniform.$result_type.npz "
-    paths+="pwgs_allvars_multi_llh=${BATCH}.pwgs.allvars/$runid/$runid.pwgs_trees_multi_llh.$result_type.npz "
-    paths+="pwgs_supervars_single_uniform=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_single_uniform.$result_type.npz "
-    paths+="pwgs_supervars_single_llh=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
-    paths+="pwgs_supervars_multi_uniform=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_uniform.$result_type.npz "
-    paths+="pwgs_supervars_multi_llh=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_llh.$result_type.npz "
+    paths+="pairtree_multi=${BATCH}.pairtree/${runid}.pairtree_trees.all.llh.$result_type.npz "
+    paths+="pairtree_single=${BATCH}.pairtree/${runid}.pairtree_trees.subset.llh.$result_type.npz "
+    paths+="pwgs_allvars=${BATCH}.pwgs.allvars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
+    paths+="pplus_allvars=${BATCH}.pwgs.allvars/$runid/$runid.pwgs_trees_multi_llh.$result_type.npz "
+    paths+="pwgs_supervars=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
+    paths+="pplus_supervars=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_llh.$result_type.npz "
+    paths+="lichee=${BATCH}.xeno.lichee/$runid.llh.$result_type.npz "
+    if [[ $result_type == mutrel ]]; then
+      paths+="pairtree_tensor=${BATCH}.pairtree/${runid}.pairtree_clustrel.mutrel.npz "
+    fi
   elif [[ $BATCH == sims ]]; then
     paths+="truth=${TRUTH_DIR}/$runid.$result_type.npz "
-    paths+="pwgs=sims.pwgs.supervars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
+    paths+="pwgs_supervars=sims.pwgs.supervars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
     paths+="pastri=${BATCH}.pastri.informative/$runid/$runid.pastri_trees_llh.$result_type.npz "
     paths+="pairtree_single=sims.pairtree.projection.singlechain/${runid}.pairtree_trees.all.llh.$result_type.npz "
     paths+="pairtree_multi=sims.pairtree.projection.multichain/${runid}.pairtree_trees.all.llh.$result_type.npz "
-    paths+="pairtree_tensor=sims.pairtree.onlytensor/$runid.pairtree_clustrel.$result_type.npz "
     paths+="lichee=sims.lichee/$runid.llh.$result_type.npz "
+    if [[ $result_type == mutrel ]]; then
+      paths+="pairtree_tensor=sims.pairtree.onlytensor/$runid.pairtree_clustrel.$result_type.npz "
+    fi
   fi
 
   echo $paths
@@ -96,7 +95,7 @@ function eval_mutrels {
     cmd+="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/eval_mutrels.py "
     cmd+="--discard-garbage "
     if [[ $BATCH == steph ]]; then
-      for method in pwgs_allvars_{single,multi}_{uniform,llh}; do
+      for method in {pwgs,pplus}_allvars; do
         cmd+="--ignore-garbage-for $method "
       done
     fi
@@ -133,7 +132,7 @@ function compile_scores {
     echo 'runid,'$methods
     for foo in *.$suffix; do
       if [[ $(head -n1 $foo) != $methods ]]; then
-        echo "Methods in $foo don't match expected $methods" >&2
+        echo "Methods in $foo ($(head -n1 $foo)) don't match expected $methods" >&2
         exit 1
       fi
       S=$(echo $foo | cut -d. -f1)
@@ -162,7 +161,7 @@ function eval_runtime {
       cmd+="pairtree_single=$RESULTSDIR/sims.pairtree.projection.singlechain/$runid.time "
       cmd+="pairtree_multi=$RESULTSDIR/sims.pairtree.projection.multichain/$runid.time "
       cmd+="pastri=$RESULTSDIR/sims.pastri.informative/$runid/$runid.time "
-      cmd+="pwgs=$RESULTSDIR/sims.pwgs.supervars/$runid/$runid.time "
+      cmd+="pwgs_supervars=$RESULTSDIR/sims.pwgs.supervars/$runid/$runid.time "
       cmd+="> $SCORESDIR/$BATCH/$runid.${timetype}time.txt "
       echo $cmd
     done
@@ -215,42 +214,76 @@ function partition_by_K {
 function plot_individual {
   ptype=$1
   plot_type=$2
+  infn=$3
+  outfn=$4
 
   cd $SCORESDIR
-  for ktype in bigK smallK; do
-    basefn="$SCORESDIR/$BATCH.$ptype.$ktype"
-    infn=$basefn.txt
-    outfn=$basefn.html
 
-    if [[ $(cat $infn | wc -l) -le 1 ]]; then
-      # Since we don't generate mutrel for bigK, it will be an empty file
-      # with just the header.
-      continue
-    fi
+  if [[ $(cat $infn | wc -l) -le 1 ]]; then
+    # Since we don't generate mutrel for bigK, it will be an empty file
+    # with just the header.
+    continue
+  fi
 
-    cmd="python3 $SCRIPTDIR/plot_individual.py "
-    cmd+="--template plotly_white "
-    cmd+="--score-type $ptype "
-    cmd+="--plot-type $plot_type "
+  cmd="python3 $SCRIPTDIR/plot_individual.py "
+  cmd+="--template plotly_white "
+  cmd+="--score-type $ptype "
+  cmd+="--plot-type $plot_type "
+  if [[ $BATCH == "sims" ]]; then
     cmd+="--S-threshold 10 "
-    if [[ $ptype == "mutrel" ]]; then
-      cmd+="--bandwidth 1 "
-    elif [[ $ptype =~ time$ ]]; then
-      cmd+="--bandwidth 0.07 "
-    fi
-    if [[ $ptype == "mutphi" && $BATCH == "sims" ]]; then
-      cmd+="--baseline truth "
-    fi
-    if [[ $ptype == "mutphi" && $BATCH == "steph" ]]; then
-      cmd+="--baseline pairtree_handbuilt "
-    fi
-    if [[ $ptype =~ time$ ]]; then
-      cmd+="--log-y-axis "
-    fi
-    cmd+="$( [[ $BATCH == sims ]] && echo --partition-by-samples) "
-    cmd+="$infn $outfn "
-    echo $cmd
-  done
+  fi
+  if [[ $ptype == "mutphi" || $ptype == "mutrel" ]]; then
+    cmd+="--hide-method mle_unconstrained "
+  fi
+  if [[ $ptype == "mutrel" ]]; then
+    cmd+="--bandwidth 1 "
+  elif [[ $ptype =~ time$ ]]; then
+    cmd+="--bandwidth 0.07 "
+  fi
+  if [[ $ptype == "mutphi" && $BATCH == "sims" ]]; then
+    cmd+="--baseline truth "
+  fi
+  if [[ $ptype == "mutphi" && $BATCH == "steph" ]]; then
+    cmd+="--baseline truth "
+  fi
+  if [[ $ptype =~ time$ ]]; then
+    cmd+="--log-y-axis "
+  fi
+  cmd+="$infn $outfn "
+
+  echo $cmd
+}
+
+function plot_results_sims {
+  #make_sims_truth
+  #make_mle_mutphis
+
+  (eval_mutrels; eval_mutphis) | para
+  compile_scores mutrel
+  compile_scores mutphi
+  partition_by_K mutrel
+  partition_by_K mutphi
+
+  # Don't plot mutrel for bigK, since these results don't exist.
+  (
+    basefn="$SCORESDIR/$BATCH"
+    plot_individual mutrel violin $basefn.mutrel.smallK.{txt,html}
+    plot_individual mutphi box $basefn.mutphi.smallK.{txt,html}
+    plot_individual mutphi box $basefn.mutphi.bigK.{txt,html}
+  ) | para
+}
+
+function plot_results_steph {
+  #make_mle_mutphis
+
+  (eval_mutrels; eval_mutphis) | para
+  compile_scores mutrel
+  compile_scores mutphi
+  (
+    basefn="$SCORESDIR/$BATCH"
+    plot_individual mutrel violin $basefn.mutrel.{txt,html}
+    plot_individual mutphi box $basefn.mutphi.{txt,html}
+  ) | para
 }
 
 function remove_missing {
@@ -263,39 +296,33 @@ function remove_missing {
   done | bash
 }
 
-function plot_mutrel_and_mutphi {
-  export MLE_MUTPHIS_DIR=$RESULTSDIR/${BATCH}.mle_unconstrained
-  #[[ $BATCH == "sims" ]] && make_sims_truth
-  #make_mle_mutphis
-
-  (eval_mutrels; eval_mutphis) | para 2>$SCRATCH/tmp/eval.log
-  compile_scores mutrel
-  compile_scores mutphi
-  partition_by_K mutrel
-  partition_by_K mutphi
-  (plot_individual mutrel violin; plot_individual mutphi box) | para
-}
-
 function plot_runtime {
   eval_runtime | para
   compile_runtime
   remove_missing
   partition_by_K cputime
   partition_by_K walltime
-  (plot_individual cputime violin; plot_individual walltime violin) | para
+  for ktype in bigK smallK; do
+    for ttype in cputime walltime; do
+      basefn="$SCORESDIR/$BATCH.$ttype.$ktype"
+      plot_individual $ttype violin $basefn.{txt,html}
+    done
+  done | para
 }
 
 function main {
-  export BATCH=sims
-  export PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
-  export TRUTH_DIR=$RESULTSDIR/sims.truth
-  plot_mutrel_and_mutphi
-  plot_runtime
+  #export BATCH=sims
+  #export PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+  #export TRUTH_DIR=$RESULTSDIR/sims.truth
+  #export MLE_MUTPHIS_DIR=$RESULTSDIR/${BATCH}.mle_unconstrained
+  #plot_results_sims
+  #plot_runtime
 
-  #export BATCH=steph
-  #export PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
-  #export TRUTH_DIR=$RESULTSDIR/steph.pairtree.hbstruct
-  #plot_mutrel_and_mutphi
+  export BATCH=steph
+  export PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+  export TRUTH_DIR=$RESULTSDIR/steph.pairtree.hbstruct
+  export MLE_MUTPHIS_DIR=$RESULTSDIR/${BATCH}.mle_unconstrained
+  plot_results_steph
 }
 
 main

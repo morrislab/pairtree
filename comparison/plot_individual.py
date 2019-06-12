@@ -12,32 +12,17 @@ MISSING = -1
 HAPPY_METHOD_NAMES = [
   ('truth', 'Truth'),
   ('pairtree_handbuilt', 'Pairtree (manually constructed trees)'),
-  ('pairtree_proj_single_llh', 'Pairtree (single-chain)'),
-  ('pairtree_proj_multi_llh', 'Pairtree (multi-chain)'),
-  ('pastri_llh', 'PASTRI'),
-  ('lichee_llh', 'LICHeE'),
-  ('pwgs_supervars_multi_llh', 'PhyloPlus'),
-  ('pwgs_allvars_multi_llh', 'PhyloPlus (unclustered)'),
-  ('pwgs_supervars_single_llh', 'PhyloWGS'),
-  ('pwgs_allvars_single_llh', 'PhyloWGS (unclustered)'),
-  ('pairtree_clustrel', 'Pairs tensor'),
+  ('pairtree_single', 'Pairtree (single-chain)'),
+  ('pairtree_multi', 'Pairtree (multi-chain)'),
+  ('pastri', 'PASTRI'),
+  ('lichee', 'LICHeE'),
+  ('pplus_supervars', 'PhyloPlus'),
+  ('pplus_allvars', 'PhyloPlus (unclustered)'),
+  ('pwgs_supervars', 'PhyloWGS'),
+  ('pwgs_allvars', 'PhyloWGS (unclustered)'),
+  ('pairtree_tensor', 'Pairs tensor'),
   ('mle_unconstrained', 'MLE lineage frequencies'),
 ]
-
-for name, synonym in (
-  ('pairtree_single', 'pairtree_proj_single_llh'),
-  ('pairtree_multi', 'pairtree_proj_multi_llh'),
-  ('pastri', 'pastri_llh'),
-  ('lichee', 'lichee_llh'),
-  ('pwgs', 'pwgs_supervars_single_llh'),
-  ('pairtree_tensor', 'pairtree_clustrel'),
-):
-  for K, V in HAPPY_METHOD_NAMES:
-    if K == synonym:
-      HAPPY_METHOD_NAMES.append((name, V))
-      break
-  else:
-    raise Exception('No match for %s, which is aliased to %s' % (name, synonym))
 
 METHOD_ORDER = {M: idx for idx, (M, M_full) in enumerate(HAPPY_METHOD_NAMES)}
 HAPPY_METHOD_NAMES = {M: M_full for (M, M_full) in HAPPY_METHOD_NAMES}
@@ -74,7 +59,7 @@ def load_results(resultsfn):
   return (results, methods)
 
 def get_method_names(results):
-  methnames = [K for K in results.keys() if K != 'runid']
+  methnames = [K for K in results.keys() if K not in ('runid', 'truth')]
   return methnames
 
 def partition(results, methods, key):
@@ -111,7 +96,7 @@ def sort_methods(methods):
   methods = sorted(methods, key = lambda M: METHOD_ORDER.get(M, 0))
   return methods
 
-def make_bar_trace(methods, complete, total, name):
+def make_bar_trace(methods, complete, total, name=None):
   methods = sort_methods(methods)
   complete = np.array([complete[M] for M in methods])
   total = np.array([total[M] for M in methods])
@@ -122,8 +107,9 @@ def make_bar_trace(methods, complete, total, name):
     'type': 'bar',
     'x': [HAPPY_METHOD_NAMES.get(M, M) for M in methods],
     'y': frac_missing,
-    'name': name,
   }
+  if name is not None:
+    trace['name'] = name
   return trace
 
 def _make_points(vals):
@@ -284,7 +270,6 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('--partition-by-samples', action='store_true')
   parser.add_argument('--S-threshold', type=int)
   parser.add_argument('--template', default='seaborn')
   parser.add_argument('--max-y')
@@ -293,24 +278,25 @@ def main():
   parser.add_argument('--bandwidth', type=float)
   parser.add_argument('--plot-type', choices=('box', 'violin'), default='box')
   parser.add_argument('--log-y-axis', action='store_true')
+  parser.add_argument('--hide-method', nargs='+')
   parser.add_argument('results_fn')
   parser.add_argument('plot_fn')
   args = parser.parse_args()
 
   results, methods = load_results(args.results_fn)
+  if args.hide_method is not None:
+    methods = [M for M in methods if M not in args.hide_method]
+
+  if args.baseline is not None:
+    assert args.baseline in results
+    for M in methods:
+      present = results[M] != MISSING
+      results.loc[present,M] -= results.loc[present,args.baseline]
 
   if args.score_type == 'mutrel':
     set_missing_to(results, methods, 1)
     for M in methods:
       results[M] *= 100
-
-  if args.baseline is not None:
-    assert args.baseline in methods
-    for M in methods:
-      if M == args.baseline:
-        continue
-      present = results[M] != MISSING
-      results.loc[present,M] -= results.loc[present,args.baseline]
 
   sides = {
     'lte': 'negative',
@@ -323,13 +309,13 @@ def main():
 
   score_traces = []
   completion_traces = []
-  if args.partition_by_samples:
+  if args.S_threshold is not None:
     results = augment(results, 'S')
     parted_by_S = partition(results, methods, key='S')
     parted_by_thresh = partition_by_threshold(parted_by_S, args.S_threshold)
     for group in parted_by_thresh.keys():
       vals = parted_by_thresh[group]
-      methods = [M for M in vals.keys() if M != 'truth']
+      methods = [M for M in vals.keys()]
       scores = {M: vals[M]['scores'] for M in methods}
       complete = {M: vals[M]['complete'] for M in methods}
       total = {M: vals[M]['total'] for M in methods}
@@ -343,8 +329,16 @@ def main():
 
       score_traces.append(score_trace)
       completion_traces.append(make_bar_trace(methods, complete, total, name=names[group]))
-  #else:
-  #  parted = partition(results, methods, key=None)
+  else:
+    scores = {M: np.array(results[M]) for M in methods}
+    total = {M: len(scores[M]) for M in methods}
+    complete = {M: np.sum(scores[M] != MISSING) for M in methods}
+    if args.plot_type == 'box':
+      score_trace = make_box_trace(scores)
+    elif args.plot_type == 'violin':
+      score_trace = make_violin_trace(scores, side='both', bandwidth=args.bandwidth)
+    score_traces.append(score_trace)
+    completion_traces.append(make_bar_trace(methods, complete, total))
 
 
   figs = [
