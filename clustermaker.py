@@ -16,9 +16,9 @@ def _check_clusters(variants, clusters, garbage):
   assert len(clustered & garbage) == 0
   assert set(vids) == (clustered | garbage)
 
-def use_pre_existing(variants, prior, parallel, clusters, garbage):
+def use_pre_existing(variants, logprior, parallel, clusters, garbage):
   supervars = make_cluster_supervars(clusters, variants)
-  clust_posterior, clust_evidence = pairwise.calc_posterior(supervars, prior, rel_type='supervariant', parallel=parallel)
+  clust_posterior, clust_evidence = pairwise.calc_posterior(supervars, logprior, rel_type='supervariant', parallel=parallel)
   _check_clusters(variants, clusters, garbage)
   return (supervars, clust_posterior, clust_evidence, clusters, garbage)
 
@@ -86,7 +86,7 @@ def _merge_until_no_pairwise_mle_remain(mutrel_posterior):
   assert A < B
   return [(A, B)]
 
-def _merge_clusters(to_merge, clusters, variants, mutrel_posterior, mutrel_evidence, prior, pbar, parallel):
+def _merge_clusters(to_merge, clusters, variants, mutrel_posterior, mutrel_evidence, logprior, pbar, parallel):
   debug('to_merge', [[mutrel_evidence.vids[I] for I in C] for C in to_merge])
   # 1. Update the clustering
   to_remove = []
@@ -114,7 +114,7 @@ def _merge_clusters(to_merge, clusters, variants, mutrel_posterior, mutrel_evide
     variants,
     mutrel_posterior,
     mutrel_evidence,
-    prior,
+    logprior,
     pbar,
     parallel
   )
@@ -199,7 +199,7 @@ def _plot(mutrel_posterior, clusters, variants, garbage):
 _plot.idx = 1
 _plot.prefix = None
 
-def _iterate_clustering(selector, desc, variants, clusters, clust_posterior, clust_evidence, prior, parallel):
+def _iterate_clustering(selector, desc, variants, clusters, clust_posterior, clust_evidence, logprior, parallel):
   # Do initial round of garbage rejection.
   clusters, garbage, clust_posterior, clust_evidence = _discard_garbage(clusters, clust_posterior, clust_evidence)
 
@@ -217,7 +217,7 @@ def _iterate_clustering(selector, desc, variants, clusters, clust_posterior, clu
         variants,
         clust_posterior,
         clust_evidence,
-        prior,
+        logprior,
         pbar,
         parallel
       )
@@ -229,7 +229,7 @@ def _iterate_clustering(selector, desc, variants, clusters, clust_posterior, clu
 
   return (clusters, garbage, clust_posterior, clust_evidence)
 
-def cluster_and_discard_garbage(variants, mutrel_posterior, mutrel_evidence, prior, parallel):
+def cluster_and_discard_garbage(variants, mutrel_posterior, mutrel_evidence, logprior, parallel):
   assert np.all(mutrel_posterior.vids == mutrel_evidence.vids)
 
   # Copy mutrels so we don't modify them.
@@ -250,7 +250,7 @@ def cluster_and_discard_garbage(variants, mutrel_posterior, mutrel_evidence, pri
       clusters,
       clust_posterior,
       clust_evidence,
-      prior,
+      logprior,
       parallel
     )
     garbage += G
@@ -267,7 +267,7 @@ def cluster_and_discard_garbage(variants, mutrel_posterior, mutrel_evidence, pri
   # replaced by a supervariant) shouldn't change, but evidence between
   # single-variant clusters and other supervariants will likely shift slighty.
   clusters, supervars, clust_posterior, clust_evidence = _sort_clusters_by_vaf(clusters, variants, clust_posterior, clust_evidence)
-  clust_posterior, clust_evidence = pairwise.calc_posterior(supervars, prior, 'cluster', parallel)
+  clust_posterior, clust_evidence = pairwise.calc_posterior(supervars, logprior, 'cluster', parallel)
   return (supervars, clust_posterior, clust_evidence, clusters, garbage)
 
 def _make_supervar(name, variants):

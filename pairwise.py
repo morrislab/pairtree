@@ -40,8 +40,7 @@ def _calc_posterior(evidence, logprior):
   posterior = np.exp(joint) / np.sum(np.exp(joint))
   return posterior
 
-def _calc_posterior_full(evidence, prior):
-  logprior = _complete_prior(prior)
+def _calc_posterior_full(evidence, logprior):
   # This function is currently unused.
   joint = evidence + logprior[None,None,:]
   B = np.max(joint, axis=2)
@@ -59,36 +58,33 @@ def _calc_posterior_full(evidence, prior):
 
   return posterior
 
-def _complete_prior(prior):
+def _complete_logprior(logprior):
   '''
   If you don't want to include a certain model in the posterior (e.g., perhaps
   you're computing pairwise probabilities for supervariants, and so don't want
   to allow them to cocluster unless they're the same supervariant), set the
   corresponding entry in prior to 0.
   '''
-  if prior is None:
-    prior = {}
-  for K in prior.keys():
+  if logprior is None:
+    logprior = {}
+  for K in logprior.keys():
     assert K in Models._all
-    assert 0 <= prior[K] <= 1
+    assert logprior[K] <= 0
 
-  total = np.sum(list(prior.values()))
-  assert 0 <= total <= 1
-  remaining = set(Models._all) - set(prior.keys())
+  logtotal = scipy.special.logsumexp(list(logprior.values()))
+  assert logtotal <= 0
+  remaining = set(Models._all) - set(logprior.keys())
   for K in remaining:
-    prior[K] = (1 - total) / len(remaining)
+    logprior[K] = np.log(1 - np.exp(logtotal)) - np.log(len(remaining))
 
-  logprior = -np.inf * np.ones(len(prior))
-  for K in prior:
-    if prior[K] == 0:
-      continue
-    logprior[getattr(Models, K)] = np.log(prior[K])
+  logprior_vals = -np.inf * np.ones(len(logprior))
+  for K in logprior:
+    logprior_vals[getattr(Models, K)] = logprior[K]
+  assert np.isclose(0, scipy.special.logsumexp(logprior_vals))
+  return logprior_vals
 
-  assert np.isclose(0, scipy.special.logsumexp(logprior))
-  return logprior
-
-def _compute_pairs(pairs, variants, prior, posterior, evidence, pbar=None, parallel=1):
-  logprior = _complete_prior(prior)
+def _compute_pairs(pairs, variants, logprior, posterior, evidence, pbar=None, parallel=1):
+  logprior = _complete_logprior(logprior)
   # TODO: change ordering of pairs based on what will provide optimal
   # integration accuracy according to Quaid's advice.
   pairs = [sorted(C) for C in pairs]
@@ -124,10 +120,10 @@ def _compute_pairs(pairs, variants, prior, posterior, evidence, pbar=None, paral
 
   # TODO: only calculate posterior once here, instead of computing it within
   # each worker separately for a given variant pair.
-  assert np.allclose(posterior.rels, _calc_posterior_full(evidence.rels, prior))
+  assert np.allclose(posterior.rels, _calc_posterior_full(evidence.rels, logprior))
   return (posterior, evidence)
 
-def calc_posterior(variants, prior, rel_type, parallel=1):
+def calc_posterior(variants, logprior, rel_type, parallel=1):
   M = len(variants)
   # Allow Numba use by converting to namedtuple.
   vids = common.extract_vids(variants)
@@ -140,7 +136,7 @@ def calc_posterior(variants, prior, rel_type, parallel=1):
   _compute = lambda pbar: _compute_pairs(
      pairs,
      variants,
-     prior,
+     logprior,
      posterior,
      evidence,
      pbar,
@@ -154,7 +150,7 @@ def calc_posterior(variants, prior, rel_type, parallel=1):
     posterior, evidence =_compute(None)
   return (posterior, evidence)
 
-def merge_variants(to_merge, evidence, prior):
+def merge_variants(to_merge, evidence, logprior):
   assert np.all(np.array([V for group in to_merge for V in group]) < len(evidence.vids))
   already_merged = set()
 
@@ -186,11 +182,11 @@ def merge_variants(to_merge, evidence, prior):
   evidence = mutrel.remove_variants(evidence, already_merged)
   posterior = mutrel.Mutrel(
     vids = evidence.vids,
-    rels = _calc_posterior_full(evidence.rels, prior),
+    rels = _calc_posterior_full(evidence.rels, logprior),
   )
   return (posterior, evidence)
 
-def add_variants(vids_to_add, variants, mutrel_posterior, mutrel_evidence, prior, pbar, parallel):
+def add_variants(vids_to_add, variants, mutrel_posterior, mutrel_evidence, logprior, pbar, parallel):
   for vid in vids_to_add:
     assert vid in variants
 
@@ -212,7 +208,7 @@ def add_variants(vids_to_add, variants, mutrel_posterior, mutrel_evidence, prior
   return _compute_pairs(
     pairs,
     variants,
-    prior,
+    logprior,
     new_posterior,
     new_evidence,
     pbar,
@@ -244,7 +240,7 @@ def _examine(V1, V2, variants, _calc_lh=None):
     Es,
   ))
 
-  prior = {'garbage': 0.001}
-  post1 = _calc_posterior(E, _complete_prior(None))
-  post2 = _calc_posterior(E, _complete_prior({'garbage': 0.001}))
+  logprior = {'garbage': np.log(0.001)}
+  post1 = _calc_posterior(E, _complete_logprior(None))
+  post2 = _calc_posterior(E, _complete_logprior(logprior))
   return (persamp, E, post1, post2)

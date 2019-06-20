@@ -45,7 +45,6 @@ def main():
   # physical cores you have.
   parallel = args.parallel if args.parallel is not None else multiprocessing.cpu_count()
   tree_chains = args.tree_chains if args.tree_chains is not None else parallel
-  prior = {'garbage': 0.001}
 
   if args.seed is not None:
     seed = args.seed
@@ -57,6 +56,7 @@ def main():
 
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.params_fn)
+  logprior = {'garbage': -np.inf}
 
   if os.path.exists(args.results_fn):
     results = resultserializer.load(args.results_fn)
@@ -67,21 +67,21 @@ def main():
     if 'clusters' in params and 'garbage' in params:
       supervars, results['clustrel_posterior'], results['clustrel_evidence'], results['clusters'], results['garbage'] = clustermaker.use_pre_existing(
         variants,
-        prior,
+        logprior,
         parallel,
         params['clusters'],
         params['garbage'],
       )
     else:
       if 'mutrel_posterior' not in results:
-        results['mutrel_posterior'], results['mutrel_evidence'] = pairwise.calc_posterior(variants, prior=prior, rel_type='variant', parallel=parallel)
+        results['mutrel_posterior'], results['mutrel_evidence'] = pairwise.calc_posterior(variants, logprior=logprior, rel_type='variant', parallel=parallel)
         resultserializer.save(results, args.results_fn)
       clustermaker._plot.prefix = os.path.basename(args.ssm_fn).split('.')[0]
       supervars, results['clustrel_posterior'], results['clustrel_evidence'], results['clusters'], results['garbage'] = clustermaker.cluster_and_discard_garbage(
         variants,
         results['mutrel_posterior'],
         results['mutrel_evidence'],
-        prior,
+        logprior,
         parallel,
       )
     resultserializer.save(results, args.results_fn)

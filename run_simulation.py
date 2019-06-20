@@ -73,7 +73,7 @@ def main():
   data = simulator.generate_data(args.K, args.S, args.T, args.M, args.G)
   data['seed'] = seed
 
-  posterior, evidence = pairwise.calc_posterior(data['variants_all'], prior=None, parallel=args.parallel)
+  posterior, evidence = pairwise.calc_posterior(data['variants_all'], logprior=None, parallel=args.parallel)
   write_results(data, posterior, evidence, args.datafn, args.pairwisefn, args.resultsfn)
 
 if __name__ == '__main__':
