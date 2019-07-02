@@ -56,7 +56,7 @@ def main():
 
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.params_fn)
-  logprior = {'garbage': -np.inf}
+  logprior = {'garbage': -np.inf, 'cocluster': -np.inf}
 
   if os.path.exists(args.results_fn):
     results = resultserializer.load(args.results_fn)
