@@ -7,6 +7,18 @@ import phi_fitter
 Models = common.Models
 debug = common.debug
 
+from collections import namedtuple
+InnerSample = namedtuple('InnerSample', (
+  'adj',
+  'anc',
+  'depth_frac',
+  'llh',
+  'logfit',
+  'progress',
+  'W_subtree',
+))
+
+
 def _calc_llh_phi(phi, V, N, omega_v, epsilon=1e-5):
   K, S = phi.shape
   for arr in V, N, omega_v:
@@ -66,9 +78,21 @@ def _init_cluster_adj_random(K):
   cluster_adj[parents, range(1,K)] = 1
   return cluster_adj
 
-def _permute_adj(adj):
-  adj = np.copy(adj)
+def _modify_tree(adj, anc, A, B):
+  '''If `B` is ancestral to `A`, swap nodes `A` and `B`. Otherwise, move
+  subtree `B` under `A`.
+
+  `B` can't be 0 (i.e., the root node), as we want always to preserve the
+  property that node zero is root.'''
   K = len(adj)
+  # Ensure `B` is not zero.
+  assert 0 <= A < K and 0 < B < K
+
+  if A == B:
+    return adj
+
+  adj = np.copy(adj)
+  anc = np.copy(anc)
 
   assert np.array_equal(np.diag(adj), np.ones(K))
   # Diagonal should be 1, and every node except one of them should have a parent.
@@ -77,15 +101,8 @@ def _permute_adj(adj):
   # except for column denoting root.
   assert np.array_equal(np.sort(np.sum(adj, axis=0)), np.array([1] + (K - 1)*[2]))
 
-  anc = common.make_ancestral_from_adj(adj)
-  A, B = np.random.choice(K, size=2, replace=False)
-  if B == 0:
-    # Don't permit cluster 0 to become non-root node, since it corresponds to
-    # normal cell population.
-    assert anc[B,A]
-    debug('tree_permute', (A,B), 'do nothing')
-    return adj
   np.fill_diagonal(adj, 0)
+  np.fill_diagonal(anc, 0)
 
   if anc[B,A]:
     adj_BA = adj[B,A]
@@ -102,17 +119,27 @@ def _permute_adj(adj):
 
     if adj_BA:
       adj[A,B] = 1
-    debug('tree_permute', (A,B), 'swapping', A, B)
+    #debug('tree_permute', (A,B), 'swapping', A, B)
   else:
     # Move B so it becomes child of A. I don't need to modify the A column.
     adj[:,B] = 0
     adj[A,B] = 1
-    debug('tree_permute', (A,B), 'moving', B, 'under', A)
+    #debug('tree_permute', (A,B), 'moving', B, 'under', A)
 
   np.fill_diagonal(adj, 1)
   return adj
 
-def _calc_depth(adj):
+def _choose_nodes_uniformly(K, anc):
+  while True:
+    A, B = np.random.choice(K, size=2, replace=False)
+    assert A != B
+    # Prevent `B` from being the root node.
+    # Also prevent `B` from being ancestral to `A`.
+    if B != 0 and not anc[B,A]:
+      break
+  return (A, B)
+
+def _calc_depth_frac(adj):
   K = len(adj)
   root = 0
   Z = np.copy(adj)
@@ -130,7 +157,9 @@ def _calc_depth(adj):
 
   assert depth[root] == 0
   assert np.all(depth[:root] > 0) and np.all(depth[root+1:] > 0)
-  return depth
+
+  depth_frac = depth / np.max(depth)
+  return depth_frac
 
 def calc_binom_params(supervars):
   svids = common.extract_vids(supervars)
@@ -154,22 +183,19 @@ def _find_parent(node, adj):
   assert len(parents) == 1
   return parents[0]
 
-def _make_W_subtree(adj, logfit, progress):
+def _make_W_subtree(adj, depth_frac, logfit, progress):
   # Hyperparams:
   # * tau: weight of depth term
   # * rho: weight of mutrel fit term
   # * psi: how strongly peaked depth term is
   tau = 1
-  rho = 1
-  psi = 2
+  rho = 5
+  psi = 3
 
   K = len(adj)
 
   assert np.all(logfit <= 0)
   assert adj.shape == (K, K)
-  depth = _calc_depth(adj)
-  assert len(depth) == K
-  depth_frac = depth / np.max(depth)
 
   assert 0 <= progress <= 1
   A = psi * progress + 1
@@ -182,62 +208,83 @@ def _make_W_subtree(adj, logfit, progress):
 
   assert np.all(logfit <= 0)
   if np.all(logfit == 0):
-    weights_fit = np.ones(K-1) / (K-1)
+    weights_fit = np.ones(K-1)
   else:
-    weights_fit = logfit / np.sum(logfit)
+    weights_fit = np.maximum(1e-5, logfit)
+  weights_fit /= np.sum(weights_fit)
 
   weights      = tau * weights_depth
   weights[1:] += rho * weights_fit
-  assert weights[0] == 0 and np.all(weights[1:] > 0)
+  assert weights[0] == 0 and np.all(weights[1:] >= 0) and np.any(weights > 0)
 
   norm_weights = weights / np.sum(weights)
-  _make_W_subtree.debug = (progress, _find_parents(adj), depth_frac, weights_depth, weights_fit, logfit, weights, norm_weights)
+  _make_W_subtree.debug = (progress, depth_frac, weights_depth, weights_fit, logfit, weights, norm_weights)
   return norm_weights
 
-def _make_W_parents(anc, subtree_idx):
+def _make_W_parents(anc, depth_frac, subtree_idx, mutrel):
+  # theta: weight of `B_A` pairwise probabilities
+  # kappa: weight of depth_frac
+  theta = 8
+  kappa = 1
+
   K = len(anc)
-  weights = np.ones(K)
-  # Can't choose self or any descendants of self for new parent.
-  subtree_desc = np.flatnonzero(anc[subtree_idx])
-  weights[subtree_desc] = 0
-  assert weights[subtree_idx] == 0
-  norm_weights = weights / np.sum(weights)
-  return norm_weights
+  cluster_idx = subtree_idx - 1
+  assert mutrel.vids[cluster_idx] == 'S%s' % cluster_idx
 
-def _move_subtree(subtree_idx, new_parent, adj):
-  adj = np.copy(adj)
-  adj[:,subtree_idx] = 0
-  adj[subtree_idx,subtree_idx] = 1
-  adj[new_parent,subtree_idx] = 1
-  return adj
+  weights = np.zeros(K)
+  weights[1:] += theta * mutrel.rels[cluster_idx,:,Models.B_A]
+  weights     += kappa * depth_frac
 
-from collections import namedtuple
-InnerSample = namedtuple('InnerSample', (
-  'adj',
-  'anc',
-  'llh',
-  'logfit',
-  'progress',
-  'W_subtree',
-))
+  # We can use `anc` to put zero mass on choosing a parent that is already a
+  # descendant of the node. But, for now, we do not.
+  #subtree_desc = np.flatnonzero(anc[subtree_idx])
+  #weights[subtree_desc] = 0
+
+  weights /= np.sum(weights)
+  # Use normalized weights to set root weight.
+  # Intutiion: if none of the non-root nodes are high probability parents, then
+  # the root should be high probability.
+  weights[0] = max(0.001, 1 - np.max(weights[1:]))
+  # Allow all nodes to be chosen with some small probability ...
+  weights[1:] = np.maximum(1e-10, weights[1:])
+  # ... but don't allow a node to be its own parent.
+  weights[subtree_idx] = 0
+  # Renormalize.
+  weights /= np.sum(weights)
+
+  return weights
 
 def _sample_cat(W):
   return np.random.choice(len(W), p=W)
 
+#def _load_truth(data_mutrel, superclusters):
+#  truthfn = '/home/q/qmorris/jawinter/work/pairtree/scratch/inputs/sims.pairtree/sim_K3_S3_T50_M300_G300_run1.data.pickle'
+#  import pickle
+#  with open(truthfn, 'rb') as F:
+#    truth = pickle.load(F)
+#  true_adjm = truth['adjm']
+#  true_phi = truth['phi']
+#  true_parents = _find_parents(true_adjm)
+#  true_llh, true_logfit = _calc_llh_mutrel(true_adjm, data_mutrel, superclusters)
+#  return (true_parents, true_llh, true_logfit, true_adjm, true_phi)
+
 def _run_inner_mh_chain(init_adj, nsamples, data_mutrel, superclusters):
   init_llh, init_logfit = _calc_llh_mutrel(init_adj, data_mutrel, superclusters)
   init_anc = common.make_ancestral_from_adj(init_adj)
+  init_depth_frac = _calc_depth_frac(init_adj)
   init_progress = 0
   samps = [InnerSample(
     adj = init_adj,
     anc = init_anc,
+    depth_frac = init_depth_frac,
     llh = init_llh,
     logfit = init_logfit,
     progress = init_progress,
-    W_subtree = _make_W_subtree(init_adj, init_logfit, init_progress),
+    W_subtree = _make_W_subtree(init_adj, init_depth_frac, init_logfit, init_progress),
   )]
 
   assert nsamples > 0
+  accepted = 0
   for I in range(1, nsamples):
     progress = I / nsamples
     old_samp = samps[-1]
@@ -245,40 +292,48 @@ def _run_inner_mh_chain(init_adj, nsamples, data_mutrel, superclusters):
     assert subtree_idx != 0
     # Don't carry `old_W_parents` in `old_samp`, since it's dependent not just
     # on the current tree, but also on the subtree selected.
-    old_W_parents = _make_W_parents(old_samp.anc, subtree_idx)
+    old_W_parents = _make_W_parents(old_samp.anc, old_samp.depth_frac, subtree_idx, data_mutrel)
     dbg = tuple(_make_W_subtree.debug)
     new_parent = _sample_cat(old_W_parents)
-    new_adj = _move_subtree(subtree_idx, new_parent, old_samp.adj)
+    new_adj = _modify_tree(old_samp.adj, old_samp.anc, new_parent, subtree_idx)
     new_llh, new_logfit = _calc_llh_mutrel(new_adj, data_mutrel, superclusters)
+    new_depth_frac = _calc_depth_frac(new_adj)
     new_samp = InnerSample(
       adj = new_adj,
       anc = common.make_ancestral_from_adj(new_adj),
+      depth_frac = new_depth_frac,
       llh = new_llh,
       logfit = new_logfit,
       progress = progress,
-      W_subtree = _make_W_subtree(new_adj, new_logfit, progress),
+      W_subtree = _make_W_subtree(new_adj, new_depth_frac, new_logfit, progress),
     )
 
     # This is p(subtree_idx, new_parent | old_state) = p(subtree_idx | old_state)p(new_parent | subtree_idx, old_state)
     old_parent = _find_parent(subtree_idx, old_samp.adj)
     log_p_new_given_old = np.log(old_samp.W_subtree[subtree_idx]) + np.log(old_W_parents[new_parent])
-
     # This is p(subtree_idx, old_parent | new_state) = p(subtree_idx | new_state)p(old_parent | subtree_idx, new_state)
-    new_W_parents = _make_W_parents(new_samp.anc, subtree_idx)
+    new_W_parents = _make_W_parents(new_samp.anc, new_samp.depth_frac, subtree_idx, data_mutrel)
     log_p_old_given_new = np.log(new_samp.W_subtree[subtree_idx]) + np.log(new_W_parents[old_parent])
 
     log_p_transition = (new_samp.llh - old_samp.llh) + (log_p_old_given_new - log_p_new_given_old)
-
     U = np.random.uniform()
+
     if log_p_transition >= np.log(U):
       action = 'accept'
       samps.append(new_samp)
+      accepted += 1
     else:
       action = 'reject'
       samps.append(old_samp)
-    #print(*(dbg + ((old_parent, new_parent, subtree_idx), '%.3f' % old_samp.llh, '%.3f' % new_samp.llh, action)), sep='\t')
 
-    #debug( 'mh_inner', I, action, old_llh, new_llh, new_llh - old_llh, U, _find_parents(old_adj), _find_parents(new_adj), sep='\t')
+    #true_parents, true_llh, true_logfit, true_adjm, true_phi = _load_truth(data_mutrel, superclusters)
+    #norm = -1 * (len(old_samp.adj) - 1)**2 * np.log(2)
+    #old_mutrel_error = old_samp.llh / norm
+    #new_mutrel_error = new_samp.llh / norm
+    #true_mutrel_error = true_llh / norm
+    #cols = ('progress', 'depth_frac', 'weights_depth', 'weights_fit', 'logfit', 'weights', 'norm_weights', 'nodes', 'old_W_subtree', 'new_W_subtree', 'old_W_parents', 'new_W_parents', 'old_parents', 'new_parents', 'true_parents', 'old_llh', 'new_llh', 'p_old_given_new', 'p_new_given_old', 'p_state_delta', 'old_mutrel_error', 'new_mutrel_error', 'true_mutrel_error', 'action')
+    #new_dbg = dbg + ((old_parent, new_parent, subtree_idx), old_samp.W_subtree, new_samp.W_subtree, old_W_parents, new_W_parents, _find_parents(old_samp.adj), _find_parents(new_samp.adj), true_parents, '%.3f' % old_samp.llh, '%.3f' % new_samp.llh, '%.3f' % log_p_old_given_new, '%.3f' % log_p_new_given_old, '%.3f' % (log_p_old_given_new - log_p_new_given_old),  '%.3f' % old_mutrel_error, '%.3f' % new_mutrel_error, '%.3f' % true_mutrel_error, action)
+    #debug(*['%s=%s' % (K, V) for K, V in zip(cols, new_dbg)], sep='\t')
 
   # Before, I called `choose_best_tree` to choose the tree to return from the
   # inner loop. Now, I just select the last tree sampled, on the assumption
@@ -286,7 +341,36 @@ def _run_inner_mh_chain(init_adj, nsamples, data_mutrel, superclusters):
   #
   # Before, when choosing the tree with the highest likelihood, I would often
   # always propose the same tree, missing reasonable structures altogether.
-  return samps[-1].adj
+  accept_rate = accepted / (nsamples - 1)
+  return (samps[-1].adj, accept_rate)
+
+def _run_inner_mh_chain_simple(init_adj, nsamples, data_mutrel, superclusters):
+  init_llh, init_logfit = _calc_llh_mutrel(init_adj, data_mutrel, superclusters)
+  adj = [init_adj]
+  llh = [init_llh]
+
+  assert nsamples > 0
+  accepted = 0
+  for I in range(1, nsamples):
+    old_adj = adj[-1]
+    old_llh = llh[-1]
+    old_anc = common.make_ancestral_from_adj(old_adj)
+    A, B = _choose_nodes_uniformly(len(old_adj), old_anc)
+    new_adj = _modify_tree(old_adj, old_anc, A, B)
+    new_llh, new_logfit = _calc_llh_mutrel(new_adj, data_mutrel, superclusters)
+
+    U = np.random.uniform()
+    if new_llh - old_llh >= np.log(U):
+      action = 'accept'
+      accepted += 1
+      adj.append(new_adj)
+      llh.append(new_llh)
+    else:
+      action = 'reject'
+      adj.append(old_adj)
+      llh.append(old_llh)
+  accept_rate = accepted / (nsamples - 1)
+  return (adj[-1], accept_rate)
 
 def _run_outer_mh_chain(data_mutrel, supervars, superclusters, nsamples, phi_method, phi_iterations, tree_perturbations, seed, progress_queue=None):
   # Ensure each chain gets a new random state. I add chain index to initial
@@ -315,17 +399,19 @@ def _run_outer_mh_chain(data_mutrel, supervars, superclusters, nsamples, phi_met
   llh = [_calc_llh(cluster_adj[0], phi[0])]
 
   assert nsamples > 0
+  accepted = 0
   for I in range(1, nsamples):
     if progress_queue is not None:
       progress_queue.put(I)
     old_llh, old_adj, old_phi = llh[-1], cluster_adj[-1], phi[-1]
-    new_adj = _run_inner_mh_chain(old_adj, tree_perturbations, data_mutrel, superclusters)
+    new_adj, inner_accept_rate = _run_inner_mh_chain(old_adj, tree_perturbations, data_mutrel, superclusters)
     new_phi = _calc_phi(new_adj)
     new_llh = _calc_llh(new_adj, new_phi)
 
     U = np.random.uniform()
     if new_llh - old_llh >= np.log(U):
       action = 'accept'
+      accepted += 1
       cluster_adj.append(new_adj)
       phi.append(new_phi)
       llh.append(new_llh)
@@ -334,19 +420,33 @@ def _run_outer_mh_chain(data_mutrel, supervars, superclusters, nsamples, phi_met
       cluster_adj.append(old_adj)
       phi.append(old_phi)
       llh.append(old_llh)
-    #debug(
+
+    #true_parents, true_llh, true_logfit, true_adjm, true_phi = _load_truth(data_mutrel, superclusters)
+    #_, _logfit = _calc_llh_mutrel(new_adj, data_mutrel, superclusters)
+    #norm = -old_phi.size * np.log(2)
+    #true_mutphi_llh = _calc_llh(true_adjm, true_phi) 
+    #cols = ('loop', 'iter', 'action', 'old_llh', 'new_llh', 'llh_delta', 'old_mutphi', 'new_mutphi', 'true_mutphi', 'U', 'old_parents', 'new_parents', 'true_parents', 'inner_accept', 'logfit', 'true_logfit')
+    #vals = (
     #  'mh_outer',
     #  I,
     #  action,
-    #  old_llh,
-    #  new_llh,
-    #  new_llh - old_llh,
-    #  U,
+    #  '%.3f' % old_llh,
+    #  '%.3f' % new_llh,
+    #  '%.3f' % (new_llh - old_llh),
+    #  '%.3f' % (old_llh / norm),
+    #  '%.3f' % (new_llh / norm),
+    #  '%.3f' % (true_mutphi_llh / norm),
+    #  '%.3f' % U,
     #  _find_parents(old_adj),
     #  _find_parents(new_adj),
-    #  sep='\t'
+    #  true_parents,
+    #  '%.3f' % inner_accept_rate,
+    #  _logfit,
+    #  true_logfit,
     #)
+    #debug(*['%s=%s' % (K, V) for K, V in zip(cols, vals)], sep='\t')
 
+  debug('outer_accept_rate=%s' % (accepted/(nsamples - 1)))
   return (cluster_adj, phi, llh)
 
 def use_existing_structures(adjms, supervars, superclusters, phi_method, phi_iterations, parallel=0):
