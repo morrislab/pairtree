@@ -41,21 +41,20 @@ def _calc_posterior(evidence, logprior):
   return posterior
 
 def _calc_posterior_full(evidence, logprior):
-  # This function is currently unused.
+  # This function is currently used only to double-check the results of
+  # `_calc_posterior`.
+  # TODO: remove this function.
   joint = evidence + logprior[None,None,:]
+  diag = range(len(joint))
+  joint[diag,diag,:] = -np.inf
+  joint[diag,diag,Models.cocluster] = 0
+
   B = np.max(joint, axis=2)
   joint -= B[:,:,None]
   expjoint = np.exp(joint)
   posterior = expjoint / np.sum(expjoint, axis=2)[:,:,None]
 
-  # Regardless of what the prior is on coclustering (even if it's zero), if
-  # we're dealing with a pair consisting of variant `i` and variant `i`, we
-  # want the posterior to indicate coclustering certainty.
-  M = range(len(posterior))
-  posterior[M,M,:] = 0
-  posterior[M,M,Models.cocluster] = 1
   mutrel.check_posterior_sanity(posterior)
-
   return posterior
 
 def _complete_logprior(logprior):
@@ -67,11 +66,13 @@ def _complete_logprior(logprior):
   '''
   if logprior is None:
     logprior = {}
-  for K in logprior.keys():
-    assert K in Models._all
-    assert logprior[K] <= 0
+    logtotal = -np.inf
+  else:
+    for K in logprior.keys():
+      assert K in Models._all
+      assert logprior[K] <= 0
+    logtotal = scipy.special.logsumexp(list(logprior.values()))
 
-  logtotal = scipy.special.logsumexp(list(logprior.values()))
   assert logtotal <= 0
   remaining = set(Models._all) - set(logprior.keys())
   for K in remaining:
@@ -240,7 +241,7 @@ def _examine(V1, V2, variants, _calc_lh=None):
     Es,
   ))
 
-  logprior = {'garbage': np.log(0.001)}
+  logprior = {'garbage': -np.inf, 'cocluster': -np.inf}
   post1 = _calc_posterior(E, _complete_logprior(None))
   post2 = _calc_posterior(E, _complete_logprior(logprior))
   return (persamp, E, post1, post2)
