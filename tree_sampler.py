@@ -78,6 +78,77 @@ def _init_cluster_adj_random(K):
   cluster_adj[parents, range(1,K)] = 1
   return cluster_adj
 
+def _init_cluster_adj_mutrels(data_mutrel):
+  # theta: weight of `B_A` pairwise probabilities
+  # kappa: weight of depth_frac
+  # TODO: unify hyperparam representation to have single copy
+  theta = 4
+  kappa = 1
+
+  K = len(data_mutrel.rels) + 1
+  adj = np.eye(K, dtype=np.int)
+  depth = np.zeros(K, dtype=np.int)
+  in_tree = set((0,))
+  remaining = set(range(1, K))
+
+  W_nodes      = np.zeros(K)
+  W_nodes[1:] += np.sum(data_mutrel.rels[:,:,Models.A_B], axis=1)
+  # Root should never be selected.
+  assert W_nodes[0] == 0
+
+  while len(remaining) > 0:
+    if np.all(W_nodes[list(remaining)] == 0):
+      W_nodes[list(remaining)] = 1
+    W_nodes_norm = W_nodes / np.sum(W_nodes)
+    # nidx: node index
+    # cidx: cluster index
+    nidx = _sample_cat(W_nodes_norm)
+    cidx = nidx - 1
+    assert data_mutrel.vids[cidx] == 'S%s' % cidx
+
+    anc_probs = data_mutrel.rels[cidx,:,Models.B_A]
+    assert anc_probs[cidx] == 0
+
+    if np.any(depth > 0):
+      depth_frac = depth / np.max(depth)
+    else:
+      # All nodes are at zero depth.
+      depth_frac = np.copy(depth)
+    assert depth_frac[0] == 0
+
+    W_parents      = np.zeros(K)
+    W_parents[0]  += theta * (1 - np.max(anc_probs))
+    W_parents[1:] += theta * anc_probs
+    W_parents     += kappa * depth_frac
+    # `W_anc[nidx]` and `depth_frac[nidx]` should both have been zero.
+    assert W_parents[nidx] == 0
+
+    # Don't select a parent not yet in the tree.
+    W_parents[list(remaining)] = 0
+    W_parents_intree = W_parents[list(in_tree)]
+    # If all potential parents have zero weight (e.g., because their ancestral
+    # probabilities are zero), establish uniform distribution over them.
+    if np.all(W_parents_intree == 0):
+      W_parents_intree[:] = 1
+    # Normalize before setting minimum.
+    W_parents_intree /= np.sum(W_parents_intree)
+    W_parents_intree  = np.maximum(1e-5, W_parents[list(in_tree)])
+    # Renormalize.
+    W_parents_intree /= np.sum(W_parents_intree)
+    W_parents[list(in_tree)] = W_parents_intree
+
+    parent = _sample_cat(W_parents)
+    adj[parent,nidx] = 1
+    depth[nidx] = depth[parent] + 1
+
+    remaining.remove(nidx)
+    in_tree.add(nidx)
+    W_nodes[nidx] = 0
+
+  assert np.all(W_nodes == 0)
+  assert depth[0] == 0 and np.all(depth[1:] > 0)
+  return adj
+
 def _modify_tree(adj, anc, A, B):
   '''If `B` is ancestral to `A`, swap nodes `A` and `B`. Otherwise, move
   subtree `B` under `A`.
@@ -157,7 +228,6 @@ def _calc_depth_frac(adj):
 
   assert depth[root] == 0
   assert np.all(depth[:root] > 0) and np.all(depth[root+1:] > 0)
-
   depth_frac = depth / np.max(depth)
   return depth_frac
 
@@ -221,10 +291,23 @@ def _make_W_subtree(adj, depth_frac, fit_mutrel, progress):
   _make_W_subtree.debug = (weights_depth, weights_fit, weights, norm_weights)
   return norm_weights
 
+def _normalize_W_parents(weights, subtree_idx, curr_parent):
+  # Normalize for setting minimum.
+  weights /= np.sum(weights)
+  # Allow all nodes to be chosen with some small probability ...
+  weights = np.maximum(1e-5, weights)
+  # ... but don't allow a node to be its own parent ...
+  weights[subtree_idx] = 0
+  # ... and ensure a different parent is chosen than the current one.
+  weights[curr_parent] = 0
+  # Renormalize.
+  weights /= np.sum(weights)
+  return weights
+
 def _make_W_parents(subtree_idx, curr_parent, anc, depth_frac, mutrel):
   # theta: weight of `B_A` pairwise probabilities
   # kappa: weight of depth_frac
-  theta = 8
+  theta = 4
   kappa = 1
 
   K = len(anc)
@@ -232,7 +315,12 @@ def _make_W_parents(subtree_idx, curr_parent, anc, depth_frac, mutrel):
   assert mutrel.vids[cluster_idx] == 'S%s' % cluster_idx
 
   weights = np.zeros(K)
-  weights[1:] += theta * mutrel.rels[cluster_idx,:,Models.B_A]
+  anc_probs = mutrel.rels[cluster_idx,:,Models.B_A]
+  assert anc_probs[cluster_idx] == 0
+  # Intuition: if none of the non-root nodes are high probability parents, then
+  # the root should be high probability.
+  weights[0]  += theta * (1 - np.max(anc_probs))
+  weights[1:] += theta * anc_probs
   weights     += kappa * depth_frac
 
   # We can use `anc` to put zero mass on choosing a parent that is already a
@@ -240,24 +328,14 @@ def _make_W_parents(subtree_idx, curr_parent, anc, depth_frac, mutrel):
   #subtree_desc = np.flatnonzero(anc[subtree_idx])
   #weights[subtree_desc] = 0
 
-  weights /= np.sum(weights)
-  # Use normalized weights to set root weight.
-  # Intuition: if none of the non-root nodes are high probability parents, then
-  # the root should be high probability.
-  weights[0] = max(0.001, 1 - np.max(weights[1:]))
-  # Allow all nodes to be chosen with some small probability ...
-  weights[1:] = np.maximum(1e-10, weights[1:])
-  # ... but don't allow a node to be its own parent ...
-  weights[subtree_idx] = 0
-  # ... and ensure a different parent is chosen than the current one.
-  weights[curr_parent] = 0
-  # Renormalize.
-  weights /= np.sum(weights)
-
+  weights = _normalize_W_parents(weights, subtree_idx, curr_parent)
   return weights
 
 def _sample_cat(W):
-  return np.random.choice(len(W), p=W)
+  assert np.all(W >= 0) and np.isclose(1, np.sum(W))
+  choice = np.random.choice(len(W), p=W)
+  assert W[choice] > 0
+  return choice
 
 def _load_truth(truthfn):
   import pickle
@@ -267,7 +345,28 @@ def _load_truth(truthfn):
   true_phi = truth['phi']
   return (true_adjm, true_phi)
 
-def _init_chain(K, seed, __calc_phi, __calc_llh_phi, __calc_llh_mutrel):
+def _ensure_valid_tree(adj):
+  # I had several issues with subtle bugs in my tree initialization algorithm
+  # creating invalid trees. This function is useful to ensure that `adj`
+  # corresponds to a valid tree.
+  adj = np.copy(adj)
+  K = len(adj)
+  assert np.all(np.diag(adj) == 1)
+  np.fill_diagonal(adj, 0)
+  visited = set()
+
+  stack = [0]
+  while len(stack) > 0:
+    P = stack.pop()
+    assert P not in visited
+    visited.add(P)
+    C = np.flatnonzero(adj[P])
+    if len(C) == 0:
+      continue
+    stack += list(C)
+  assert visited == set(range(K))
+
+def _init_chain(seed, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_mutrel):
   # Ensure each chain gets a new random state. I add chain index to initial
   # random seed to seed a new chain, so I must ensure that the seed is still in
   # the valid range [0, 2**32).
@@ -278,7 +377,9 @@ def _init_chain(K, seed, __calc_phi, __calc_llh_phi, __calc_llh_mutrel):
   # initialization, as it doesn't require any steps that "undo" bad choices, as
   # in the linear or random (which is partly linear, given that later clusters
   # aren't allowed to be parents of earlier ones) cases.
-  init_adj = _init_cluster_adj_branching(K)
+  #init_adj = _init_cluster_adj_branching(K)
+  init_adj = _init_cluster_adj_mutrels(data_mutrel)
+  _ensure_valid_tree(init_adj)
 
   init_llh_mutrel, init_fit_mutrel = __calc_llh_mutrel(init_adj)
   init_anc = common.make_ancestral_from_adj(init_adj)
@@ -336,20 +437,21 @@ def _sample_tree(progress, old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __
   accept = log_p_transition >= np.log(U)
 
   def _print_debug():
-    true_adj, true_phi = _load_truth('/home/q/qmorris/jawinter/work/pairtree/scratch/inputs/sims.pairtree/sim_K10_S3_T1000_M100_G10_run1.data.pickle')
+    #true_adj, true_phi = _load_truth('/home/q/qmorris/jawinter/work/pairtree/scratch/inputs/sims.pairtree/sim_K10_S3_T50_M200_G2_run1.data.pickle')
     norm_phi_llh = -old_samp.phi.size * np.log(2)
     cols = (
       'action',
       'old_llh',
       'new_llh',
-      'true_llh',
+      #'true_llh',
       'p_new_given_old',
       'p_old_given_new',
+      'progress',
       'nodes',
       'W_parents',
       'old_parents',
       'new_parents',
-      'true_parents',
+      #'true_parents',
       'weights_depth',
       'weights_fit',
       'weights',
@@ -359,14 +461,15 @@ def _sample_tree(progress, old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __
       'accept' if accept else 'reject',
       '%.3f' % (old_samp.llh_phi / norm_phi_llh),
       '%.3f' % (new_samp.llh_phi / norm_phi_llh),
-      '%.3f' % (__calc_llh_phi(true_adj, true_phi) / norm_phi_llh),
+      #'%.3f' % (__calc_llh_phi(true_adj, true_phi) / norm_phi_llh),
       '%.3f' % log_p_new_given_old,
       '%.3f' % log_p_old_given_new,
+      '%.3f' % progress,
       (subtree_idx, old_parent, new_parent),
       old_W_parents,
       _find_parents(old_samp.adj),
       _find_parents(new_samp.adj),
-      _find_parents(true_adj),
+      #_find_parents(true_adj),
     ) + old_debug_info
     debug(*['%s=%s' % (K, V) for K, V in zip(cols, vals)], sep='\t')
   #_print_debug()
@@ -380,7 +483,6 @@ def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_method, phi_
   assert nsamples > 0
 
   V, N, omega_v = calc_binom_params(supervars)
-  K = len(superclusters)
   def __calc_phi(adj):
     phi, eta = phi_fitter.fit_phis(adj, superclusters, supervars, method=phi_method, iterations=phi_iterations, parallel=0)
     return phi
@@ -389,15 +491,25 @@ def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_method, phi_
   def __calc_llh_mutrel(adj):
     return _calc_llh_mutrel(adj, data_mutrel, superclusters)
 
-  samps = [_init_chain(K, seed, __calc_phi, __calc_llh_phi, __calc_llh_mutrel)]
+  samps = [_init_chain(seed, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_mutrel)]
   accepted = 0
   if progress_queue is not None:
     progress_queue.put(0)
 
+  # TODO: this should be a hyperparam
+  tree_traversals = 5
+  period = int(nsamples / tree_traversals)
+  # If I can't take at least 100 samples per tree traversal, then I will
+  # perform only a single tree traversal. (I.e., we need `nsamples >= 500` for
+  # multiple tree traversals to occur.)
+  if period < 100:
+    period = nsamples
+
   for I in range(1, nsamples):
     if progress_queue is not None:
       progress_queue.put(I)
-    progress = I / nsamples
+    progress = (I % period) / float(period)
+    assert 0 <= progress < 1
     accept, samp = _sample_tree(progress, samps[-1], data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_mutrel)
     samps.append(samp)
     if accept:
