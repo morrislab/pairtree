@@ -479,7 +479,7 @@ def _sample_tree(progress, old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __
   else:
     return (accept, old_samp)
 
-def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_method, phi_iterations, tree_perturbations, seed, progress_queue=None):
+def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_method, phi_iterations, seed, progress_queue=None):
   assert nsamples > 0
 
   V, N, omega_v = calc_binom_params(supervars)
@@ -535,7 +535,7 @@ def use_existing_structures(adjms, supervars, superclusters, phi_method, phi_ite
     llhs.append(llh)
   return (np.array(adjms), np.array(phis), np.array(llhs))
 
-def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_per_chain, nchains, phi_method, phi_iterations, tree_perturbations, seed, parallel):
+def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_per_chain, nchains, phi_method, phi_iterations, seed, parallel):
   assert nchains > 0
   jobs = []
   total_per_chain = trees_per_chain + burnin_per_chain
@@ -555,7 +555,7 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_
         for C in range(nchains):
           # Ensure each chain's random seed is different from the seed used to
           # seed the initial Pairtree invocation, yet nonetheless reproducible.
-          jobs.append(ex.submit(_run_chain, data_mutrel, supervars, superclusters, total_per_chain, phi_method, phi_iterations, tree_perturbations, seed + C + 1, progress_queue))
+          jobs.append(ex.submit(_run_chain, data_mutrel, supervars, superclusters, total_per_chain, phi_method, phi_iterations, seed + C + 1, progress_queue))
 
         # Exactly `total` items will be added to the queue. Once we've
         # retrieved that many items from the queue, we can assume that our
@@ -570,7 +570,7 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_
   else:
     results = []
     for C in range(nchains):
-      results.append(_run_chain(data_mutrel, supervars, superclusters, total_per_chain, phi_method, phi_iterations, tree_perturbations, seed + C + 1))
+      results.append(_run_chain(data_mutrel, supervars, superclusters, total_per_chain, phi_method, phi_iterations, seed + C + 1))
 
   merged_adj = []
   merged_phi = []
