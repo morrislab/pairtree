@@ -4,6 +4,7 @@ import common
 import mutrel
 from progressbar import progressbar
 import phi_fitter
+import hyperparams as hparams
 Models = common.Models
 debug = common.debug
 
@@ -79,11 +80,9 @@ def _init_cluster_adj_random(K):
   return cluster_adj
 
 def _init_cluster_adj_mutrels(data_mutrel):
-  # theta: weight of `B_A` pairwise probabilities
-  # kappa: weight of depth_frac
-  # TODO: unify hyperparam representation to have single copy
-  theta = 4
-  kappa = 1
+  # Hyperparams:
+  #   * theta: weight of `B_A` pairwise probabilities
+  #   * kappa: weight of depth_frac
 
   K = len(data_mutrel.rels) + 1
   adj = np.eye(K, dtype=np.int)
@@ -117,9 +116,9 @@ def _init_cluster_adj_mutrels(data_mutrel):
     assert depth_frac[0] == 0
 
     W_parents      = np.zeros(K)
-    W_parents[0]  += theta * (1 - np.max(anc_probs))
-    W_parents[1:] += theta * anc_probs
-    W_parents     += kappa * depth_frac
+    W_parents[0]  += hparams.theta * (1 - np.max(anc_probs))
+    W_parents[1:] += hparams.theta * anc_probs
+    W_parents     += hparams.kappa * depth_frac
     # `W_anc[nidx]` and `depth_frac[nidx]` should both have been zero.
     assert W_parents[nidx] == 0
 
@@ -258,18 +257,14 @@ def _make_W_subtree(adj, depth_frac, fit_mutrel, progress):
   # * tau: weight of depth term
   # * rho: weight of mutrel fit term
   # * psi: how strongly peaked depth term is
-  tau = 1
-  rho = 5
-  psi = 3
-
   K = len(adj)
 
   assert np.all(fit_mutrel <= 0)
   assert adj.shape == (K, K)
 
   assert 0 <= progress <= 1
-  A = psi * progress + 1
-  B = psi * (1 - progress) + 1
+  A = hparams.psi * progress + 1
+  B = hparams.psi * (1 - progress) + 1
   depth_frac[1:] = np.minimum(0.99, depth_frac[1:])
   depth_frac[1:] = np.maximum(0.01, depth_frac[1:])
   weights_depth = depth_frac**(A-1) * (1 - depth_frac)**(B-1)
@@ -283,8 +278,8 @@ def _make_W_subtree(adj, depth_frac, fit_mutrel, progress):
     weights_fit = np.maximum(1e-5, fit_mutrel)
   weights_fit /= np.sum(weights_fit)
 
-  weights      = tau * weights_depth
-  weights[1:] += rho * weights_fit
+  weights      = hparams.tau * weights_depth
+  weights[1:] += hparams.rho * weights_fit
   assert weights[0] == 0 and np.all(weights[1:] >= 0) and np.any(weights > 0)
 
   norm_weights = weights / np.sum(weights)
@@ -305,10 +300,9 @@ def _normalize_W_parents(weights, subtree_idx, curr_parent):
   return weights
 
 def _make_W_parents(subtree_idx, curr_parent, anc, depth_frac, mutrel):
-  # theta: weight of `B_A` pairwise probabilities
-  # kappa: weight of depth_frac
-  theta = 4
-  kappa = 1
+  # Hyperparams:
+  #   * theta: weight of `B_A` pairwise probabilities
+  #   * kappa: weight of depth_frac
 
   K = len(anc)
   cluster_idx = subtree_idx - 1
@@ -319,9 +313,9 @@ def _make_W_parents(subtree_idx, curr_parent, anc, depth_frac, mutrel):
   assert anc_probs[cluster_idx] == 0
   # Intuition: if none of the non-root nodes are high probability parents, then
   # the root should be high probability.
-  weights[0]  += theta * (1 - np.max(anc_probs))
-  weights[1:] += theta * anc_probs
-  weights     += kappa * depth_frac
+  weights[0]  += hparams.theta * (1 - np.max(anc_probs))
+  weights[1:] += hparams.theta * anc_probs
+  weights     += hparams.kappa * depth_frac
 
   # We can use `anc` to put zero mass on choosing a parent that is already a
   # descendant of the node. But, for now, we do not.
@@ -480,6 +474,10 @@ def _sample_tree(progress, old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __
     return (accept, old_samp)
 
 def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_method, phi_iterations, seed, progress_queue=None):
+  # Hyperparams:
+  #   * tree_traverals: how many depth-based traverals to make through tree
+  #     over course of the Metropolis-Hastings run
+
   assert nsamples > 0
 
   V, N, omega_v = calc_binom_params(supervars)
@@ -496,9 +494,7 @@ def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_method, phi_
   if progress_queue is not None:
     progress_queue.put(0)
 
-  # TODO: this should be a hyperparam
-  tree_traversals = 5
-  period = int(nsamples / tree_traversals)
+  period = int(nsamples / hparams.tree_traversals)
   # If I can't take at least 100 samples per tree traversal, then I will
   # perform only a single tree traversal. (I.e., we need `nsamples >= 500` for
   # multiple tree traversals to occur.)

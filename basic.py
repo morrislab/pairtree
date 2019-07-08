@@ -13,12 +13,9 @@ import inputparser
 import tree_sampler
 import clustermaker
 import resultserializer
+import hyperparams
 
-def main():
-  np.set_printoptions(linewidth=400, precision=3, threshold=sys.maxsize, suppress=True)
-  np.seterr(divide='raise', invalid='raise')
-  warnings.simplefilter('ignore', category=scipy.integrate.IntegrationWarning)
-
+def _parse_args():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
@@ -33,10 +30,49 @@ def main():
   parser.add_argument('--phi-iterations', dest='phi_iterations', type=int, default=10000)
   parser.add_argument('--phi-fitter', dest='phi_fitter', choices=('graddesc', 'rprop', 'projection', 'proj_rprop'), default='rprop')
   parser.add_argument('--only-build-tensor', dest='only_build_tensor', action='store_true')
+
+  parser.add_argument('--rho', type=float, default=5,
+    help='Weight of mutrel fit term when selecting node to move within tree, such that we prefer nodes with high mutrel error')
+  parser.add_argument('--tau', type=float, default=1,
+    help='Weight of tree depth when selecting node to move within tree, such that the Metropolis-Hastings run makes multiple passes from the root to the leaves over its full duration, allowing us to correct errors close to the root before we correct errors close to the leaves')
+  parser.add_argument('--psi', type=float, default=3,
+    help='How strongly peaked the depth term is in the beta-PDF-like depth score, such that higher values will favour nodes at the precise requested depth')
+  parser.add_argument('--tree-traversals', type=int, default=5,
+    help='How many passes to make through the tree over the course of the Metropolis-Hastings run')
+  parser.add_argument('--theta', type=float, default=4,
+    help='Weight of ancestral pairwise probabilities when determining potential parent probability distribution for selected node when doing tree updates, such that nodes with high ancestral probability are preferred as parents')
+  parser.add_argument('--kappa', type=float, default=1,
+    help='Weight of tree depth when determining potential parent probability distribution for selected node when doing tree updates, such that nodes deeper in the existing tree are preferred as parents')
+
   parser.add_argument('ssm_fn')
   parser.add_argument('results_fn')
   args = parser.parse_args()
+  return args
 
+def _init_hyperparams(args):
+  hparams = (
+    'rho',
+    'tau',
+    'psi',
+    'tree_traversals',
+    'theta',
+    'kappa',
+  )
+  for K in hparams:
+    V = getattr(args, K)
+    # Checking that the key already exists in `hyperparams` isn't necessary.
+    # But it's useful because it enforces treating `hyperparams` as a central
+    # listing of all hyperparams.
+    assert hasattr(hyperparams, K)
+    setattr(hyperparams, K, V)
+
+def main():
+  np.set_printoptions(linewidth=400, precision=3, threshold=sys.maxsize, suppress=True)
+  np.seterr(divide='raise', invalid='raise')
+  warnings.simplefilter('ignore', category=scipy.integrate.IntegrationWarning)
+
+  args = _parse_args()
+  _init_hyperparams(args)
   common.debug.DEBUG = args.verbose
 
   # Note that multiprocessing.cpu_count() returns number of logical cores, so
