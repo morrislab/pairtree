@@ -5,6 +5,7 @@ import mutrel
 from progressbar import progressbar
 import phi_fitter
 import hyperparams as hparams
+import math
 Models = common.Models
 debug = common.debug
 
@@ -473,7 +474,7 @@ def _sample_tree(progress, old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __
   else:
     return (accept, old_samp)
 
-def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_method, phi_iterations, seed, progress_queue=None):
+def _run_chain(data_mutrel, supervars, superclusters, nsamples, thinned_frac, phi_method, phi_iterations, seed, progress_queue=None):
   # Hyperparams:
   #   * tree_traverals: how many depth-based traverals to make through tree
   #     over course of the Metropolis-Hastings run
@@ -501,18 +502,40 @@ def _run_chain(data_mutrel, supervars, superclusters, nsamples, phi_method, phi_
   if period < 100:
     period = nsamples
 
+  assert 0 < thinned_frac <= 1
+  record_every = round(1 / thinned_frac)
+  # Why is `expected_total_trees` equal to this?
+  #
+  # We always taken the first tree, since `0%k = 0` for all `k`. There remain
+  # `nsamples - 1` samples to take, of which we record every `record_every`
+  # one.
+  #
+  # This can give somewhat weird results, since you intuitively expect
+  # approximately `thinned_frac * nsamples` trees to be returned. E.g., if
+  # `nsamples = 3000` and `thinned_frac = 0.3`, you expect `0.3 * 3000 = 900`
+  # trees, but you actually get 1000. To not be surprised by this, try to
+  # choose `thinned_frac` such that `1 / thinned_frac` is close to an integer.
+  # (I.e., `thinned_frac = 0.5` or `thinned_frac = 0.3333333` generally give
+  # results as you'd expect.
+  expected_total_trees = 1 + math.floor((nsamples - 1) / record_every)
+
+  last_samp = samps[0]
   for I in range(1, nsamples):
     if progress_queue is not None:
       progress_queue.put(I)
     progress = (I % period) / float(period)
     assert 0 <= progress < 1
-    accept, samp = _sample_tree(progress, samps[-1], data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_mutrel)
-    samps.append(samp)
+
+    accept, samp = _sample_tree(progress, last_samp, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_mutrel)
+    if I % record_every == 0:
+      samps.append(samp)
+    last_samp = samp
     if accept:
       accepted += 1
 
   accept_rate = accepted / (nsamples - 1)
-  debug('accept_rate', accept_rate)
+  assert len(samps) == expected_total_trees
+  debug('accept_rate=%s' % accept_rate, 'total_trees=%s' % len(samps))
   return (
     [S.adj     for S in samps],
     [S.phi     for S in samps],
@@ -531,11 +554,14 @@ def use_existing_structures(adjms, supervars, superclusters, phi_method, phi_ite
     llhs.append(llh)
   return (np.array(adjms), np.array(phis), np.array(llhs))
 
-def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_per_chain, nchains, phi_method, phi_iterations, seed, parallel):
+def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin, nchains, thinned_frac, phi_method, phi_iterations, seed, parallel):
   assert nchains > 0
+  assert trees_per_chain > 0
+  assert 0 <= burnin <= 1
+  assert 0 < thinned_frac <= 1
+
   jobs = []
-  total_per_chain = trees_per_chain + burnin_per_chain
-  total = nchains * total_per_chain
+  total = nchains * trees_per_chain
 
   # Don't use (hard-to-debug) parallelism machinery unless necessary.
   if parallel > 0:
@@ -551,7 +577,7 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_
         for C in range(nchains):
           # Ensure each chain's random seed is different from the seed used to
           # seed the initial Pairtree invocation, yet nonetheless reproducible.
-          jobs.append(ex.submit(_run_chain, data_mutrel, supervars, superclusters, total_per_chain, phi_method, phi_iterations, seed + C + 1, progress_queue))
+          jobs.append(ex.submit(_run_chain, data_mutrel, supervars, superclusters, trees_per_chain, thinned_frac, phi_method, phi_iterations, seed + C + 1, progress_queue))
 
         # Exactly `total` items will be added to the queue. Once we've
         # retrieved that many items from the queue, we can assume that our
@@ -566,13 +592,15 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin_
   else:
     results = []
     for C in range(nchains):
-      results.append(_run_chain(data_mutrel, supervars, superclusters, total_per_chain, phi_method, phi_iterations, seed + C + 1))
+      results.append(_run_chain(data_mutrel, supervars, superclusters, trees_per_chain, thinned_frac, phi_method, phi_iterations, seed + C + 1))
 
+  discard_first = round(burnin * trees_per_chain)
   merged_adj = []
   merged_phi = []
   merged_llh = []
   for A, P, L in results:
-    merged_adj += A[burnin_per_chain:]
-    merged_phi += P[burnin_per_chain:]
-    merged_llh += L[burnin_per_chain:]
+    merged_adj += A[discard_first:]
+    merged_phi += P[discard_first:]
+    merged_llh += L[discard_first:]
+  assert len(merged_adj) == len(merged_phi) == len(merged_llh)
   return (merged_adj, merged_phi, merged_llh)

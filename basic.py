@@ -24,9 +24,10 @@ def _parse_args():
   parser.add_argument('--seed', dest='seed', type=int)
   parser.add_argument('--parallel', dest='parallel', type=int, default=None)
   parser.add_argument('--params', dest='params_fn')
-  parser.add_argument('--burnin-per-chain', dest='burnin_per_chain', type=int, default=1000)
   parser.add_argument('--trees-per-chain', dest='trees_per_chain', type=int, default=2000)
   parser.add_argument('--tree-chains', dest='tree_chains', type=int, default=None)
+  parser.add_argument('--burnin', dest='burnin', type=float, default=(1/3), help='Fraction of samples to discard from beginning of each chain')
+  parser.add_argument('--thinned-frac', dest='thinned_frac', type=float, default=1)
   parser.add_argument('--phi-iterations', dest='phi_iterations', type=int, default=10000)
   parser.add_argument('--phi-fitter', dest='phi_fitter', choices=('graddesc', 'rprop', 'projection', 'proj_rprop'), default='rprop')
   parser.add_argument('--only-build-tensor', dest='only_build_tensor', action='store_true')
@@ -119,6 +120,7 @@ def main():
         logprior,
         parallel,
       )
+
     resultserializer.save(results, args.results_fn)
   else:
     supervars = clustermaker.make_cluster_supervars(results['clusters'], variants)
@@ -137,8 +139,9 @@ def main():
         supervars,
         superclusters,
         args.trees_per_chain,
-        args.burnin_per_chain,
+        args.burnin,
         tree_chains,
+        args.thinned_frac,
         args.phi_fitter,
         args.phi_iterations,
         seed,
