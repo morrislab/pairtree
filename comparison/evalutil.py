@@ -49,6 +49,10 @@ def save_sorted_mutrel(mrel, mrelfn):
   np.savez_compressed(mrelfn, rels=mrel.rels, vids=mrel.vids)
 
 def _distinguish_unique_trees(adjms, logweights, clusterings):
+  # Uncomment these two lines to short-circuit the "distinguish unique trees"
+  # behaviour.
+  #M = len(adjms)
+  #return (adjms, clusterings, logweights, np.ones(M))
   used_logweights = set()
   uniq_adjms = []
   uniq_clusterings = []

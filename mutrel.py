@@ -39,8 +39,11 @@ def remove_variants(mrel, vidxs):
   )
 
 def sort_mutrel_by_vids(mrel):
-  sort_map = {vid: vidx for vidx, vid in enumerate(mrel.vids)}
   sorted_vids = common.sort_vids(mrel.vids)
+  if mrel.vids == sorted_vids:
+    return mrel
+
+  sort_map = {vid: vidx for vidx, vid in enumerate(mrel.vids)}
   order = [sort_map[vid] for vid in sorted_vids]
   assert sorted_vids == [mrel.vids[idx] for idx in order]
   return Mutrel(
@@ -120,7 +123,6 @@ def reorder_array(arr, order):
   # common.reorder_square_matrix does hierarchical clustering to determine
   # order. This is a much simpler and more elegant function that uses a
   # user-defined order.
-  #
   M = len(arr)
   assert arr.ndim >= 2
   assert arr.shape[:2] == (M, M)
