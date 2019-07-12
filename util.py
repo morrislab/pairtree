@@ -1,3 +1,4 @@
+import numpy as np
 import scipy.special
 import time
 
@@ -17,3 +18,9 @@ def time_exec(f):
     return ret
   return wrap
 time_exec._ms = None
+
+def softmax(V):
+  log_softmax = V - scipy.special.logsumexp(V)
+  softmax = np.exp(log_softmax)
+  assert np.isclose(np.sum(softmax), 1)
+  return softmax

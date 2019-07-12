@@ -4,9 +4,6 @@ import util
 import common
 import sys
 
-def softmax(V):
-  return np.exp(V) / np.sum(np.exp(V))
-
 def create_vars():
   variants = {
     #'V1': {'var_reads': [18], 'total_reads': [100]},
@@ -62,7 +59,7 @@ def main():
       M_name.ljust(max_estimator_len),
       '%.3f ms' % util.time_exec._ms,
       evidence,
-      softmax(evidence),
+      util.softmax(evidence),
       sep='\t',
     )
 
