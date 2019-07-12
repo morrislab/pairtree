@@ -6,6 +6,7 @@ from progressbar import progressbar
 import phi_fitter
 import hyperparams as hparams
 import math
+import util
 Models = common.Models
 debug = common.debug
 
@@ -18,7 +19,7 @@ TreeSample = namedtuple('TreeSample', (
   'llh_phi',
   'fit_mutrel',
   'progress',
-  'W_subtree',
+  'W_nodes',
 ))
 
 def _calc_llh_phi(phi, V, N, omega_v, epsilon=1e-5):
@@ -253,7 +254,7 @@ def _find_parent(node, adj):
   assert len(parents) == 1
   return parents[0]
 
-def _make_W_subtree(adj, depth_frac, fit_mutrel, progress):
+def _make_W_nodes(adj, depth_frac, fit_mutrel, progress):
   # Hyperparams:
   # * tau: weight of depth term
   # * rho: weight of mutrel fit term
@@ -284,10 +285,10 @@ def _make_W_subtree(adj, depth_frac, fit_mutrel, progress):
   assert weights[0] == 0 and np.all(weights[1:] >= 0) and np.any(weights > 0)
 
   norm_weights = weights / np.sum(weights)
-  _make_W_subtree.debug = (weights_depth, weights_fit, weights, norm_weights)
+  _make_W_nodes.debug = (weights_depth, weights_fit, weights, norm_weights)
   return norm_weights
 
-def _normalize_W_parents(weights, subtree_idx, curr_parent):
+def _normalize_W_dests(weights, subtree_idx, curr_parent):
   # Normalize for setting minimum.
   weights /= np.sum(weights)
   # Allow all nodes to be chosen with some small probability ...
@@ -300,10 +301,15 @@ def _normalize_W_parents(weights, subtree_idx, curr_parent):
   weights /= np.sum(weights)
   return weights
 
-def _make_W_parents(subtree_idx, curr_parent, anc, depth_frac, mutrel):
+def _make_W_dests(subtree_idx, curr_parent, adj, anc, depth_frac, mutrel):
   # Hyperparams:
   #   * theta: weight of `B_A` pairwise probabilities
   #   * kappa: weight of depth_frac
+  # We refer to `W_dests` rather than `W_parents`, since the destination chosen
+  # for `subtree_idx` could actually be a descendant of it, in which case the
+  # nodes are swapped. When the destination for `subtree_idx` *isn't* its
+  # descendant, then `subtree_idx` is moved under it to become its child.
+  assert adj[curr_parent,subtree_idx] == 1
 
   K = len(anc)
   cluster_idx = subtree_idx - 1
@@ -323,7 +329,7 @@ def _make_W_parents(subtree_idx, curr_parent, anc, depth_frac, mutrel):
   #subtree_desc = np.flatnonzero(anc[subtree_idx])
   #weights[subtree_desc] = 0
 
-  weights = _normalize_W_parents(weights, subtree_idx, curr_parent)
+  weights = _normalize_W_dests(weights, subtree_idx, curr_parent)
   return weights
 
 def _sample_cat(W):
@@ -390,22 +396,25 @@ def _init_chain(seed, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_mutrel
     llh_phi = __calc_llh_phi(init_adj, init_phi),
     fit_mutrel = init_fit_mutrel,
     progress = init_progress,
-    W_subtree = _make_W_subtree(init_adj, init_depth_frac, init_fit_mutrel, init_progress),
+    W_nodes = _make_W_nodes(init_adj, init_depth_frac, init_fit_mutrel, init_progress),
   )
   return init_samp
 
 def _sample_tree(progress, old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_mutrel):
-  subtree_idx = _sample_cat(old_samp.W_subtree)
-  assert subtree_idx != 0
-  old_debug_info = tuple(_make_W_subtree.debug)
+  # If `B` is ancestral to `A`, swap nodes `A` and `B`. Otherwise, move subtree
+  # `B` under `A`.
+  B = _sample_cat(old_samp.W_nodes)
+  assert B != 0
+  old_debug_info = tuple(_make_W_nodes.debug)
 
-  old_parent = _find_parent(subtree_idx, old_samp.adj)
-  # Don't carry `old_W_parents` in `old_samp`, since it's dependent not just
+  old_parent = _find_parent(B, old_samp.adj)
+  # Don't carry `old_W_dests` in `old_samp`, since it's dependent not just
   # on the current tree, but also on the subtree selected.
-  old_W_parents = _make_W_parents(subtree_idx, old_parent, old_samp.anc, old_samp.depth_frac, data_mutrel)
-  new_parent = _sample_cat(old_W_parents)
-  assert new_parent != old_parent
-  new_adj = _modify_tree(old_samp.adj, old_samp.anc, new_parent, subtree_idx)
+  old_W_dests = _make_W_dests(B, old_parent, old_samp.adj, old_samp.anc, old_samp.depth_frac, data_mutrel)
+
+  A = _sample_cat(old_W_dests)
+  assert A != old_parent
+  new_adj = _modify_tree(old_samp.adj, old_samp.anc, A, B)
   new_llh_mutrel, new_fit_mutrel = __calc_llh_mutrel(new_adj)
   new_depth_frac = _calc_depth_frac(new_adj)
   new_phi = __calc_phi(new_adj)
@@ -418,14 +427,15 @@ def _sample_tree(progress, old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __
     llh_phi = __calc_llh_phi(new_adj, new_phi),
     fit_mutrel = new_fit_mutrel,
     progress = progress,
-    W_subtree = _make_W_subtree(new_adj, new_depth_frac, new_fit_mutrel, progress),
+    W_nodes = _make_W_nodes(new_adj, new_depth_frac, new_fit_mutrel, progress),
   )
 
-  # This is p(subtree_idx, new_parent | old_state) = p(subtree_idx | old_state)p(new_parent | subtree_idx, old_state)
-  log_p_new_given_old = np.log(old_samp.W_subtree[subtree_idx]) + np.log(old_W_parents[new_parent])
-  # This is p(subtree_idx, old_parent | new_state) = p(subtree_idx | new_state)p(old_parent | subtree_idx, new_state)
-  new_W_parents = _make_W_parents(subtree_idx, new_parent, new_samp.anc, new_samp.depth_frac, data_mutrel)
-  log_p_old_given_new = np.log(new_samp.W_subtree[subtree_idx]) + np.log(new_W_parents[old_parent])
+  new_parent = _find_parent(B, new_adj)
+  # This is p(A, B | old_state) = p(B | old_state)p(A | B, old_state)
+  log_p_new_given_old = np.log(old_samp.W_nodes[B]) + np.log(old_W_dests[A])
+  # This is p(B, old_parent | new_state) = p(B | new_state)p(old_parent | B, new_state)
+  new_W_dests = _make_W_dests(B, new_parent, new_samp.adj, new_samp.anc, new_samp.depth_frac, data_mutrel)
+  log_p_old_given_new = np.log(new_samp.W_nodes[B]) + np.log(new_W_dests[old_parent])
 
   log_p_transition = (new_samp.llh_phi - old_samp.llh_phi) + (log_p_old_given_new - log_p_new_given_old)
   U = np.random.uniform()
@@ -443,7 +453,7 @@ def _sample_tree(progress, old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __
       'p_old_given_new',
       'progress',
       'nodes',
-      'W_parents',
+      'W_dests',
       'old_parents',
       'new_parents',
       #'true_parents',
@@ -460,8 +470,8 @@ def _sample_tree(progress, old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __
       '%.3f' % log_p_new_given_old,
       '%.3f' % log_p_old_given_new,
       '%.3f' % progress,
-      (subtree_idx, old_parent, new_parent),
-      old_W_parents,
+      (B, old_parent, new_parent),
+      old_W_dests,
       _find_parents(old_samp.adj),
       _find_parents(new_samp.adj),
       #_find_parents(true_adj),
