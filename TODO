@@ -1,10 +1,7 @@
-Switch to cross entropy loss
-Eliminate coclustering relation
+Occasionally init with fully branched tree
+Occasionally do random update
+Do hyperparam search
 
-Add toggles to variant/garbage/etc.
-Select highest LH tree
-Investigate why SJBALL022610 seems weird
-  What are the pairwise probs between clusters?
+Take mturel error as sum of mutrel error
 
-Make figures
-Make supplementary tables
+
