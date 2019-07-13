@@ -288,20 +288,38 @@ def _make_W_nodes(adj, depth_frac, fit_mutrel, progress):
   _make_W_nodes.debug = (weights_depth, weights_fit, weights, norm_weights)
   return norm_weights
 
-def _normalize_W_dests(weights, subtree_idx, curr_parent):
-  # Normalize for setting minimum.
+def _make_W_dests_full(subtree_idx, curr_parent, adj, anc, depth_frac, __calc_llh_mutrel):
+  assert adj[curr_parent,subtree_idx] == 1
+
+  K = len(adj)
+  weights_mutrel = np.zeros(K)
+  for new_parent in range(K):
+    if new_parent in (curr_parent, subtree_idx):
+      weights_mutrel[new_parent] = -np.inf
+      continue
+    new_adj = _modify_tree(adj, anc, new_parent, subtree_idx)
+    weights_mutrel[new_parent], _ = __calc_llh_mutrel(new_adj)
+
+  weights_mutrel = util.softmax(weights_mutrel)
+  # Preserve irreducibility of chain by ensuring all valid parents have
+  # non-zero weight.
+  assert weights_mutrel[curr_parent] == 0
+  assert weights_mutrel[subtree_idx] == 0
+  assert np.isclose(np.sum(weights_mutrel), 1)
+
+  weights = np.zeros(K)
+  weights += 3 * weights_mutrel
+  weights += 1 * depth_frac
+
   weights /= np.sum(weights)
-  # Allow all nodes to be chosen with some small probability ...
-  weights = np.maximum(1e-5, weights)
-  # ... but don't allow a node to be its own parent ...
-  weights[subtree_idx] = 0
-  # ... and ensure a different parent is chosen than the current one.
+  weights = np.maximum(1e-3, weights)
   weights[curr_parent] = 0
-  # Renormalize.
+  weights[subtree_idx] = 0
   weights /= np.sum(weights)
+
   return weights
 
-def _make_W_dests(subtree_idx, curr_parent, adj, anc, depth_frac, mutrel):
+def _make_W_dests_onlyanc(subtree_idx, curr_parent, adj, anc, depth_frac, mutrel):
   # Hyperparams:
   #   * theta: weight of `B_A` pairwise probabilities
   #   * kappa: weight of depth_frac
@@ -329,8 +347,19 @@ def _make_W_dests(subtree_idx, curr_parent, adj, anc, depth_frac, mutrel):
   #subtree_desc = np.flatnonzero(anc[subtree_idx])
   #weights[subtree_desc] = 0
 
-  weights = _normalize_W_dests(weights, subtree_idx, curr_parent)
+  # Normalize for setting minimum.
+  weights /= np.sum(weights)
+  # Allow all nodes to be chosen with some small probability ...
+  weights = np.maximum(1e-5, weights)
+  # ... but don't allow a node to be its own parent ...
+  weights[subtree_idx] = 0
+  # ... and ensure a different parent is chosen than the current one.
+  weights[curr_parent] = 0
+  # Renormalize.
+  weights /= np.sum(weights)
   return weights
+
+_make_W_dests = _make_W_dests_onlyanc
 
 def _sample_cat(W):
   assert np.all(W >= 0) and np.isclose(1, np.sum(W))
@@ -410,7 +439,7 @@ def _sample_tree(progress, old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __
   old_parent = _find_parent(B, old_samp.adj)
   # Don't carry `old_W_dests` in `old_samp`, since it's dependent not just
   # on the current tree, but also on the subtree selected.
-  old_W_dests = _make_W_dests(B, old_parent, old_samp.adj, old_samp.anc, old_samp.depth_frac, data_mutrel)
+  old_W_dests = _make_W_dests(B, old_parent, old_samp.adj, old_samp.anc, old_samp.depth_frac, __calc_llh_mutrel)
 
   A = _sample_cat(old_W_dests)
   assert A != old_parent
@@ -434,7 +463,7 @@ def _sample_tree(progress, old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __
   # This is p(A, B | old_state) = p(B | old_state)p(A | B, old_state)
   log_p_new_given_old = np.log(old_samp.W_nodes[B]) + np.log(old_W_dests[A])
   # This is p(B, old_parent | new_state) = p(B | new_state)p(old_parent | B, new_state)
-  new_W_dests = _make_W_dests(B, new_parent, new_samp.adj, new_samp.anc, new_samp.depth_frac, data_mutrel)
+  new_W_dests = _make_W_dests(B, new_parent, new_samp.adj, new_samp.anc, new_samp.depth_frac, __calc_llh_mutrel)
   log_p_old_given_new = np.log(new_samp.W_nodes[B]) + np.log(new_W_dests[old_parent])
 
   log_p_transition = (new_samp.llh_phi - old_samp.llh_phi) + (log_p_old_given_new - log_p_new_given_old)
