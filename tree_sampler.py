@@ -18,7 +18,6 @@ TreeSample = namedtuple('TreeSample', (
   'phi',
   'llh_phi',
   'fit_mutrel',
-  'progress',
   'W_nodes',
 ))
 
@@ -254,39 +253,29 @@ def _find_parent(node, adj):
   assert len(parents) == 1
   return parents[0]
 
-def _make_W_nodes(adj, depth_frac, fit_mutrel, progress):
+def _make_W_nodes(adj, depth_frac, fit_mutrel):
   # Hyperparams:
-  # * tau: weight of depth term
   # * rho: weight of mutrel fit term
-  # * psi: how strongly peaked depth term is
   K = len(adj)
-
-  assert np.all(fit_mutrel <= 0)
   assert adj.shape == (K, K)
-
-  assert 0 <= progress <= 1
-  A = hparams.psi * progress + 1
-  B = hparams.psi * (1 - progress) + 1
-  depth_frac[1:] = np.minimum(0.99, depth_frac[1:])
-  depth_frac[1:] = np.maximum(0.01, depth_frac[1:])
-  weights_depth = depth_frac**(A-1) * (1 - depth_frac)**(B-1)
-  weights_depth[0] = 0
-  weights_depth /= np.sum(weights_depth)
 
   assert np.all(fit_mutrel <= 0)
   if np.all(fit_mutrel == 0):
     weights_fit = np.ones(K-1)
   else:
-    weights_fit = np.maximum(1e-5, fit_mutrel)
+    weights_fit = np.copy(fit_mutrel)
+
+  weights_fit /= np.sum(weights_fit)
+  weights_fit = np.maximum(1e-3, fit_mutrel)
   weights_fit /= np.sum(weights_fit)
 
-  weights      = hparams.tau * weights_depth
+  weights      = np.zeros(K)
   weights[1:] += hparams.rho * weights_fit
-  assert weights[0] == 0 and np.all(weights[1:] >= 0) and np.any(weights > 0)
+  weights /= np.sum(weights)
+  assert weights[0] == 0 and np.all(weights[1:] > 0)
 
-  norm_weights = weights / np.sum(weights)
-  _make_W_nodes.debug = (weights_depth, weights_fit, weights, norm_weights)
-  return norm_weights
+  _make_W_nodes.debug = (weights,)
+  return weights
 
 def _make_W_dests_full(subtree_idx, curr_parent, adj, anc, depth_frac, __calc_llh_mutrel):
   assert adj[curr_parent,subtree_idx] == 1
@@ -359,7 +348,7 @@ def _make_W_dests_onlyanc(subtree_idx, curr_parent, adj, anc, depth_frac, mutrel
   weights /= np.sum(weights)
   return weights
 
-_make_W_dests = _make_W_dests_onlyanc
+_make_W_dests = _make_W_dests_full
 
 def _sample_cat(W):
   assert np.all(W >= 0) and np.isclose(1, np.sum(W))
@@ -414,7 +403,6 @@ def _init_chain(seed, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_mutrel
   init_llh_mutrel, init_fit_mutrel = __calc_llh_mutrel(init_adj)
   init_anc = common.make_ancestral_from_adj(init_adj)
   init_depth_frac = _calc_depth_frac(init_adj)
-  init_progress = 0
   init_phi = __calc_phi(init_adj)
 
   init_samp = TreeSample(
@@ -424,12 +412,11 @@ def _init_chain(seed, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_mutrel
     phi = init_phi,
     llh_phi = __calc_llh_phi(init_adj, init_phi),
     fit_mutrel = init_fit_mutrel,
-    progress = init_progress,
-    W_nodes = _make_W_nodes(init_adj, init_depth_frac, init_fit_mutrel, init_progress),
+    W_nodes = _make_W_nodes(init_adj, init_depth_frac, init_fit_mutrel),
   )
   return init_samp
 
-def _sample_tree(progress, old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_mutrel):
+def _sample_tree(old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_mutrel):
   # If `B` is ancestral to `A`, swap nodes `A` and `B`. Otherwise, move subtree
   # `B` under `A`.
   B = _sample_cat(old_samp.W_nodes)
@@ -455,8 +442,7 @@ def _sample_tree(progress, old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __
     phi = new_phi,
     llh_phi = __calc_llh_phi(new_adj, new_phi),
     fit_mutrel = new_fit_mutrel,
-    progress = progress,
-    W_nodes = _make_W_nodes(new_adj, new_depth_frac, new_fit_mutrel, progress),
+    W_nodes = _make_W_nodes(new_adj, new_depth_frac, new_fit_mutrel),
   )
 
   new_parent = _find_parent(B, new_adj)
@@ -480,16 +466,12 @@ def _sample_tree(progress, old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __
       #'true_llh',
       'p_new_given_old',
       'p_old_given_new',
-      'progress',
       'nodes',
       'W_dests',
       'old_parents',
       'new_parents',
       #'true_parents',
-      'weights_depth',
-      'weights_fit',
       'weights',
-      'norm_weights',
     )
     vals = (
       'accept' if accept else 'reject',
@@ -498,7 +480,6 @@ def _sample_tree(progress, old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __
       #'%.3f' % (__calc_llh_phi(true_adj, true_phi) / norm_phi_llh),
       '%.3f' % log_p_new_given_old,
       '%.3f' % log_p_old_given_new,
-      '%.3f' % progress,
       (B, old_parent, new_parent),
       old_W_dests,
       _find_parents(old_samp.adj),
@@ -514,10 +495,6 @@ def _sample_tree(progress, old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __
     return (accept, old_samp)
 
 def _run_chain(data_mutrel, supervars, superclusters, nsamples, thinned_frac, phi_method, phi_iterations, seed, progress_queue=None):
-  # Hyperparams:
-  #   * tree_traverals: how many depth-based traverals to make through tree
-  #     over course of the Metropolis-Hastings run
-
   assert nsamples > 0
 
   V, N, omega_v = calc_binom_params(supervars)
@@ -533,13 +510,6 @@ def _run_chain(data_mutrel, supervars, superclusters, nsamples, thinned_frac, ph
   accepted = 0
   if progress_queue is not None:
     progress_queue.put(0)
-
-  period = int(nsamples / hparams.tree_traversals)
-  # If I can't take at least 100 samples per tree traversal, then I will
-  # perform only a single tree traversal. (I.e., we need `nsamples >= 500` for
-  # multiple tree traversals to occur.)
-  if period < 100:
-    period = nsamples
 
   assert 0 < thinned_frac <= 1
   record_every = round(1 / thinned_frac)
@@ -562,10 +532,8 @@ def _run_chain(data_mutrel, supervars, superclusters, nsamples, thinned_frac, ph
   for I in range(1, nsamples):
     if progress_queue is not None:
       progress_queue.put(I)
-    progress = (I % period) / float(period)
-    assert 0 <= progress < 1
 
-    accept, samp = _sample_tree(progress, last_samp, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_mutrel)
+    accept, samp = _sample_tree(last_samp, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_mutrel)
     if I % record_every == 0:
       samps.append(samp)
     last_samp = samp

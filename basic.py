@@ -34,12 +34,8 @@ def _parse_args():
 
   parser.add_argument('--rho', type=float, default=5,
     help='Weight of mutrel fit term when selecting node to move within tree, such that we prefer nodes with high mutrel error')
-  parser.add_argument('--tau', type=float, default=1,
-    help='Weight of tree depth when selecting node to move within tree, such that the Metropolis-Hastings run makes multiple passes from the root to the leaves over its full duration, allowing us to correct errors close to the root before we correct errors close to the leaves')
   parser.add_argument('--psi', type=float, default=3,
     help='How strongly peaked the depth term is in the beta-PDF-like depth score, such that higher values will favour nodes at the precise requested depth')
-  parser.add_argument('--tree-traversals', type=int, default=5,
-    help='How many passes to make through the tree over the course of the Metropolis-Hastings run')
   parser.add_argument('--theta', type=float, default=4,
     help='Weight of ancestral pairwise probabilities when determining potential parent probability distribution for selected node when doing tree updates, such that nodes with high ancestral probability are preferred as parents')
   parser.add_argument('--kappa', type=float, default=1,
@@ -53,9 +49,7 @@ def _parse_args():
 def _init_hyperparams(args):
   hparams = (
     'rho',
-    'tau',
     'psi',
-    'tree_traversals',
     'theta',
     'kappa',
   )
