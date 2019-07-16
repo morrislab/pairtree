@@ -23,8 +23,7 @@ HAPPY_METHOD_NAMES = [
   ('pairtree_tensor', 'Pairs tensor'),
   ('mle_unconstrained', 'MLE lineage frequencies'),
 ]
-
-METHOD_ORDER = {M: idx for idx, (M, M_full) in enumerate(HAPPY_METHOD_NAMES)}
+SORTED_METHODS = [M for M, M_full in HAPPY_METHOD_NAMES]
 HAPPY_METHOD_NAMES = {M: M_full for (M, M_full) in HAPPY_METHOD_NAMES}
 
 def augment(results, param_names):
@@ -93,8 +92,11 @@ def partition(results, methods, key):
   return partitioned
 
 def sort_methods(methods):
-  methods = sorted(methods, key = lambda M: METHOD_ORDER.get(M, 0))
-  return methods
+  methods = set(methods)
+  M_sorted = [M for M in SORTED_METHODS if M in methods]
+  unspecified = methods - set(M_sorted)
+  M_sorted += sorted(unspecified)
+  return M_sorted
 
 def make_bar_trace(methods, complete, total, name=None):
   methods = sort_methods(methods)
