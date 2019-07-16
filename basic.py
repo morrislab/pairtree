@@ -32,10 +32,10 @@ def _parse_args():
   parser.add_argument('--phi-fitter', dest='phi_fitter', choices=('graddesc', 'rprop', 'projection', 'proj_rprop'), default='rprop')
   parser.add_argument('--only-build-tensor', dest='only_build_tensor', action='store_true')
 
-  parser.add_argument('--rho', type=float, default=5,
+  parser.add_argument('--rho', type=float, default=4,
     help='Weight of mutrel fit term when selecting node to move within tree, such that we prefer nodes with high mutrel error')
-  parser.add_argument('--psi', type=float, default=3,
-    help='How strongly peaked the depth term is in the beta-PDF-like depth score, such that higher values will favour nodes at the precise requested depth')
+  parser.add_argument('--tau', type=float, default=1,
+    help='Weight of depth term when selecting node to move within tree, such that we prefer nodes deeper in tree')
   parser.add_argument('--theta', type=float, default=4,
     help='Weight of ancestral pairwise probabilities when determining potential parent probability distribution for selected node when doing tree updates, such that nodes with high ancestral probability are preferred as parents')
   parser.add_argument('--kappa', type=float, default=1,
@@ -49,7 +49,7 @@ def _parse_args():
 def _init_hyperparams(args):
   hparams = (
     'rho',
-    'psi',
+    'tau',
     'theta',
     'kappa',
   )

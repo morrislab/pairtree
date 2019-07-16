@@ -253,25 +253,33 @@ def _find_parent(node, adj):
   assert len(parents) == 1
   return parents[0]
 
-def _make_W_nodes(adj, depth_frac, fit_mutrel):
+def _make_W_nodes(adj, anc, depth_frac, fit_mutrel):
   # Hyperparams:
   # * rho: weight of mutrel fit term
+
   K = len(adj)
-  assert adj.shape == (K, K)
+  assert adj.shape == anc.shape == (K, K)
+  assert fit_mutrel.shape == (K-1,)
+  assert depth_frac.shape == (K,)
 
   assert np.all(fit_mutrel <= 0)
   if np.all(fit_mutrel == 0):
     weights_fit = np.ones(K-1)
   else:
-    weights_fit = np.copy(fit_mutrel)
+    #weights_fit = np.copy(fit_mutrel)
+    weights_fit = np.dot(anc[1:,1:], fit_mutrel)
 
   weights_fit /= np.sum(weights_fit)
-  weights_fit = np.maximum(1e-3, fit_mutrel)
+  weights_fit  = np.maximum(1e-3, weights_fit)
   weights_fit /= np.sum(weights_fit)
+
+  assert np.all(0 <= depth_frac) and np.all(depth_frac <= 1)
+  weights_depth = np.copy(depth_frac)
 
   weights      = np.zeros(K)
   weights[1:] += hparams.rho * weights_fit
-  weights /= np.sum(weights)
+  weights     += hparams.tau * weights_depth
+  weights     /= np.sum(weights)
   assert weights[0] == 0 and np.all(weights[1:] > 0)
 
   _make_W_nodes.debug = (weights,)
@@ -297,8 +305,8 @@ def _make_W_dests_full(subtree_idx, curr_parent, adj, anc, depth_frac, __calc_ll
   assert np.isclose(np.sum(weights_mutrel), 1)
 
   weights = np.zeros(K)
-  weights += 3 * weights_mutrel
-  weights += 1 * depth_frac
+  weights += hparams.theta * weights_mutrel
+  weights += hparams.kappa * depth_frac
 
   weights /= np.sum(weights)
   weights = np.maximum(1e-3, weights)
@@ -339,7 +347,7 @@ def _make_W_dests_onlyanc(subtree_idx, curr_parent, adj, anc, depth_frac, mutrel
   # Normalize for setting minimum.
   weights /= np.sum(weights)
   # Allow all nodes to be chosen with some small probability ...
-  weights = np.maximum(1e-5, weights)
+  weights = np.maximum(1e-3, weights)
   # ... but don't allow a node to be its own parent ...
   weights[subtree_idx] = 0
   # ... and ensure a different parent is chosen than the current one.
@@ -412,7 +420,7 @@ def _init_chain(seed, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_mutrel
     phi = init_phi,
     llh_phi = __calc_llh_phi(init_adj, init_phi),
     fit_mutrel = init_fit_mutrel,
-    W_nodes = _make_W_nodes(init_adj, init_depth_frac, init_fit_mutrel),
+    W_nodes = _make_W_nodes(init_adj, init_anc, init_depth_frac, init_fit_mutrel),
   )
   return init_samp
 
@@ -431,18 +439,19 @@ def _sample_tree(old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_m
   A = _sample_cat(old_W_dests)
   assert A != old_parent
   new_adj = _modify_tree(old_samp.adj, old_samp.anc, A, B)
+  new_anc = common.make_ancestral_from_adj(new_adj)
   new_llh_mutrel, new_fit_mutrel = __calc_llh_mutrel(new_adj)
   new_depth_frac = _calc_depth_frac(new_adj)
   new_phi = __calc_phi(new_adj)
 
   new_samp = TreeSample(
     adj = new_adj,
-    anc = common.make_ancestral_from_adj(new_adj),
+    anc = new_anc,
     depth_frac = new_depth_frac,
     phi = new_phi,
     llh_phi = __calc_llh_phi(new_adj, new_phi),
     fit_mutrel = new_fit_mutrel,
-    W_nodes = _make_W_nodes(new_adj, new_depth_frac, new_fit_mutrel),
+    W_nodes = _make_W_nodes(new_adj, new_anc, new_depth_frac, new_fit_mutrel),
   )
 
   new_parent = _find_parent(B, new_adj)
