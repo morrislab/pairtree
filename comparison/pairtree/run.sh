@@ -7,8 +7,8 @@ SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 BASEDIR=~/work/pairtree
 JOBDIR=~/jobs
 
-PARALLEL=0
-TREE_CHAINS=$PARALLEL
+PARALLEL=40
+#TREE_CHAINS=$PARALLEL
 TREE_CHAINS=1
 TREES_PER_CHAIN=3000
 PHI_ITERATIONS=10000
@@ -17,13 +17,22 @@ THINNED_FRAC=1.0
 
 BATCH=sims.pairtree
 PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
-PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.lol32
+PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.lol51
 #BATCH=steph.pairtree.multichain
 #PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 #PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/$BATCH
 
 function is_run_complete {
   if ([[ -f $1 ]] && unzip -l $1 | grep "adjm.npy" > /dev/null); then
+    return 0
+  else
+    return 1
+  fi
+}
+
+function is_big_K {
+  runid=$1
+  if [[ $runid =~ K30 || $runid =~ K100 ]]; then
     return 0
   else
     return 1
@@ -38,8 +47,9 @@ function run_pairtree {
     runid=$(basename $ssmfn | cut -d. -f1)
     outdir="$PAIRTREE_RESULTS_DIR/$runid"
     resultsfn="$outdir/$runid.results.npz"
-    is_run_complete $resultsfn && continue
-    [[ $runid =~ K30 || $runid =~ K100 ]] || continue
+    #is_big_K $runid && continue
+    #is_run_complete $resultsfn && continue
+    #[[ -f $resultsfn ]] || continue
 
     jobfn=$(mktemp)
     (
@@ -66,8 +76,6 @@ function run_pairtree {
         "--phi-fitter $PHI_FITTER" \
         "--params $PAIRTREE_INPUTS_DIR/${runid}.params.json" \
         "--thinned-frac $THINNED_FRAC" \
-        "--rho 1" \
-        "--tau 0" \
         "$PAIRTREE_INPUTS_DIR/$runid.ssm" \
         "$resultsfn" \
         ">$runid.stdout" \
@@ -82,10 +90,9 @@ function convert_outputs {
   for resultsfn in $PAIRTREE_RESULTS_DIR/*/*.results.npz; do
     outdir=$(dirname $resultsfn)
     runid=$(basename $resultsfn | cut -d. -f1)
-    #[[ $runid =~ K30 || $runid =~ K100 ]] && continue
     is_run_complete $resultsfn || continue
 
-    #jobfn=$(mktemp)
+    jobfn=$(mktemp)
     (
         #echo "#!/bin/bash"
         #echo "#SBATCH --nodes=1"
@@ -95,13 +102,13 @@ function convert_outputs {
         #echo "#SBATCH --output=$JOBDIR/slurm_${runid}_%j.txt"
         #echo "#SBATCH --mail-type=NONE"
 
-        basepath="${outdir}/${runid}.pairtree_clustrel"
-        echo "cd $outdir &&" \
-          "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_mutrels.py" \
-          "--clustrel-mutrel ${basepath}.mutrel.npz" \
-          "$resultsfn" \
-          ">${basepath}.output_conversion.stdout" \
-          "2>${basepath}.output_conversion.stderr"
+        #basepath="${outdir}/${runid}.pairtree_clustrel"
+        #echo "cd $outdir &&" \
+        #  "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_mutrels.py" \
+        #  "--clustrel-mutrel ${basepath}.mutrel.npz" \
+        #  "$resultsfn" \
+        #  ">${basepath}.output_conversion.stdout" \
+        #  "2>${basepath}.output_conversion.stderr"
 
         subset_size=2000
         for use_subset in false; do
@@ -123,28 +130,30 @@ function convert_outputs {
             cmd+="2>${basepath}.mutphi_output_conversion.stderr"
             echo $cmd
 
-            cmd="cd $outdir && "
-            cmd+="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_mutrels.py "
-            if [[ "$use_subset" == "true" ]]; then
-              cmd+="--use-subset $subset_size "
+            if ! is_big_K $runid; then
+              cmd="cd $outdir && "
+              cmd+="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_mutrels.py "
+              if [[ "$use_subset" == "true" ]]; then
+                cmd+="--use-subset $subset_size "
+              fi
+              cmd+="--weight-trees-by $tree_weights "
+              cmd+="--trees-mutrel ${basepath}.mutrel.npz "
+              cmd+="$resultsfn "
+              cmd+=">${basepath}.mutrel_output_conversion.stdout "
+              cmd+="2>${basepath}.mutrel_output_conversion.stderr"
+              echo $cmd
             fi
-            cmd+="--weight-trees-by $tree_weights "
-            cmd+="--trees-mutrel ${basepath}.mutrel.npz "
-            cmd+="$resultsfn "
-            cmd+=">${basepath}.mutrel_output_conversion.stdout "
-            cmd+="2>${basepath}.mutrel_output_conversion.stderr"
-            echo $cmd
           done
         done
     ) #> $jobfn
     #sbatch $jobfn
-    #rm $jobfn
+    rm $jobfn
   done
 }
 
 function main {
-  run_pairtree
-  #convert_outputs
+  run_pairtree | grep python3 | parallel -j80 --halt 1 --eta
+  convert_outputs | grep python3 | parallel -j10 --halt 1 --eta
 }
 
 main

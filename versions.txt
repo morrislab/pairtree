@@ -1,0 +1,50 @@
+lol1: revised tree sampling algorithm, uses depth and mutrels
+lol2: use progress of outer MH loop, not inner loop, to dictate depth scores
+lol3: uses ancestor * logfit to get accumulated logfit score to dicate subtree probs, without using `progress`
+lol4: return to old sampling scheme (but using new code) to confirm new code works as expected (results were identical)
+
+More ideas:
+  lol5: exclude the transition probabilities from the MH
+  lol6: exclude depth from LH
+  lol7: exclude mutrels from LH
+  lol8: old sampling scheme, verifying that it's basically same as lol4
+  lol9: old sampling scheme, but constrain moves so only "B under A" (not "swap A & B") is possible
+  lol10: use ancestral probs to dictate prob of selecting ancestor
+
+lol17: nested MCMC, but fixed parent selection, small K
+lol18: same as lol17, but big K
+lol19: single-loop MCMC with only mutphi, small K
+lol20: same as lol19, but don't permit same (parent, child) pair to be proposed on successive updates
+lol21: same as lol20, but run 5 chains instead of 1 chain
+lol22: same as lol21, but with multiple progress periods to perform multile passes through the tree
+lol23: better tree init using mutrels
+lol24: same as lol23, but on big `K`
+lol25: can't remember
+lol26: can't remember
+lol27: final run for paper, now removed
+lol28: big K, try sampling 10x as many trees but with --thinned-frac=0.1
+lol29: previously final runs for paper, multichain, big+small K
+lol30: previously final runs for paper, quadchain, big+small K
+lol31: previously final runs for paper, singlechain, big+small K
+lol32: disable tree depth contribution -- rho=1, tau=0 -- small K
+lol33: disable tree depth contribution -- rho=1, tau=0 -- big K
+lol34: new destination-selection scheme based on mutrel LLH for every possible parent, small K
+lol35: old destination-selection scheme based on ancestral probs and depth fracs, small K (but with minor bug fixed relative to lol32)
+lol36: new destination-selection scheme based on mutrel LLH for every possible parent, big K
+lol37: new destination-selection scheme, but also with depth term when choosing destinations
+lol38: new node-selection scheme using summed error through tree, including depth term to favour deeper nodes, small K, single-chain -- I think there was a bug with this
+lol39: same as lol38, but big K -- I think there was a bug with this
+lol40: same as lol39, but restoring node-parent choice to be based just on mutrel ancestral probs, not on softmax of mutrel LLH -- I think there was a bug with this
+lol41: big K, single-chain, choose dest based on anc probs, choose node based on only its mutrel (not mutrel error of itself + desc), no depth score applied (rho=1, tau=0, theta=4, kappa=1)
+lol42: big K, single-chain, choose dest based on anc probs, choose node based on mutrel error of self + desc (rho=1, tau=0, theta=4, kappa=1)
+lol43: big K, single-chain, same as lol42, but different hyperparams (rho=4, tau=1, theta=4, kappa=1)
+lol44: big K, single-chain, choose node based on only its own mutrel error, choose dest based on all possible parents  (rho=1, tau=0, theta=4, kappa=1)
+lol45: big K, single-chain, choose node based on summed mutrel error through tree, choose dest based on all possible parents  (rho=4, tau=1, theta=4, kappa=1)
+lol46: small K, single-chain, choose node based on itself, choose dest based on Q's new scheme
+lol47: same as lol46, but big K
+lol48: same as lol47, but change hyperparam to 1e-2 from 1e-4
+lol49: small K, new node selection based on probs rather than L1 distance
+lol50: same as lol49, but big K
+lol51: new node choice and dest choice algorithms, multichain, bit and small K
+
+Interesting: lol9 does as poorly as most other lol runs, and much worse than lol4 and lol8

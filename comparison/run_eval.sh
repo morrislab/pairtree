@@ -58,26 +58,32 @@ function make_results_paths {
   if [[ $BATCH == steph ]]; then
     truth_path="${BATCH}.pairtree.hbstruct/${runid}.pairtree_trees.all.llh.${result_type}.npz"
     paths+="truth=$truth_path "
-    paths+="pairtree_multi=${BATCH}.pairtree/${runid}.pairtree_trees.all.llh.$result_type.npz "
-    paths+="pairtree_single=${BATCH}.pairtree/${runid}.pairtree_trees.subset.llh.$result_type.npz "
+    paths+="pairtree_multi=${BATCH}.pairtree.multichain/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
+    paths+="pairtree_single=${BATCH}.pairtree.singlechain/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
     paths+="pwgs_allvars=${BATCH}.pwgs.allvars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
     paths+="pplus_allvars=${BATCH}.pwgs.allvars/$runid/$runid.pwgs_trees_multi_llh.$result_type.npz "
     paths+="pwgs_supervars=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
     paths+="pplus_supervars=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_llh.$result_type.npz "
     paths+="lichee=${BATCH}.xeno.lichee/$runid.llh.$result_type.npz "
     if [[ $result_type == mutrel ]]; then
-      paths+="pairtree_tensor=${BATCH}.pairtree/${runid}.pairtree_clustrel.mutrel.npz "
+      paths+="pairtree_tensor=${BATCH}.pairtree.onlytensor/${runid}/${runid}.pairtree_clustrel.mutrel.npz "
     fi
   elif [[ $BATCH == sims ]]; then
     paths+="truth=${TRUTH_DIR}/$runid.$result_type.npz "
     paths+="pwgs_supervars=sims.pwgs.supervars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
     paths+="pastri=${BATCH}.pastri.informative/$runid/$runid.pastri_trees_llh.$result_type.npz "
-    paths+="pairtree_single=sims.pairtree.projection.singlechain/${runid}.pairtree_trees.all.llh.$result_type.npz "
-    paths+="pairtree_multi=sims.pairtree.projection.multichain/${runid}.pairtree_trees.all.llh.$result_type.npz "
+    for foo in $(seq 29 51); do
+      paths+="pairtree_lol${foo}=sims.pairtree.lol${foo}/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
+    done
+    #paths+="pairtree_single=sims.pairtree.singlechain/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
+    #paths+="pairtree_multi=sims.pairtree.multichain/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
+    #paths+="pairtree_quad=sims.pairtree.quadchain/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
+    paths+="pairtree_single_old=sims.pairtree.projection.singlechain.old_proposals/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
+    paths+="pairtree_multi_old=sims.pairtree.projection.multichain.old_proposals/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
     paths+="lichee=sims.lichee/$runid.llh.$result_type.npz "
-    if [[ $result_type == mutrel ]]; then
-      paths+="pairtree_tensor=sims.pairtree.onlytensor/$runid.pairtree_clustrel.$result_type.npz "
-    fi
+    #if [[ $result_type == mutrel ]]; then
+    #  paths+="pairtree_tensor=sims.pairtree.onlytensor/${runid}/$runid.pairtree_clustrel.$result_type.npz "
+    #fi
   fi
 
   echo $paths
@@ -157,9 +163,12 @@ function eval_runtime {
       cmd="python3 $SCRIPTDIR/eval_runtime.py "
       cmd+="--time-type $timetype "
       cmd+="lichee=$RESULTSDIR/sims.lichee/$runid.time "
-      cmd+="pairtree_tensor=$RESULTSDIR/sims.pairtree.onlytensor/$runid.time "
-      cmd+="pairtree_single=$RESULTSDIR/sims.pairtree.projection.singlechain/$runid.time "
-      cmd+="pairtree_multi=$RESULTSDIR/sims.pairtree.projection.multichain/$runid.time "
+      cmd+="pairtree_tensor=$RESULTSDIR/sims.pairtree.onlytensor/$runid/$runid.time "
+      cmd+="pairtree_single=$RESULTSDIR/sims.pairtree.singlechain/$runid/$runid.time "
+      cmd+="pairtree_multi=$RESULTSDIR/sims.pairtree.multichain/$runid/$runid.time "
+      cmd+="pairtree_quad=$RESULTSDIR/sims.pairtree.quadchain/$runid/$runid.time "
+      cmd+="pairtree_single_old=$RESULTSDIR/sims.pairtree.projection.singlechain.old_proposals/$runid/$runid.time "
+      cmd+="pairtree_multi_old=$RESULTSDIR/sims.pairtree.projection.multichain.old_proposals/$runid/$runid.time "
       cmd+="pastri=$RESULTSDIR/sims.pastri.informative/$runid/$runid.time "
       cmd+="pwgs_supervars=$RESULTSDIR/sims.pwgs.supervars/$runid/$runid.time "
       cmd+="> $SCORESDIR/$BATCH/$runid.${timetype}time.txt "
@@ -311,18 +320,18 @@ function plot_runtime {
 }
 
 function main {
-  #export BATCH=sims
-  #export PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
-  #export TRUTH_DIR=$RESULTSDIR/sims.truth
-  #export MLE_MUTPHIS_DIR=$RESULTSDIR/${BATCH}.mle_unconstrained
-  #plot_results_sims
+  export BATCH=sims
+  export PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+  export TRUTH_DIR=$RESULTSDIR/sims.truth
+  export MLE_MUTPHIS_DIR=$RESULTSDIR/${BATCH}.mle_unconstrained
+  plot_results_sims
   #plot_runtime
 
-  export BATCH=steph
-  export PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
-  export TRUTH_DIR=$RESULTSDIR/steph.pairtree.hbstruct
-  export MLE_MUTPHIS_DIR=$RESULTSDIR/${BATCH}.mle_unconstrained
-  plot_results_steph
+  #export BATCH=steph
+  #export PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+  #export TRUTH_DIR=$RESULTSDIR/steph.pairtree.hbstruct
+  #export MLE_MUTPHIS_DIR=$RESULTSDIR/${BATCH}.mle_unconstrained
+  #plot_results_steph
 }
 
 main
