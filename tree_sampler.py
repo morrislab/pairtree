@@ -234,7 +234,7 @@ def _make_W_nodes(adj, data_logmutrel):
   assert np.allclose(0, pair_error[0])
   assert np.allclose(0, pair_error[:,0])
   pair_error = np.maximum(1e-10, pair_error)
-  node_error = scipy.misc.logsumexp(np.log(pair_error), axis=1)
+  node_error = scipy.special.logsumexp(np.log(pair_error), axis=1)
 
   weights = np.zeros(K)
   weights[1:] += util.softmax(node_error[1:])
@@ -259,7 +259,7 @@ def _make_data_logmutrel(mutrel):
   logrels[range(K),range(K),Models.cocluster] = 0
 
   logrels[:,:,valid_models] -= np.log(1 + len(valid_models)*alpha)
-  assert np.allclose(0, scipy.misc.logsumexp(logrels, axis=2))
+  assert np.allclose(0, scipy.special.logsumexp(logrels, axis=2))
   assert not np.any(np.isnan(logrels))
 
   logmutrel = Mutrel(rels=logrels, vids=mutrel.vids)

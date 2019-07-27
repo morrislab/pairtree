@@ -23,7 +23,7 @@ def save(results, resultsfn):
   np.savez_compressed(resultsfn, **serialized)
 
 def load(resultsfn):
-  results = np.load(resultsfn)
+  results = np.load(resultsfn, allow_pickle=True)
   # Convert from NpzFile type.
   results = dict(results)
 
