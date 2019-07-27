@@ -7,8 +7,10 @@ import phi_fitter
 import hyperparams as hparams
 import math
 import util
+
 Models = common.Models
 debug = common.debug
+Mutrel = mutrel.Mutrel
 
 from collections import namedtuple
 TreeSample = namedtuple('TreeSample', (
@@ -17,7 +19,6 @@ TreeSample = namedtuple('TreeSample', (
   'depth_frac',
   'phi',
   'llh_phi',
-  'fit_mutrel',
   'W_nodes',
 ))
 
@@ -36,24 +37,6 @@ def _calc_llh_phi(phi, V, N, omega_v, epsilon=1e-5):
   assert not np.isnan(phi_llh)
   assert not np.isinf(phi_llh)
   return phi_llh
-
-def _calc_llh_mutrel(cluster_adj, data_mutrel, superclusters):
-  tree_mutrel = mutrel.make_mutrel_tensor_from_cluster_adj(cluster_adj, superclusters)
-  # mutrel_error is symmetric, so every off-diagonal element is counted twice
-  # in the sum that becomes the LLH. I could avoid this by making the matrix
-  # (upper or lower) triangular, but for `fit_mutrel` to be useful, I don't want to
-  # do this.
-  mutrel_error = np.abs(data_mutrel.rels - tree_mutrel.rels)
-  assert np.all(mutrel_error <= 1)
-
-  mutrel_fit = 1 - mutrel_error
-  # Prevent log of zero.
-  mutrel_fit = np.maximum(common._EPSILON, mutrel_fit)
-  fit_mutrel = np.log(mutrel_fit)
-
-  fit_mutrel = np.sum(fit_mutrel, axis=(1,2))
-  llh = np.sum(fit_mutrel)
-  return (llh, fit_mutrel)
 
 def _init_cluster_adj_linear(K):
   cluster_adj = np.eye(K, dtype=np.int)
@@ -158,9 +141,7 @@ def _modify_tree(adj, anc, A, B):
   K = len(adj)
   # Ensure `B` is not zero.
   assert 0 <= A < K and 0 < B < K
-
-  if A == B:
-    return adj
+  assert A != B
 
   adj = np.copy(adj)
   anc = np.copy(anc)
@@ -199,16 +180,6 @@ def _modify_tree(adj, anc, A, B):
 
   np.fill_diagonal(adj, 1)
   return adj
-
-def _choose_nodes_uniformly(K, anc):
-  while True:
-    A, B = np.random.choice(K, size=2, replace=False)
-    assert A != B
-    # Prevent `B` from being the root node.
-    # Also prevent `B` from being ancestral to `A`.
-    if B != 0 and not anc[B,A]:
-      break
-  return (A, B)
 
 def _calc_depth_frac(adj):
   K = len(adj)
@@ -253,110 +224,127 @@ def _find_parent(node, adj):
   assert len(parents) == 1
   return parents[0]
 
-def _make_W_nodes(adj, anc, depth_frac, fit_mutrel):
-  # Hyperparams:
-  # * rho: weight of mutrel fit term
-
+def _make_W_nodes(adj, data_logmutrel):
   K = len(adj)
-  assert adj.shape == anc.shape == (K, K)
-  assert fit_mutrel.shape == (K-1,)
-  assert depth_frac.shape == (K,)
+  assert adj.shape == (K, K)
 
-  assert np.all(fit_mutrel <= 0)
-  if np.all(fit_mutrel == 0):
-    weights_fit = np.ones(K-1)
-  else:
-    #weights_fit = np.copy(fit_mutrel)
-    weights_fit = np.dot(anc[1:,1:], fit_mutrel)
+  tree_logmutrel = _calc_tree_logmutrel(adj, data_logmutrel)
+  pair_error = 1 - np.exp(tree_logmutrel)
+  assert np.allclose(0, np.diag(pair_error))
+  assert np.allclose(0, pair_error[0])
+  assert np.allclose(0, pair_error[:,0])
+  pair_error = np.maximum(1e-10, pair_error)
+  node_error = scipy.misc.logsumexp(np.log(pair_error), axis=1)
 
-  weights_fit /= np.sum(weights_fit)
-  weights_fit  = np.maximum(1e-3, weights_fit)
-  weights_fit /= np.sum(weights_fit)
-
-  assert np.all(0 <= depth_frac) and np.all(depth_frac <= 1)
-  weights_depth = np.copy(depth_frac)
-
-  weights      = np.zeros(K)
-  weights[1:] += hparams.rho * weights_fit
-  weights     += hparams.tau * weights_depth
-  weights     /= np.sum(weights)
+  weights = np.zeros(K)
+  weights[1:] += util.softmax(node_error[1:])
+  weights[1:] = np.maximum(1e-2, weights[1:])
+  weights /= np.sum(weights)
   assert weights[0] == 0 and np.all(weights[1:] > 0)
 
   _make_W_nodes.debug = (weights,)
   return weights
 
-def _make_W_dests_full(subtree_idx, curr_parent, adj, anc, depth_frac, __calc_llh_mutrel):
-  assert adj[curr_parent,subtree_idx] == 1
+def _make_data_logmutrel(mutrel):
+  K = len(mutrel.rels)
+  valid_models = (Models.A_B, Models.B_A, Models.diff_branches)
+  invalid_models = (Models.cocluster, Models.garbage)
+
+  alpha = 0.001
+  logrels = np.full(mutrel.rels.shape, np.nan)
+  logrels[:,:,invalid_models] = -np.inf
+  logrels[:,:,valid_models] = np.log(mutrel.rels[:,:,valid_models] + alpha)
+
+  logrels[range(K),range(K),:] = -np.inf
+  logrels[range(K),range(K),Models.cocluster] = 0
+
+  logrels[:,:,valid_models] -= np.log(1 + len(valid_models)*alpha)
+  assert np.allclose(0, scipy.misc.logsumexp(logrels, axis=2))
+  assert not np.any(np.isnan(logrels))
+
+  logmutrel = Mutrel(rels=logrels, vids=mutrel.vids)
+  return logmutrel
+
+def _determine_node_rels(adj):
+  adj = np.copy(adj)
+  assert np.all(np.diag(adj) == 1)
+  np.fill_diagonal(adj, 0)
 
   K = len(adj)
-  weights_mutrel = np.zeros(K)
-  for new_parent in range(K):
-    if new_parent in (curr_parent, subtree_idx):
-      weights_mutrel[new_parent] = -np.inf
+  node_rels = np.full((K, K), Models.diff_branches)
+  stack = [0]
+  visited = set()
+
+  np.fill_diagonal(node_rels, Models.cocluster)
+  node_rels[0,1:] = Models.A_B
+
+  while len(stack) > 0:
+    P = stack.pop()
+    visited.add(P)
+    C = list(np.flatnonzero(adj[P]))
+    if len(C) == 0:
       continue
-    new_adj = _modify_tree(adj, anc, new_parent, subtree_idx)
-    weights_mutrel[new_parent], _ = __calc_llh_mutrel(new_adj)
 
-  weights_mutrel = util.softmax(weights_mutrel)
-  # Preserve irreducibility of chain by ensuring all valid parents have
-  # non-zero weight.
-  assert weights_mutrel[curr_parent] == 0
-  assert weights_mutrel[subtree_idx] == 0
-  assert np.isclose(np.sum(weights_mutrel), 1)
+    P_anc = list(np.flatnonzero(node_rels[P] == Models.B_A))
+    C_anc = P_anc + [P]
+    node_rels[np.ix_(C_anc,C)] = Models.A_B
+    node_rels[np.ix_(C,C_anc)] = Models.B_A
 
-  weights = np.zeros(K)
-  weights += hparams.theta * weights_mutrel
-  weights += hparams.kappa * depth_frac
+    stack += C
 
-  weights /= np.sum(weights)
-  weights = np.maximum(1e-3, weights)
+  assert visited == set(range(K))
+  assert np.all(np.diag(node_rels) == Models.cocluster)
+  assert np.all(node_rels[0,1:] == Models.A_B)
+  assert np.all(node_rels[1:,0] == Models.B_A)
+
+  return node_rels
+
+def _calc_tree_logmutrel(adj, data_logmutrel):
+  node_rels = _determine_node_rels(adj)
+  K = len(node_rels)
+  assert node_rels.shape == (K, K)
+  assert data_logmutrel.rels.shape == (K-1, K-1, len(Models._all))
+  assert list(data_logmutrel.vids) == ['S%s' % idx for idx in range(K-1)]
+
+  idxs = np.broadcast_to(np.arange(K-1), shape=(K-1, K-1))
+  rows = idxs.T
+  cols = idxs
+  clust_rels = node_rels[1:,1:]
+  assert rows.shape == cols.shape == clust_rels.shape
+
+  tree_logmutrel = data_logmutrel.rels[rows,cols,clust_rels]
+  for axis in (0, 1):
+    tree_logmutrel = np.insert(tree_logmutrel, 0, 0, axis=axis)
+
+  assert np.array_equal(tree_logmutrel, tree_logmutrel.T)
+  assert np.all(tree_logmutrel <= 0)
+  return tree_logmutrel
+
+def _make_W_dests(subtree_head, curr_parent, adj, anc, depth_frac, data_logmutrel):
+  assert subtree_head > 0
+  assert adj[curr_parent,subtree_head] == 1
+  cluster_idx = subtree_head - 1
+  assert data_logmutrel.vids[cluster_idx] == 'S%s' % cluster_idx
+  K = len(adj)
+
+  logweights = np.full(K, -np.inf)
+  for dest in range(K):
+    if dest in (curr_parent, subtree_head):
+      continue
+    new_adj = _modify_tree(adj, anc, dest, subtree_head)
+    tree_logmutrel = _calc_tree_logmutrel(adj, data_logmutrel)
+    logweights[dest] = np.sum(np.triu(tree_logmutrel))
+
+  assert not np.any(np.isnan(logweights))
+  valid_logweights = np.delete(logweights, (curr_parent, subtree_head))
+  assert not np.any(np.isinf(valid_logweights))
+
+  weights = util.softmax(logweights)
+  weights = np.maximum(1e-2, weights)
   weights[curr_parent] = 0
-  weights[subtree_idx] = 0
-  weights /= np.sum(weights)
-
-  return weights
-
-def _make_W_dests_onlyanc(subtree_idx, curr_parent, adj, anc, depth_frac, mutrel):
-  # Hyperparams:
-  #   * theta: weight of `B_A` pairwise probabilities
-  #   * kappa: weight of depth_frac
-  # We refer to `W_dests` rather than `W_parents`, since the destination chosen
-  # for `subtree_idx` could actually be a descendant of it, in which case the
-  # nodes are swapped. When the destination for `subtree_idx` *isn't* its
-  # descendant, then `subtree_idx` is moved under it to become its child.
-  assert adj[curr_parent,subtree_idx] == 1
-
-  K = len(anc)
-  cluster_idx = subtree_idx - 1
-  assert mutrel.vids[cluster_idx] == 'S%s' % cluster_idx
-
-  weights = np.zeros(K)
-  anc_probs = mutrel.rels[cluster_idx,:,Models.B_A]
-  assert anc_probs[cluster_idx] == 0
-  # Intuition: if none of the non-root nodes are high probability parents, then
-  # the root should be high probability.
-  weights[0]  += hparams.theta * (1 - np.max(anc_probs))
-  weights[1:] += hparams.theta * anc_probs
-  weights     += hparams.kappa * depth_frac
-
-  # We can use `anc` to put zero mass on choosing a parent that is already a
-  # descendant of the node. But, for now, we do not.
-  #subtree_desc = np.flatnonzero(anc[subtree_idx])
-  #weights[subtree_desc] = 0
-
-  # Normalize for setting minimum.
-  weights /= np.sum(weights)
-  # Allow all nodes to be chosen with some small probability ...
-  weights = np.maximum(1e-3, weights)
-  # ... but don't allow a node to be its own parent ...
-  weights[subtree_idx] = 0
-  # ... and ensure a different parent is chosen than the current one.
-  weights[curr_parent] = 0
-  # Renormalize.
+  weights[subtree_head] = 0
   weights /= np.sum(weights)
   return weights
-
-_make_W_dests = _make_W_dests_full
 
 def _sample_cat(W):
   assert np.all(W >= 0) and np.isclose(1, np.sum(W))
@@ -387,13 +375,11 @@ def _ensure_valid_tree(adj):
     P = stack.pop()
     assert P not in visited
     visited.add(P)
-    C = np.flatnonzero(adj[P])
-    if len(C) == 0:
-      continue
-    stack += list(C)
+    C = list(np.flatnonzero(adj[P]))
+    stack += C
   assert visited == set(range(K))
 
-def _init_chain(seed, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_mutrel):
+def _init_chain(seed, data_mutrel, data_logmutrel, __calc_phi, __calc_llh_phi):
   # Ensure each chain gets a new random state. I add chain index to initial
   # random seed to seed a new chain, so I must ensure that the seed is still in
   # the valid range [0, 2**32).
@@ -405,10 +391,11 @@ def _init_chain(seed, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_mutrel
   # in the linear or random (which is partly linear, given that later clusters
   # aren't allowed to be parents of earlier ones) cases.
   #init_adj = _init_cluster_adj_branching(K)
+
+  # TODO: change init to work with `data_logmutrel` instead of `data_mutrel`
   init_adj = _init_cluster_adj_mutrels(data_mutrel)
   _ensure_valid_tree(init_adj)
 
-  init_llh_mutrel, init_fit_mutrel = __calc_llh_mutrel(init_adj)
   init_anc = common.make_ancestral_from_adj(init_adj)
   init_depth_frac = _calc_depth_frac(init_adj)
   init_phi = __calc_phi(init_adj)
@@ -419,14 +406,11 @@ def _init_chain(seed, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_mutrel
     depth_frac = init_depth_frac,
     phi = init_phi,
     llh_phi = __calc_llh_phi(init_adj, init_phi),
-    fit_mutrel = init_fit_mutrel,
-    W_nodes = _make_W_nodes(init_adj, init_anc, init_depth_frac, init_fit_mutrel),
+    W_nodes = _make_W_nodes(init_adj, data_logmutrel),
   )
   return init_samp
 
-def _sample_tree(old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_mutrel):
-  # If `B` is ancestral to `A`, swap nodes `A` and `B`. Otherwise, move subtree
-  # `B` under `A`.
+def _sample_tree(old_samp, data_logmutrel, __calc_phi, __calc_llh_phi):
   B = _sample_cat(old_samp.W_nodes)
   assert B != 0
   old_debug_info = tuple(_make_W_nodes.debug)
@@ -434,13 +418,12 @@ def _sample_tree(old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_m
   old_parent = _find_parent(B, old_samp.adj)
   # Don't carry `old_W_dests` in `old_samp`, since it's dependent not just
   # on the current tree, but also on the subtree selected.
-  old_W_dests = _make_W_dests(B, old_parent, old_samp.adj, old_samp.anc, old_samp.depth_frac, __calc_llh_mutrel)
+  old_W_dests = _make_W_dests(B, old_parent, old_samp.adj, old_samp.anc, old_samp.depth_frac, data_logmutrel)
 
   A = _sample_cat(old_W_dests)
-  assert A != old_parent
+  #assert A != old_parent
   new_adj = _modify_tree(old_samp.adj, old_samp.anc, A, B)
   new_anc = common.make_ancestral_from_adj(new_adj)
-  new_llh_mutrel, new_fit_mutrel = __calc_llh_mutrel(new_adj)
   new_depth_frac = _calc_depth_frac(new_adj)
   new_phi = __calc_phi(new_adj)
 
@@ -450,15 +433,14 @@ def _sample_tree(old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_m
     depth_frac = new_depth_frac,
     phi = new_phi,
     llh_phi = __calc_llh_phi(new_adj, new_phi),
-    fit_mutrel = new_fit_mutrel,
-    W_nodes = _make_W_nodes(new_adj, new_anc, new_depth_frac, new_fit_mutrel),
+    W_nodes = _make_W_nodes(new_adj, data_logmutrel),
   )
 
   new_parent = _find_parent(B, new_adj)
   # This is p(A, B | old_state) = p(B | old_state)p(A | B, old_state)
   log_p_new_given_old = np.log(old_samp.W_nodes[B]) + np.log(old_W_dests[A])
   # This is p(B, old_parent | new_state) = p(B | new_state)p(old_parent | B, new_state)
-  new_W_dests = _make_W_dests(B, new_parent, new_samp.adj, new_samp.anc, new_samp.depth_frac, __calc_llh_mutrel)
+  new_W_dests = _make_W_dests(B, new_parent, new_samp.adj, new_samp.anc, new_samp.depth_frac, data_logmutrel)
   log_p_old_given_new = np.log(new_samp.W_nodes[B]) + np.log(new_W_dests[old_parent])
 
   log_p_transition = (new_samp.llh_phi - old_samp.llh_phi) + (log_p_old_given_new - log_p_new_given_old)
@@ -505,6 +487,7 @@ def _sample_tree(old_samp, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_m
 
 def _run_chain(data_mutrel, supervars, superclusters, nsamples, thinned_frac, phi_method, phi_iterations, seed, progress_queue=None):
   assert nsamples > 0
+  data_logmutrel = _make_data_logmutrel(data_mutrel)
 
   V, N, omega_v = calc_binom_params(supervars)
   def __calc_phi(adj):
@@ -512,10 +495,8 @@ def _run_chain(data_mutrel, supervars, superclusters, nsamples, thinned_frac, ph
     return phi
   def __calc_llh_phi(adj, phi):
     return _calc_llh_phi(phi, V, N, omega_v)
-  def __calc_llh_mutrel(adj):
-    return _calc_llh_mutrel(adj, data_mutrel, superclusters)
 
-  samps = [_init_chain(seed, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_mutrel)]
+  samps = [_init_chain(seed, data_mutrel, data_logmutrel, __calc_phi, __calc_llh_phi)]
   accepted = 0
   if progress_queue is not None:
     progress_queue.put(0)
@@ -542,7 +523,7 @@ def _run_chain(data_mutrel, supervars, superclusters, nsamples, thinned_frac, ph
     if progress_queue is not None:
       progress_queue.put(I)
 
-    accept, samp = _sample_tree(last_samp, data_mutrel, __calc_phi, __calc_llh_phi, __calc_llh_mutrel)
+    accept, samp = _sample_tree(last_samp, data_logmutrel, __calc_phi, __calc_llh_phi)
     if I % record_every == 0:
       samps.append(samp)
     last_samp = samp
