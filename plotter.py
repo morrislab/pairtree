@@ -100,6 +100,7 @@ def main():
   supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
 
   if 'phi' in results:
+    print(results)
     json_writer.write_json(
       args.sampid,
       params['samples'],

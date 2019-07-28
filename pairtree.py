@@ -3,226 +3,152 @@ import os
 import numpy as np
 import scipy.integrate
 import warnings
+import random
+import multiprocessing
+import sys
 
 import common
-import handbuilt
 import pairwise
-import json_writer
-import json
-import tree_sampler
-import phi_fitter
-import vaf_plotter
-import relation_plotter
 import inputparser
+import tree_sampler
+import clustermaker
+import resultserializer
+import hyperparams
 
-def create_matrix(model, model_probs, variants):
-  N = len(variants)
-  mat = np.zeros((N, N))
-  for vids, P in model_probs.items():
-    assert 0 <= P <= 1
-    vidx1, vidx2 = [int(V[1:]) for V in vids.split(',')]
-    mat[(vidx1, vidx2)] = P
-  if model in ('garbage', 'cocluster', 'diff_branches'):
-    # These should be symmetric.
-    assert np.allclose(mat, mat.T)
-
-  return mat
-
-def create_model_prob_tensor(model_probs, K='model_probs'):
-  M = len(model_probs['variants'])
-  num_models = len(common.Models._all)
-  tensor = np.zeros((M, M, num_models))
-  for midx, mdl in enumerate(common.Models._all):
-    tensor[:,:,midx] = create_matrix(mdl, model_probs[K][mdl], model_probs['variants'])
-  return tensor
-
-def fit_phis(adjm, variants, clusters, tidxs, iterations, parallel=1):
-  ntrees = len(adjm)
-  nsamples = len(list(variants.values())[0]['total_reads'])
-
-  N, K, S = ntrees, len(clusters), nsamples
-  eta = np.ones((N, K, S))
-  phi = np.ones((N, K, S))
-
-  for tidx in tidxs:
-    phi[tidx,:,:], eta[tidx,:,:] = phi_fitter.fit_phis(adjm[tidx], clusters, variants, iterations, parallel)
-
-  return (phi, eta)
-
-def read_file(fn):
-  basedir = os.path.abspath(os.path.dirname(__file__))
-  with open(os.path.join(basedir, fn)) as F:
-    return F.read()
-
-def write_header(sampid, outf):
-  print('<script type="text/javascript" src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>', file=outf)
-  print('<script src="https://d3js.org/d3.v4.min.js"></script>', file=outf)
-  print('<script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>', file=outf)
-  print('<script type="text/javascript">%s</script>' % read_file('highlight_table_labels.js'), file=outf)
-  print('<script type="text/javascript">%s</script>' % read_file('tree_plotter.js'), file=outf)
-  print('<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">', file=outf)
-  print('<h1>%s</h1>' % sampid, file=outf)
-  print('<style type="text/css">%s</style>' % read_file('tree.css'), file=outf)
-  print('<style type="text/css">%s</style>' % read_file('matrix.css'), file=outf)
-  print('<style type="text/css">td, th, table { padding: 5px; margin: 0; border-collapse: collapse; font-weight: normal; } span { visibility: hidden; } td:hover > span { visibility: visible; } .highlighted { background-color: black !important; color: white; }</style>', file=outf)
-
-def write_trees(sampid, tidx, outf):
-  colourings = {
-    'SJBALL022609': [{'left': 'D', 'right': 'R1'}],
-    'SJETV010steph': [{'left': 'D', 'right': 'R2'}],
-    'SJBALL022610steph': [{'left': 'D', 'right': 'R1'}],
-    'SJETV010stephR1R2': [{'left': 'D', 'right': 'R1'}, {'left': 'D', 'right': 'R2'}, {'left': 'R1', 'right': 'R2'}],
-  }
-  if sampid not in colourings:
-    colourings[sampid] = [{'left': 'D', 'right': 'R1'}]
-
-  print('''<div id="trees"></div>''', file=outf)
-  print('''<script type="text/javascript">$(document).ready(function() {''', file=outf)
-  for colouring in colourings[sampid]:
-    print('''(new TreePlotter()).plot('%s.summ.json', %s, '%s', '%s', '%s', '#trees');''' % (
-      sampid,
-      tidx,
-      'sampled',
-      colouring['left'],
-      colouring['right'],
-    ), file=outf)
-  print('});</script>', file=outf)
-
-def write_phi_matrix(sampid, outf):
-  print('''<script type="text/javascript">$(document).ready(function() {
-  (new PhiMatrix()).plot('%s', '%s.phi.json', '#phi_matrix');
-  });</script>''' % (sampid, sampid), file=outf)
-  print('<div id="phi_matrix" style="margin: 30px"></div>', file=outf)
-
-def write_phi_json(phi, sampnames, phifn):
-  with open(phifn, 'w') as outf:
-    json.dump({
-      'samples': sampnames,
-      'phi': phi.tolist()
-    }, outf)
-
-def print_error(phi, supervars, llh):
-  svkeys = sorted(supervars.keys(), key = lambda S: int(S[1:]))
-  supervar_vaf = np.array([supervars[S]['vaf'] for S in svkeys])
-  assert np.allclose(phi[0], 1)
-  phi = phi[1:] # Discard phi for normal node, which should always be 1.
-  assert supervar_vaf.shape == phi.shape
-
-  diff = np.abs(2*supervar_vaf - phi)
-  M, S = phi.shape
-  phi_error = np.sum(diff) / (M*S)
-
-  llh_error = -llh / (M*S*np.log(2))
-  print('phi_error = %.3f, llh_error = %.3f' % (phi_error, llh_error))
-
-def remove_garbage(garbage_ids, variants):
-  garbage_variants = {}
-  for varid in sorted(variants.keys(), key = lambda S: int(S[1:])):
-    if int(varid[1:]) in garbage_ids:
-      garbage_variants[varid] = variants[varid]
-      del variants[varid]
-  return garbage_variants
-
-def _munge(variants):
-  V1, V2 = variants['C0'], variants['C1']
-  V2['var_reads'] *= 100
-  V2['ref_reads'] *= 100
-  V2['total_reads'] *= 100
-  return
-  for V, var, total in ((V1, 400, 1000), (V2, 100, 1000)):
-    V['var_reads'][:] = var
-    V['total_reads'][:] = total
-    V['ref_reads'] = V['total_reads'] - V['var_reads']
-    V['vaf'] = V['var_reads'] / V['total_reads']
-  return
-
-  for K in ('var_reads', 'total_reads', 'ref_reads'):
-    V2[K] *= 100.
-  V2['var_reads'] += 1
-  V2['total_reads'] += 1
-  V2['vaf'] = V2['var_reads'] / V2['total_reads']
-
-def main():
-  np.set_printoptions(linewidth=400, precision=3, threshold=np.nan, suppress=True)
-  np.seterr(divide='raise', invalid='raise')
-  warnings.simplefilter('ignore', category=scipy.integrate.IntegrationWarning)
-
+def _parse_args():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('--verbose', action='store_true')
   parser.add_argument('--seed', dest='seed', type=int)
-  parser.add_argument('--phi-iterations', dest='phi_iterations', type=int, default=1000)
-  parser.add_argument('--tree-samples', dest='tree_samples', type=int, default=1000)
-  parser.add_argument('--tree-chains', dest='tree_chains', type=int, default=1)
-  parser.add_argument('--parallel', dest='parallel', type=int, default=1)
-  parser.add_argument('sampid')
+  parser.add_argument('--parallel', dest='parallel', type=int, default=None)
+  parser.add_argument('--params', dest='params_fn')
+  parser.add_argument('--trees-per-chain', dest='trees_per_chain', type=int, default=2000)
+  parser.add_argument('--tree-chains', dest='tree_chains', type=int, default=None)
+  parser.add_argument('--burnin', dest='burnin', type=float, default=(1/3), help='Fraction of samples to discard from beginning of each chain')
+  parser.add_argument('--thinned-frac', dest='thinned_frac', type=float, default=1)
+  parser.add_argument('--phi-iterations', dest='phi_iterations', type=int, default=10000)
+  parser.add_argument('--phi-fitter', dest='phi_fitter', choices=('graddesc', 'rprop', 'projection', 'proj_rprop'), default='rprop')
+  parser.add_argument('--only-build-tensor', dest='only_build_tensor', action='store_true')
+  for K in hyperparams.defaults.keys():
+    parser.add_argument('--%s' % K, type=float, default=hyperparams.defaults[K], help=hyperparams.explanations[K])
+
   parser.add_argument('ssm_fn')
-  parser.add_argument('params_fn')
-  parser.add_argument('clusters_fn')
-  parser.add_argument('tree_type')
+  parser.add_argument('results_fn')
   args = parser.parse_args()
+  return args
+
+def _init_hyperparams(args):
+  hparams = (
+    'rho',
+    'tau',
+    'theta',
+    'kappa',
+    'gamma',
+  )
+  for K in hparams:
+    V = getattr(args, K)
+    # Checking that the key already exists in `hyperparams` isn't necessary.
+    # But it's useful because it enforces treating `hyperparams` as a central
+    # listing of all hyperparams.
+    assert hasattr(hyperparams, K)
+    setattr(hyperparams, K, V)
+
+def main():
+  np.set_printoptions(linewidth=400, precision=3, threshold=sys.maxsize, suppress=True)
+  np.seterr(divide='raise', invalid='raise')
+  warnings.simplefilter('ignore', category=scipy.integrate.IntegrationWarning)
+
+  args = _parse_args()
+  _init_hyperparams(args)
+  common.debug.DEBUG = args.verbose
+
+  # Note that multiprocessing.cpu_count() returns number of logical cores, so
+  # if you're using a hyperthreaded CPU, this will be more than the number of
+  # physical cores you have.
+  parallel = args.parallel if args.parallel is not None else multiprocessing.cpu_count()
+  tree_chains = args.tree_chains if args.tree_chains is not None else parallel
 
   if args.seed is not None:
-    np.random.seed(args.seed)
+    seed = args.seed
+  else:
+    # Maximum seed is 2**32 - 1.
+    seed = np.random.randint(2**32)
+  np.random.seed(seed)
+  random.seed(seed)
 
   variants = inputparser.load_ssms(args.ssm_fn)
+  common.debug._truthfn = args.ssm_fn.replace('.ssm', '.data.pickle')
   params = inputparser.load_params(args.params_fn)
-  sampnames = params['samples']
-  clusters = handbuilt.load_clusters(args.clusters_fn, variants, args.tree_type, sampnames)
-  garbage_vids = handbuilt.load_garbage(args.clusters_fn, args.tree_type)
-  garbage_variants = remove_garbage(garbage_vids, variants)
+  logprior = {'garbage': -np.inf, 'cocluster': -np.inf}
 
-  supervars = common.make_cluster_supervars(clusters, variants)
-  superclusters = common.make_superclusters(supervars)
-
-  #svkeys = sorted(supervars.keys(), key = lambda S: int(S[1:]))
-  #supervar_vaf = np.array([supervars[S]['vaf'] for S in svkeys])
-  #supervar_vaf = np.vstack((np.ones(len(supervar_vaf[0])), supervar_vaf))
-  #S = supervar_vaf
-  #from IPython import embed
-  #embed()
-  #import sys
-  #sys.exit()
-
-  if args.run_tests:
-    #_munge(supervars)
-    pairwise.test_calc_lh(supervars['C0'], supervars['C1'])
-    return
-
-  adjm = handbuilt.load_tree(args.clusters_fn, args.tree_type)
-  adjm = None
-  if adjm is not None:
-    sampled_adjm = [adjm]
-    sampled_llh = [0]
+  if os.path.exists(args.results_fn):
+    results = resultserializer.load(args.results_fn)
   else:
-    posterior, evidence = pairwise.calc_posterior(supervars, prior=None, parallel=args.parallel)
-    results = pairwise.generate_results(posterior, evidence, supervars)
-    model_probs_tensor = create_model_prob_tensor(results)
-    sampled_adjm, sampled_llh = tree_sampler.sample_trees(model_probs_tensor, supervars, superclusters, nsamples=args.tree_samples, nchains=args.tree_chains, parallel=args.parallel)
+    results = {'seed': seed}
 
-  phi, eta = fit_phis(sampled_adjm, supervars, superclusters, tidxs=(-1,), iterations=args.phi_iterations, parallel=args.parallel)
-  json_writer.write_json(
-    args.sampid,
-    sampnames,
-    variants,
-    clusters,
-    sampled_adjm,
-    sampled_llh,
-    phi,
-    '%s.summ.json' % args.sampid,
-    '%s.muts.json' % args.sampid,
-  )
-  write_phi_json(phi[-1], sampnames, '%s.phi.json' % args.sampid)
+  if 'clustrel_posterior' not in results:
+    if 'clusters' in params and 'garbage' in params:
+      supervars, results['clustrel_posterior'], results['clustrel_evidence'], results['clusters'], results['garbage'] = clustermaker.use_pre_existing(
+        variants,
+        logprior,
+        parallel,
+        params['clusters'],
+        params['garbage'],
+      )
+    else:
+      if 'mutrel_posterior' not in results:
+        results['mutrel_posterior'], results['mutrel_evidence'] = pairwise.calc_posterior(variants, logprior=logprior, rel_type='variant', parallel=parallel)
+        resultserializer.save(results, args.results_fn)
+      clustermaker._plot.prefix = os.path.basename(args.ssm_fn).split('.')[0]
+      supervars, results['clustrel_posterior'], results['clustrel_evidence'], results['clusters'], results['garbage'] = clustermaker.cluster_and_discard_garbage(
+        variants,
+        results['mutrel_posterior'],
+        results['mutrel_evidence'],
+        logprior,
+        parallel,
+      )
 
-  with open('%s.results.html' % args.sampid, 'w') as outf:
-    write_header(args.sampid, outf)
-    write_trees(args.sampid, len(sampled_adjm) - 1, outf)
-    write_phi_matrix(args.sampid, outf)
-    relation_plotter.plot_ml_relations(model_probs_tensor, outf)
-    vaf_plotter.plot_vaf_matrix(args.sampid, clusters, variants, supervars, garbage_variants, phi[-1], sampnames, None, True, outf)
+    resultserializer.save(results, args.results_fn)
+  else:
+    supervars = clustermaker.make_cluster_supervars(results['clusters'], variants)
 
-  print_error(phi[-1], supervars, sampled_llh[-1])
+  if args.only_build_tensor:
+    sys.exit()
+
+  superclusters = clustermaker.make_superclusters(supervars)
+  # Add empty initial cluster, which serves as tree root.
+  superclusters.insert(0, [])
+
+  if 'adjm' not in results:
+    if 'structures' not in params:
+      results['adjm'], results['phi'], results['llh'] = tree_sampler.sample_trees(
+        results['clustrel_posterior'],
+        supervars,
+        superclusters,
+        args.trees_per_chain,
+        args.burnin,
+        tree_chains,
+        args.thinned_frac,
+        args.phi_fitter,
+        args.phi_iterations,
+        seed,
+        parallel,
+      )
+      resultserializer.save(results, args.results_fn)
+    else:
+      adjls = [inputparser.load_structure(struct) for struct in params['structures']]
+      adjms = [common.convert_adjlist_to_adjmatrix(adjl) for adjl in adjls]
+      results['adjm'], results['phi'], results['llh'] = tree_sampler.use_existing_structures(
+        adjms,
+        supervars,
+        superclusters,
+        args.phi_fitter,
+        args.phi_iterations,
+        parallel
+      )
+      resultserializer.save(results, args.results_fn)
 
 if __name__ == '__main__':
   main()

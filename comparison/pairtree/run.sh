@@ -67,7 +67,7 @@ function run_pairtree {
         "OMP_NUM_THREADS=1 " \
         "PATH=$HOME/tmp/jose/bin:$PATH " \
         "LD_LIBRARY_PATH=$HOME/tmp/jose/bin:$LD_LIBRARY_PATH " \
-        "python3 $PROTDIR/basic.py" \
+        "python3 $PROTDIR/pairtree.py" \
         "--seed 1" \
         "--parallel $PARALLEL" \
         "--tree-chains $TREE_CHAINS" \
