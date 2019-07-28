@@ -19,7 +19,6 @@ TreeSample = namedtuple('TreeSample', (
   'depth_frac',
   'phi',
   'llh_phi',
-  'W_nodes',
 ))
 
 def _calc_llh_phi(phi, V, N, omega_v, epsilon=1e-5):
@@ -224,7 +223,7 @@ def _find_parent(node, adj):
   assert len(parents) == 1
   return parents[0]
 
-def _make_W_nodes(adj, data_logmutrel):
+def _make_W_nodes_mutrel(adj, data_logmutrel):
   K = len(adj)
   assert adj.shape == (K, K)
 
@@ -242,7 +241,13 @@ def _make_W_nodes(adj, data_logmutrel):
   weights /= np.sum(weights)
   assert weights[0] == 0 and np.all(weights[1:] > 0)
 
-  _make_W_nodes.debug = (weights,)
+  return weights
+
+def _make_W_nodes_uniform(adj):
+  K = len(adj)
+  weights = np.ones(K)
+  weights[0] = 0
+  weights /= np.sum(weights)
   return weights
 
 def _make_data_logmutrel(mutrel):
@@ -320,7 +325,7 @@ def _calc_tree_logmutrel(adj, data_logmutrel):
   assert np.all(tree_logmutrel <= 0)
   return tree_logmutrel
 
-def _make_W_dests(subtree_head, curr_parent, adj, anc, depth_frac, data_logmutrel):
+def _make_W_dests_mutrel(subtree_head, curr_parent, adj, anc, depth_frac, data_logmutrel):
   assert subtree_head > 0
   assert adj[curr_parent,subtree_head] == 1
   cluster_idx = subtree_head - 1
@@ -343,6 +348,14 @@ def _make_W_dests(subtree_head, curr_parent, adj, anc, depth_frac, data_logmutre
   weights = np.maximum(1e-2, weights)
   weights[curr_parent] = 0
   weights[subtree_head] = 0
+  weights /= np.sum(weights)
+  return weights
+
+def _make_W_dests_uniform(subtree_head, curr_parent, adj):
+  K = len(adj)
+  weights = np.ones(K)
+  weights[subtree_head] = 0
+  weights[curr_parent] = 0
   weights /= np.sum(weights)
   return weights
 
@@ -406,84 +419,80 @@ def _init_chain(seed, data_mutrel, data_logmutrel, __calc_phi, __calc_llh_phi):
     depth_frac = init_depth_frac,
     phi = init_phi,
     llh_phi = __calc_llh_phi(init_adj, init_phi),
-    W_nodes = _make_W_nodes(init_adj, data_logmutrel),
   )
   return init_samp
 
-def _sample_tree(old_samp, data_logmutrel, __calc_phi, __calc_llh_phi):
-  B = _sample_cat(old_samp.W_nodes)
-  assert B != 0
-  old_debug_info = tuple(_make_W_nodes.debug)
+def _combine_arrays(arr1, arr2, combiner):
+  assert arr1.shape == arr2.shape
+  stacked = np.vstack((arr1, arr2))
+  combined = np.dot(combiner, stacked)[0]
+  assert combined.shape == arr1.shape
+  return (stacked, combined)
 
+def _make_W_nodes_combined(adj, data_logmutrel, combiner):
+  W_nodes_uniform = _make_W_nodes_uniform(adj)
+  W_nodes_mutrel = _make_W_nodes_mutrel(adj, data_logmutrel)
+  W_nodes_stacked, W_nodes = _combine_arrays(W_nodes_uniform, W_nodes_mutrel, combiner)
+  assert W_nodes[0] == 0
+  assert np.isclose(1, np.sum(W_nodes))
+  return (W_nodes_stacked, W_nodes)
+
+def _make_W_dests_combined(subtree_head, curr_parent, adj, anc, depth_frac, data_logmutrel, combiner):
+  W_dests_uniform = _make_W_dests_uniform(subtree_head, curr_parent, adj)
+  W_dests_mutrel = _make_W_dests_mutrel(subtree_head, curr_parent, adj, anc, depth_frac, data_logmutrel)
+  W_dests_stacked, W_dests = _combine_arrays(W_dests_uniform, W_dests_mutrel, combiner)
+  assert W_dests[subtree_head] == W_dests[curr_parent] == 0
+  assert np.isclose(1, np.sum(W_dests))
+  return (W_dests_stacked, W_dests)
+
+def _generate_new_sample(old_samp, data_logmutrel, __calc_phi, __calc_llh_phi):
+  mode_weights = np.array([hparams.gamma, 1 - hparams.gamma])
+  # mode == 0: make uniform update
+  # mode == 1: make mutrel-informed update
+  mode = _sample_cat(mode_weights)
+  combiner = np.array(mode_weights)[np.newaxis,:]
+
+  W_nodes_stacked_old, W_nodes_old = _make_W_nodes_combined(old_samp.adj, data_logmutrel, combiner)
+  B = _sample_cat(W_nodes_stacked_old[mode])
   old_parent = _find_parent(B, old_samp.adj)
-  # Don't carry `old_W_dests` in `old_samp`, since it's dependent not just
-  # on the current tree, but also on the subtree selected.
-  old_W_dests = _make_W_dests(B, old_parent, old_samp.adj, old_samp.anc, old_samp.depth_frac, data_logmutrel)
+  W_dests_stacked_old, W_dests_old = _make_W_dests_combined(
+    B,
+    old_parent,
+    old_samp.adj,
+    old_samp.anc,
+    old_samp.depth_frac,
+    data_logmutrel,
+    combiner
+  )
 
-  A = _sample_cat(old_W_dests)
-  #assert A != old_parent
+  A = _sample_cat(W_dests_stacked_old[mode])
   new_adj = _modify_tree(old_samp.adj, old_samp.anc, A, B)
+  new_parent = _find_parent(B, new_adj)
   new_anc = common.make_ancestral_from_adj(new_adj)
   new_depth_frac = _calc_depth_frac(new_adj)
   new_phi = __calc_phi(new_adj)
-
   new_samp = TreeSample(
     adj = new_adj,
     anc = new_anc,
     depth_frac = new_depth_frac,
     phi = new_phi,
     llh_phi = __calc_llh_phi(new_adj, new_phi),
-    W_nodes = _make_W_nodes(new_adj, data_logmutrel),
   )
 
-  new_parent = _find_parent(B, new_adj)
-  # This is p(A, B | old_state) = p(B | old_state)p(A | B, old_state)
-  log_p_new_given_old = np.log(old_samp.W_nodes[B]) + np.log(old_W_dests[A])
-  # This is p(B, old_parent | new_state) = p(B | new_state)p(old_parent | B, new_state)
-  new_W_dests = _make_W_dests(B, new_parent, new_samp.adj, new_samp.anc, new_samp.depth_frac, data_logmutrel)
-  log_p_old_given_new = np.log(new_samp.W_nodes[B]) + np.log(new_W_dests[old_parent])
+  _, W_nodes_new = _make_W_nodes_combined(new_samp.adj, data_logmutrel, combiner)
+  _, W_dests_new = _make_W_dests_combined(
+    B,
+    new_parent,
+    new_samp.adj,
+    new_samp.anc,
+    new_samp.depth_frac,
+    data_logmutrel,
+    combiner,
+  )
 
-  log_p_transition = (new_samp.llh_phi - old_samp.llh_phi) + (log_p_old_given_new - log_p_new_given_old)
-  U = np.random.uniform()
-  accept = log_p_transition >= np.log(U)
-
-  def _print_debug():
-    #true_adj, true_phi = _load_truth('/home/q/qmorris/jawinter/work/pairtree/scratch/inputs/sims.pairtree/sim_K10_S3_T50_M200_G2_run1.data.pickle')
-    norm_phi_llh = -old_samp.phi.size * np.log(2)
-    cols = (
-      'action',
-      'old_llh',
-      'new_llh',
-      #'true_llh',
-      'p_new_given_old',
-      'p_old_given_new',
-      'nodes',
-      'W_dests',
-      'old_parents',
-      'new_parents',
-      #'true_parents',
-      'weights',
-    )
-    vals = (
-      'accept' if accept else 'reject',
-      '%.3f' % (old_samp.llh_phi / norm_phi_llh),
-      '%.3f' % (new_samp.llh_phi / norm_phi_llh),
-      #'%.3f' % (__calc_llh_phi(true_adj, true_phi) / norm_phi_llh),
-      '%.3f' % log_p_new_given_old,
-      '%.3f' % log_p_old_given_new,
-      (B, old_parent, new_parent),
-      old_W_dests,
-      _find_parents(old_samp.adj),
-      _find_parents(new_samp.adj),
-      #_find_parents(true_adj),
-    ) + old_debug_info
-    debug(*['%s=%s' % (K, V) for K, V in zip(cols, vals)], sep='\t')
-  #_print_debug()
-
-  if accept:
-    return (accept, new_samp)
-  else:
-    return (accept, old_samp)
+  log_p_new_given_old  = np.log(W_nodes_old[B]) + np.log(W_dests_old[A])
+  log_p_old_given_new = np.log(W_nodes_new[B]) + np.log(W_dests_new[old_parent])
+  return (new_samp, log_p_new_given_old, log_p_old_given_new)
 
 def _run_chain(data_mutrel, supervars, superclusters, nsamples, thinned_frac, phi_method, phi_iterations, seed, progress_queue=None):
   assert nsamples > 0
@@ -518,17 +527,61 @@ def _run_chain(data_mutrel, supervars, superclusters, nsamples, thinned_frac, ph
   # results as you'd expect.
   expected_total_trees = 1 + math.floor((nsamples - 1) / record_every)
 
-  last_samp = samps[0]
+  old_samp = samps[0]
   for I in range(1, nsamples):
     if progress_queue is not None:
       progress_queue.put(I)
 
-    accept, samp = _sample_tree(last_samp, data_logmutrel, __calc_phi, __calc_llh_phi)
+    new_samp, log_p_new_given_old, log_p_old_given_new = _generate_new_sample(
+      old_samp,
+      data_logmutrel,
+      __calc_phi,
+      __calc_llh_phi,
+    )
+    log_p_transition = (new_samp.llh_phi - old_samp.llh_phi) + (log_p_old_given_new - log_p_new_given_old)
+    U = np.random.uniform()
+    accept = log_p_transition >= np.log(U)
+    if accept:
+      samp = new_samp
+    else:
+      samp = old_samp
+
     if I % record_every == 0:
       samps.append(samp)
-    last_samp = samp
+    old_samp = samp
     if accept:
       accepted += 1
+
+    def _print_debug():
+      true_adj, true_phi = _load_truth(common.debug._truthfn)
+      norm_phi_llh = -old_samp.phi.size * np.log(2)
+      cols = (
+        'iter',
+        'action',
+        'old_llh',
+        'new_llh',
+        'true_llh',
+        'p_new_given_old',
+        'p_old_given_new',
+        'old_parents',
+        'new_parents',
+        'true_parents',
+      )
+      vals = (
+        I,
+        'accept' if accept else 'reject',
+        '%.3f' % (old_samp.llh_phi / norm_phi_llh),
+        '%.3f' % (new_samp.llh_phi / norm_phi_llh),
+        '%.3f' % (__calc_llh_phi(true_adj, true_phi) / norm_phi_llh),
+        '%.3f' % log_p_new_given_old,
+        '%.3f' % log_p_old_given_new,
+        _find_parents(old_samp.adj),
+        _find_parents(new_samp.adj),
+        _find_parents(true_adj),
+      )
+      debug(*['%s=%s' % (K, V) for K, V in zip(cols, vals)], sep='\t')
+    _print_debug()
+
 
   accept_rate = accepted / (nsamples - 1)
   assert len(samps) == expected_total_trees

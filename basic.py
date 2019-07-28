@@ -40,6 +40,8 @@ def _parse_args():
     help='Weight of ancestral pairwise probabilities when determining potential parent probability distribution for selected node when doing tree updates, such that nodes with high ancestral probability are preferred as parents')
   parser.add_argument('--kappa', type=float, default=1,
     help='Weight of tree depth when determining potential parent probability distribution for selected node when doing tree updates, such that nodes deeper in the existing tree are preferred as parents')
+  parser.add_argument('--gamma', type=float, default=0.2,
+    help='Proportion of tree modifications that should use uniform rather than mutrle-informed perturbation')
 
   parser.add_argument('ssm_fn')
   parser.add_argument('results_fn')
@@ -52,6 +54,7 @@ def _init_hyperparams(args):
     'tau',
     'theta',
     'kappa',
+    'gamma',
   )
   for K in hparams:
     V = getattr(args, K)
@@ -85,6 +88,7 @@ def main():
   random.seed(seed)
 
   variants = inputparser.load_ssms(args.ssm_fn)
+  common.debug._truthfn = args.ssm_fn.replace('.ssm', '.data.pickle')
   params = inputparser.load_params(args.params_fn)
   logprior = {'garbage': -np.inf, 'cocluster': -np.inf}
 
