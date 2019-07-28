@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import argparse
 import os
 import numpy as np
@@ -7,6 +8,7 @@ import random
 import multiprocessing
 import sys
 
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
 import common
 import pairwise
 import inputparser
