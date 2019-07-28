@@ -237,7 +237,7 @@ def _make_W_nodes_mutrel(adj, data_logmutrel):
 
   weights = np.zeros(K)
   weights[1:] += util.softmax(node_error[1:])
-  weights[1:] = np.maximum(1e-2, weights[1:])
+  weights[1:] = np.maximum(1e-10, weights[1:])
   weights /= np.sum(weights)
   assert weights[0] == 0 and np.all(weights[1:] > 0)
 
@@ -345,7 +345,9 @@ def _make_W_dests_mutrel(subtree_head, curr_parent, adj, anc, depth_frac, data_l
   assert not np.any(np.isinf(valid_logweights))
 
   weights = util.softmax(logweights)
-  weights = np.maximum(1e-2, weights)
+  # Since we end up taking logs, this can't be exactly zero. If the logweight
+  # is extremely negative, then this would otherwise be exactly zero.
+  weights = np.maximum(1e-10, weights)
   weights[curr_parent] = 0
   weights[subtree_head] = 0
   weights /= np.sum(weights)
@@ -580,8 +582,7 @@ def _run_chain(data_mutrel, supervars, superclusters, nsamples, thinned_frac, ph
         _find_parents(true_adj),
       )
       debug(*['%s=%s' % (K, V) for K, V in zip(cols, vals)], sep='\t')
-    _print_debug()
-
+    #_print_debug()
 
   accept_rate = accepted / (nsamples - 1)
   assert len(samps) == expected_total_trees
