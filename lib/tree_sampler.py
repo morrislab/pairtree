@@ -255,7 +255,7 @@ def _make_data_logmutrel(mutrel):
   valid_models = (Models.A_B, Models.B_A, Models.diff_branches)
   invalid_models = (Models.cocluster, Models.garbage)
 
-  alpha = 0.001
+  alpha = 1e-10
   logrels = np.full(mutrel.rels.shape, np.nan)
   logrels[:,:,invalid_models] = -np.inf
   logrels[:,:,valid_models] = np.log(mutrel.rels[:,:,valid_models] + alpha)
@@ -400,15 +400,18 @@ def _init_chain(seed, data_mutrel, data_logmutrel, __calc_phi, __calc_llh_phi):
   # the valid range [0, 2**32).
   np.random.seed(seed % 2**32)
 
-  # Particularly since clusters may not be ordered by mean VAF, a branching
-  # tree in which every node comes off the root is the least biased
-  # initialization, as it doesn't require any steps that "undo" bad choices, as
-  # in the linear or random (which is partly linear, given that later clusters
-  # aren't allowed to be parents of earlier ones) cases.
-  #init_adj = _init_cluster_adj_branching(K)
-
   # TODO: change init to work with `data_logmutrel` instead of `data_mutrel`
-  init_adj = _init_cluster_adj_mutrels(data_mutrel)
+  if np.random.uniform() < hparams.pants:
+    print('whoa')
+    init_adj = _init_cluster_adj_mutrels(data_mutrel)
+  else:
+    # Particularly since clusters may not be ordered by mean VAF, a branching
+    # tree in which every node comes off the root is the least biased
+    # initialization, as it doesn't require any steps that "undo" bad choices, as
+    # in the linear or random (which is partly linear, given that later clusters
+    # aren't allowed to be parents of earlier ones) cases.
+    K = len(data_logmutrel.rels) + 1
+    init_adj = _init_cluster_adj_branching(K)
   _ensure_valid_tree(init_adj)
 
   init_anc = common.make_ancestral_from_adj(init_adj)
@@ -448,7 +451,7 @@ def _make_W_dests_combined(subtree_head, curr_parent, adj, anc, depth_frac, data
   return (W_dests_stacked, W_dests)
 
 def _generate_new_sample(old_samp, data_logmutrel, __calc_phi, __calc_llh_phi):
-  mode_weights = np.array([hparams.gamma, 1 - hparams.gamma])
+  mode_weights = np.array([1 - hparams.gamma, hparams.gamma])
   # mode == 0: make uniform update
   # mode == 1: make mutrel-informed update
   mode = _sample_cat(mode_weights)

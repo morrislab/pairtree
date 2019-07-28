@@ -21,9 +21,14 @@ explanations = {
   ''',
 
   'gamma': '''
-    Proportion of tree modifications that should use uniform rather than
-    mutrle-informed perturbation
+    Proportion of tree modifications that should use mutrel-informed rather
+    than uniform perturbation
   ''',
+
+  'pants': '''
+    Probability of initializing with mutrel-informed tree rather than fully
+    branching tree when beginning chain
+  '''
 }
 
 defaults = {
@@ -31,11 +36,14 @@ defaults = {
   'tau': 1.,
   'theta': 4.,
   'kappa': 1.,
-  'gamma': 0.2,
+  'gamma': 0.75,
+  'pants': 0.75,
 }
 
+# TODO: can I eliminate the redundancy of listing these here as well as above?
 rho = None
 tau = None
 theta = None
 kappa = None
 gamma = None
+pants = None
