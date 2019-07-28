@@ -16,6 +16,7 @@ described in {insert link to paper}. The algorithm consists of two phases:
    tree, balancing the need to fit the observed mutation data while still
    obeying tree constraints.
 
+
 Installing Pairtree
 ===================
 1. Install dependencies. To ease installation, you may wish to use Anaconda
@@ -24,8 +25,11 @@ Installing Pairtree
     * Python 3.6 or greater
     * NumPy
     * SciPy
-    * tqdm (e.g., install via`pip3 install --user tqdm`)
+    * tqdm {link} (e.g., install via`pip3 install --user tqdm`)
     * C compiler (e.g., GCC)
+
+Pairtree has only been tested on Linux systems, but should work on any
+UNIX-like OS (including macOS).
 
 2. Compile the C code required to fit lineage frequencies to the tree. This
    algorithm was published in {Jose paper}, and uses the authors'
@@ -45,9 +49,11 @@ Installing Pairtree
     # View the HTML file.
     firefox example.results.html
 
+
 Interpreting Pairtree output
 ============================
 (add note about how logs will be written in JSON format if stdout/stderr is directed to a file)
+
 
 Tweaking Pairtree options
 =========================
@@ -132,3 +138,22 @@ sampling with `M = N`.)
 
 Using alternative algorithms to fit lineage frequencies to each tree
 --------------------------------------------------------------------
+By default, Pairtree uses the "Efficient projection onto the perfect phylogeny
+model" algorithm described in Bei et al. (2018) {link} to fit tree-constrained
+lineage frequencies to each sampled phylogeny. This algorithm is usually the
+fastest choice. As alternatives, however, Pairtree also supports three other
+algorithms, which you can specify via the `--phi-fitter=<algorithm>` option.
+
+* `graddesc`: uses gradient descent with an adaptive step size. (I.e., the step
+  size is increased each time a step is accepted, and reduced each time a step
+  is rejected.) Only a single global step size is used.
+
+* `rprop`: uses the rprop variant of gradient descent {link}. Separate step
+  sizes are maintained for each frequency scalar in each tissue sample. Those
+  step sizes are increased when the direction of a step is consistent with the
+  previous step taken, and reduced otherwise.
+
+* `proj_rprop`: first run the default `projection` algorithm, then refine its
+  results using `rprop`. While this can produce better lineage frequency values
+  at the cost of more computation, it has in testing demonstrated little
+  benefit to accuracy.
