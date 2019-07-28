@@ -7,26 +7,10 @@ Think about "hard zeroes" in the method
 
 Cleanup:
   Remove "dummy prob"
-  Remove VAF corrections
-  Remove all references to mu_v, replacing with omega_v
-  Remove mu_r
-  Think about new data format
-    Should mutations have unique IDs?
-    How to represent sample names? In a separate file?
-    Store variant reads instead of ref reads
-    Remove files not used by Pairtree
 
   Remove ability for phi fitter, tree samples, etc. to take clusters of variants -- they should just take single supervariant
   Remove .phi.json files, make JS extract freqs from tree summary
   Rejig the left/right node colouring in tree plotter -- make left/right samples user-configurable when plotting
-
-Instead of just including garbage variants where *every* sample is drawn from uniform, have some garbage where only some samples are drawn from uniform
-Change my grad desc to use Adam instead
-
-Bugs:
-  In phi_fitter's calc_mut_p, should I actually use 0.5? or omega_v?
-    Since it's working on superclusters, this is probably okay
-
 
 Steph:
   19 datasets
@@ -39,3 +23,9 @@ Steph:
       cd ~/work/pairtree/scratch/results/steph.xeno.sciclone && for foo in *stdout; do echo $(echo $foo | cut -d. -f1) $(cat $foo | grep "of inadequate depth" | awk '{print $1/$4}'); done | sort -nk2
       | column -t
       Median: 17.4% of variants dropped
+
+Occasionally init with fully branched tree
+Do hyperparam search
+Make Pairtree function offline by including copies of D3 and jQuery
+Put Jose's code in submodule
+  Set default path to that submodule so you don't need to set LD_LIBRARY_PATH

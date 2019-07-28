@@ -22,17 +22,27 @@ def _parse_args():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('--verbose', action='store_true')
-  parser.add_argument('--seed', dest='seed', type=int)
-  parser.add_argument('--parallel', dest='parallel', type=int, default=None)
-  parser.add_argument('--params', dest='params_fn')
-  parser.add_argument('--trees-per-chain', dest='trees_per_chain', type=int, default=2000)
-  parser.add_argument('--tree-chains', dest='tree_chains', type=int, default=None)
-  parser.add_argument('--burnin', dest='burnin', type=float, default=(1/3), help='Fraction of samples to discard from beginning of each chain')
-  parser.add_argument('--thinned-frac', dest='thinned_frac', type=float, default=1)
-  parser.add_argument('--phi-iterations', dest='phi_iterations', type=int, default=10000)
-  parser.add_argument('--phi-fitter', dest='phi_fitter', choices=('graddesc', 'rprop', 'projection', 'proj_rprop'), default='rprop')
-  parser.add_argument('--only-build-tensor', dest='only_build_tensor', action='store_true')
+  parser.add_argument('--verbose', action='store_true',
+    help='Print debugging messages'))
+  parser.add_argument('--seed', dest='seed', type=int,
+    help='Integer seed used for pseudo-random number generator. Running Pairtree with the same seed on the same inputs will produce exactly the same result.')
+  parser.add_argument('--parallel', dest='parallel', type=int, default=None,
+    help='Number of tasks to run in parallel. By default, this is set to the number of CPU cores on the system. On hyperthreaded systems, this will be twice the number of physical CPUs.')
+  parser.add_argument('--params', dest='params_fn',
+    help='Path to JSON-formatted parameters (including mutation clusters and sample names).'))
+  parser.add_argument('--trees-per-chain', dest='trees_per_chain', type=int, default=3000,
+    help='Total number of trees to sample in each MCMC chain.')
+  parser.add_argument('--tree-chains', dest='tree_chains', type=int, default=None,
+    help='Number of MCMC chains to run.')
+  parser.add_argument('--burnin', dest='burnin', type=float, default=(1/3),
+    help='Proportion of samples to discard from beginning of each chain.')
+  parser.add_argument('--thinned-frac', dest='thinned_frac', type=float, default=1,
+    help='Proportion of non-burnin trees to write as output.')
+  parser.add_argument('--phi-fitter', dest='phi_fitter', choices=('graddesc', 'rprop', 'projection', 'proj_rprop'), default='projection')
+  parser.add_argument('--phi-iterations', dest='phi_iterations', type=int, default=10000,
+    help='Maximum number of iterations of phi-fitting algorithm to run when using iterative phi-fitting algorithms (graddesc, rprop, or proj_rprop).')
+  parser.add_argument('--only-build-tensor', dest='only_build_tensor', action='store_true',
+    help='Exit after building pairwise relations tensor, without sampling any trees.')
   for K in hyperparams.defaults.keys():
     parser.add_argument('--%s' % K, type=float, default=hyperparams.defaults[K], help=hyperparams.explanations[K])
 
@@ -70,7 +80,12 @@ def main():
   # if you're using a hyperthreaded CPU, this will be more than the number of
   # physical cores you have.
   parallel = args.parallel if args.parallel is not None else multiprocessing.cpu_count()
-  tree_chains = args.tree_chains if args.tree_chains is not None else parallel
+  if args.tree_chains is not None:
+    tree_chains = args.tree_chains
+  else:
+    # We sometimes set `parallel = 0` to disable the use of multiprocessing,
+    # making it easier to read debug messages.
+    tree_chains = max(1, parallel)
 
   if args.seed is not None:
     seed = args.seed
