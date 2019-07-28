@@ -15,7 +15,7 @@ import relation_plotter
 import json_writer
 
 def read_file(fn):
-  basedir = os.path.abspath(os.path.dirname(__file__))
+  basedir = os.path.join(os.path.dirname(__file__), '..', 'plot_resources')
   with open(os.path.join(basedir, fn)) as F:
     return F.read()
 
@@ -103,7 +103,6 @@ def main():
   supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
 
   if 'phi' in results:
-    print(results)
     json_writer.write_json(
       args.sampid,
       params['samples'],
