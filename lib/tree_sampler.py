@@ -62,19 +62,19 @@ def _init_cluster_adj_random(K):
   cluster_adj[parents, range(1,K)] = 1
   return cluster_adj
 
-def _init_cluster_adj_mutrels(data_mutrel):
+def _init_cluster_adj_mutrels(data_logmutrel):
   # Hyperparams:
   #   * theta: weight of `B_A` pairwise probabilities
   #   * kappa: weight of depth_frac
 
-  K = len(data_mutrel.rels) + 1
+  K = len(data_logmutrel.rels) + 1
   adj = np.eye(K, dtype=np.int)
   depth = np.zeros(K, dtype=np.int)
   in_tree = set((0,))
   remaining = set(range(1, K))
 
   W_nodes      = np.zeros(K)
-  W_nodes[1:] += np.sum(data_mutrel.rels[:,:,Models.A_B], axis=1)
+  W_nodes[1:] += np.sum(np.exp(data_logmutrel.rels[:,:,Models.A_B]), axis=1)
   # Root should never be selected.
   assert W_nodes[0] == 0
 
@@ -86,9 +86,9 @@ def _init_cluster_adj_mutrels(data_mutrel):
     # cidx: cluster index
     nidx = _sample_cat(W_nodes_norm)
     cidx = nidx - 1
-    assert data_mutrel.vids[cidx] == 'S%s' % cidx
+    assert data_logmutrel.vids[cidx] == 'S%s' % cidx
 
-    anc_probs = data_mutrel.rels[cidx,:,Models.B_A]
+    anc_probs = np.exp(data_logmutrel.rels[cidx,:,Models.B_A])
     assert anc_probs[cidx] == 0
 
     if np.any(depth > 0):
@@ -394,16 +394,14 @@ def _ensure_valid_tree(adj):
     stack += C
   assert visited == set(range(K))
 
-def _init_chain(seed, data_mutrel, data_logmutrel, __calc_phi, __calc_llh_phi):
+def _init_chain(seed, data_logmutrel, __calc_phi, __calc_llh_phi):
   # Ensure each chain gets a new random state. I add chain index to initial
   # random seed to seed a new chain, so I must ensure that the seed is still in
   # the valid range [0, 2**32).
   np.random.seed(seed % 2**32)
 
-  # TODO: change init to work with `data_logmutrel` instead of `data_mutrel`
   if np.random.uniform() < hparams.pants:
-    print('whoa')
-    init_adj = _init_cluster_adj_mutrels(data_mutrel)
+    init_adj = _init_cluster_adj_mutrels(data_logmutrel)
   else:
     # Particularly since clusters may not be ordered by mean VAF, a branching
     # tree in which every node comes off the root is the least biased
@@ -499,9 +497,8 @@ def _generate_new_sample(old_samp, data_logmutrel, __calc_phi, __calc_llh_phi):
   log_p_old_given_new = np.log(W_nodes_new[B]) + np.log(W_dests_new[old_parent])
   return (new_samp, log_p_new_given_old, log_p_old_given_new)
 
-def _run_chain(data_mutrel, supervars, superclusters, nsamples, thinned_frac, phi_method, phi_iterations, seed, progress_queue=None):
+def _run_chain(data_logmutrel, supervars, superclusters, nsamples, thinned_frac, phi_method, phi_iterations, seed, progress_queue=None):
   assert nsamples > 0
-  data_logmutrel = _make_data_logmutrel(data_mutrel)
 
   V, N, omega_v = calc_binom_params(supervars)
   def __calc_phi(adj):
@@ -510,7 +507,7 @@ def _run_chain(data_mutrel, supervars, superclusters, nsamples, thinned_frac, ph
   def __calc_llh_phi(adj, phi):
     return _calc_llh_phi(phi, V, N, omega_v)
 
-  samps = [_init_chain(seed, data_mutrel, data_logmutrel, __calc_phi, __calc_llh_phi)]
+  samps = [_init_chain(seed, data_logmutrel, __calc_phi, __calc_llh_phi)]
   accepted = 0
   if progress_queue is not None:
     progress_queue.put(0)
@@ -616,6 +613,7 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin,
 
   jobs = []
   total = nchains * trees_per_chain
+  data_logmutrel = _make_data_logmutrel(data_mutrel)
 
   # Don't use (hard-to-debug) parallelism machinery unless necessary.
   if parallel > 0:
@@ -631,7 +629,7 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin,
         for C in range(nchains):
           # Ensure each chain's random seed is different from the seed used to
           # seed the initial Pairtree invocation, yet nonetheless reproducible.
-          jobs.append(ex.submit(_run_chain, data_mutrel, supervars, superclusters, trees_per_chain, thinned_frac, phi_method, phi_iterations, seed + C + 1, progress_queue))
+          jobs.append(ex.submit(_run_chain, data_logmutrel, supervars, superclusters, trees_per_chain, thinned_frac, phi_method, phi_iterations, seed + C + 1, progress_queue))
 
         # Exactly `total` items will be added to the queue. Once we've
         # retrieved that many items from the queue, we can assume that our
@@ -646,7 +644,7 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin,
   else:
     results = []
     for C in range(nchains):
-      results.append(_run_chain(data_mutrel, supervars, superclusters, trees_per_chain, thinned_frac, phi_method, phi_iterations, seed + C + 1))
+      results.append(_run_chain(data_logmutrel, supervars, superclusters, trees_per_chain, thinned_frac, phi_method, phi_iterations, seed + C + 1))
 
   discard_first = round(burnin * trees_per_chain)
   merged_adj = []
