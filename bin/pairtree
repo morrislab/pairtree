@@ -23,13 +23,13 @@ def _parse_args():
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--verbose', action='store_true',
-    help='Print debugging messages'))
+    help='Print debugging messages')
   parser.add_argument('--seed', dest='seed', type=int,
     help='Integer seed used for pseudo-random number generator. Running Pairtree with the same seed on the same inputs will produce exactly the same result.')
   parser.add_argument('--parallel', dest='parallel', type=int, default=None,
     help='Number of tasks to run in parallel. By default, this is set to the number of CPU cores on the system. On hyperthreaded systems, this will be twice the number of physical CPUs.')
   parser.add_argument('--params', dest='params_fn',
-    help='Path to JSON-formatted parameters (including mutation clusters and sample names).'))
+    help='Path to JSON-formatted parameters (including mutation clusters and sample names).')
   parser.add_argument('--trees-per-chain', dest='trees_per_chain', type=int, default=3000,
     help='Total number of trees to sample in each MCMC chain.')
   parser.add_argument('--tree-chains', dest='tree_chains', type=int, default=None,
@@ -52,14 +52,7 @@ def _parse_args():
   return args
 
 def _init_hyperparams(args):
-  hparams = (
-    'rho',
-    'tau',
-    'theta',
-    'kappa',
-    'gamma',
-  )
-  for K in hparams:
+  for K in hyperparams.defaults.keys():
     V = getattr(args, K)
     # Checking that the key already exists in `hyperparams` isn't necessary.
     # But it's useful because it enforces treating `hyperparams` as a central
