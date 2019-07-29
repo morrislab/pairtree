@@ -31,16 +31,19 @@ Installing Pairtree
 Pairtree has only been tested on Linux systems, but should work on any
 UNIX-like OS (including macOS).
 
-2. Compile the C code required to fit lineage frequencies to the tree. This
-   algorithm was published in {Jose paper}, and uses the authors'
-   implementation with minor modifications.
+2. Clone the Pairtree repository, then download and build the C code required
+   to fit lineage frequencies to the tree. This algorithm was published in
+   {Jose paper}, and uses the authors' implementation with minor modifications.
 
-    cd lib/freq_projection
+    git clone https://github.com/jwintersinger/pairtree
+    cd pairtree/lib
+    git clone https://github.com/jwintersinger/projectppm
+    cd projectppm
     bash make.sh
 
 3. Test your Pairtree installation.
 
-    cd example/
+    cd ../../example/
     mkdir results && cd results
     # Run Pairtree.
     ../../bin/pairtree --params ../example.params.json ../example.ssm example.results.npz
@@ -53,6 +56,10 @@ UNIX-like OS (including macOS).
 Interpreting Pairtree output
 ============================
 (add note about how logs will be written in JSON format if stdout/stderr is directed to a file)
+
+Input files
+===========
+(document the input files)
 
 
 Tweaking Pairtree options

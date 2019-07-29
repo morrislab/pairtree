@@ -65,9 +65,7 @@ function run_pairtree {
       echo "mkdir -p $outdir && cd $outdir && " \
         "TIMEFORMAT='%R %U %S'; time (" \
         "OMP_NUM_THREADS=1 " \
-        "PATH=$HOME/tmp/jose/bin:$PATH " \
-        "LD_LIBRARY_PATH=$HOME/tmp/jose/bin:$LD_LIBRARY_PATH " \
-        "python3 $PROTDIR/pairtree.py" \
+        "python3 $PROTDIR/bin/pairtree" \
         "--seed 1" \
         "--parallel $PARALLEL" \
         "--tree-chains $TREE_CHAINS" \
@@ -152,8 +150,8 @@ function convert_outputs {
 }
 
 function main {
-  run_pairtree | grep python3 | parallel -j80 --halt 1 --eta
-  convert_outputs | grep python3 | parallel -j10 --halt 1 --eta
+  run_pairtree #| grep python3 | parallel -j80 --halt 1 --eta
+  #convert_outputs | grep python3 | parallel -j10 --halt 1 --eta
 }
 
 main

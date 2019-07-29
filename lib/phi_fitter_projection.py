@@ -1,9 +1,9 @@
 import numpy as np
 import common
 import ctypes
-import ctypes.util
 import numpy.ctypeslib as npct
 import subprocess
+import os
 import sys
 
 def _convert_adjm_to_adjlist(adjm):
@@ -107,7 +107,7 @@ def _init_project_ppm():
   c_edge_p = ctypes.POINTER(Edge)
   c_short_p = ctypes.POINTER(ctypes.c_short)
 
-  lib_path = ctypes.util.find_library('projectppm')
+  lib_path = os.path.join(os.path.dirname(__file__), 'projectppm', 'bin', 'libprojectppm.so')
   assert lib_path is not None, 'Could not find libprojectppm'
   lib = ctypes.cdll.LoadLibrary(lib_path)
   func = lib.tree_cost_projection
