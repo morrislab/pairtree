@@ -54,10 +54,6 @@ def _parse_args():
 def _init_hyperparams(args):
   for K in hyperparams.defaults.keys():
     V = getattr(args, K)
-    # Checking that the key already exists in `hyperparams` isn't necessary.
-    # But it's useful because it enforces treating `hyperparams` as a central
-    # listing of all hyperparams.
-    assert hasattr(hyperparams, K)
     setattr(hyperparams, K, V)
 
 def main():

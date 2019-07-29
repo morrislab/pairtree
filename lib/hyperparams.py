@@ -39,11 +39,3 @@ defaults = {
   'gamma': 0.75,
   'pants': 0.75,
 }
-
-# TODO: can I eliminate the redundancy of listing these here as well as above?
-rho = None
-tau = None
-theta = None
-kappa = None
-gamma = None
-pants = None
