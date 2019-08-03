@@ -491,13 +491,12 @@ def _generate_new_sample(old_samp, data_logmutrel, __calc_phi, __calc_llh_phi):
   )
 
   if common.debug.DEBUG:
+    true_parent = _find_parent(B, common._true_adjm)
+    old_parent = _find_parent(B, old_samp.adj)
     _generate_new_sample.debug = (
       (
         B,
-        A,
-        _find_parent(B, common._true_adjm),
-        _find_parent(B, old_samp.adj),
-        old_samp.anc[B,A],
+        (A, true_parent, old_parent),
       ),
       mode_node,
       mode_dest,
@@ -614,7 +613,7 @@ def _run_chain(data_logmutrel, supervars, superclusters, nsamples, thinned_frac,
       )
       vals = vals + _generate_new_sample.debug
       print(*['%s=%s' % (K, V) for K, V in zip(cols, vals)], sep='\t')
-    if common.DEBUG.debug:
+    if common.debug.DEBUG:
       _print_debug()
 
     if I % record_every == 0:
