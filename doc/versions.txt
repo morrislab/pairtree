@@ -45,6 +45,15 @@ lol47: same as lol46, but big K
 lol48: same as lol47, but change hyperparam to 1e-2 from 1e-4
 lol49: small K, new node selection based on probs rather than L1 distance
 lol50: same as lol49, but big K
-lol51: new node choice and dest choice algorithms, multichain, bit and small K
+lol51: big+small K, multichain, new node choice and dest choice algorithms
+lol52: small K, singlechain, sometimes make small random perturbations to tree
+lol53: small K, singlechain, choose uniform or mutrel-informed dest independently from choice for node, rather than doing so together
+lol54: small K, singlechain, never choose dest or node uniformly
+lol55: big K, singlechain, gamma = zeta = 0.75, iota=1
+lol56: big K, singlechain, gamma = zeta = 1
+lol57: big K, singlechain, gamma = zeta = 0
+lol58: big K, singlechain, gamma = zeta = iota = 0
+lol59: dunno
+lol60: small K, singlechain, fixed bugs, gamma=zeta=1, iota=0
 
 Interesting: lol9 does as poorly as most other lol runs, and much worse than lol4 and lol8

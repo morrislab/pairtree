@@ -143,7 +143,6 @@ def _modify_tree(adj, anc, A, B):
   assert A != B
 
   adj = np.copy(adj)
-  anc = np.copy(anc)
 
   assert np.array_equal(np.diag(adj), np.ones(K))
   # Diagonal should be 1, and every node except one of them should have a parent.
@@ -153,7 +152,6 @@ def _modify_tree(adj, anc, A, B):
   assert np.array_equal(np.sort(np.sum(adj, axis=0)), np.array([1] + (K - 1)*[2]))
 
   np.fill_diagonal(adj, 0)
-  np.fill_diagonal(anc, 0)
 
   if anc[B,A]:
     adj_BA = adj[B,A]
@@ -233,7 +231,9 @@ def _make_W_nodes_mutrel(adj, data_logmutrel):
   assert np.allclose(0, pair_error[0])
   assert np.allclose(0, pair_error[:,0])
   pair_error = np.maximum(1e-10, pair_error)
-  node_error = scipy.special.logsumexp(np.log(pair_error), axis=1)
+  node_error = np.sum(np.log(pair_error), axis=1)
+  if common.debug.DEBUG:
+    _make_W_nodes_mutrel.node_error = node_error
 
   weights = np.zeros(K)
   weights[1:] += util.softmax(node_error[1:])
@@ -337,7 +337,7 @@ def _make_W_dests_mutrel(subtree_head, curr_parent, adj, anc, depth_frac, data_l
     if dest in (curr_parent, subtree_head):
       continue
     new_adj = _modify_tree(adj, anc, dest, subtree_head)
-    tree_logmutrel = _calc_tree_logmutrel(adj, data_logmutrel)
+    tree_logmutrel = _calc_tree_logmutrel(new_adj, data_logmutrel)
     logweights[dest] = np.sum(np.triu(tree_logmutrel))
 
   assert not np.any(np.isnan(logweights))
@@ -368,12 +368,13 @@ def _sample_cat(W):
   return choice
 
 def _load_truth(truthfn):
+  if hasattr(common, '_true_adjm') and hasattr(common, '_true_phi'):
+    return
   import pickle
   with open(truthfn, 'rb') as F:
     truth = pickle.load(F)
-  true_adjm = truth['adjm']
-  true_phi = truth['phi']
-  return (true_adjm, true_phi)
+  common._true_adjm = truth['adjm']
+  common._true_phi = truth['phi']
 
 def _ensure_valid_tree(adj):
   # I had several issues with subtle bugs in my tree initialization algorithm
@@ -400,7 +401,7 @@ def _init_chain(seed, data_logmutrel, __calc_phi, __calc_llh_phi):
   # the valid range [0, 2**32).
   np.random.seed(seed % 2**32)
 
-  if np.random.uniform() < hparams.pants:
+  if np.random.uniform() < hparams.iota:
     init_adj = _init_cluster_adj_mutrels(data_logmutrel)
   else:
     # Particularly since clusters may not be ordered by mean VAF, a branching
@@ -425,76 +426,99 @@ def _init_chain(seed, data_logmutrel, __calc_phi, __calc_llh_phi):
   )
   return init_samp
 
-def _combine_arrays(arr1, arr2, combiner):
-  assert arr1.shape == arr2.shape
-  stacked = np.vstack((arr1, arr2))
-  combined = np.dot(combiner, stacked)[0]
-  assert combined.shape == arr1.shape
-  return (stacked, combined)
-
-def _make_W_nodes_combined(adj, data_logmutrel, combiner):
+def _make_W_nodes_combined(adj, data_logmutrel):
   W_nodes_uniform = _make_W_nodes_uniform(adj)
   W_nodes_mutrel = _make_W_nodes_mutrel(adj, data_logmutrel)
-  W_nodes_stacked, W_nodes = _combine_arrays(W_nodes_uniform, W_nodes_mutrel, combiner)
-  assert W_nodes[0] == 0
-  assert np.isclose(1, np.sum(W_nodes))
-  return (W_nodes_stacked, W_nodes)
+  return np.vstack((W_nodes_uniform, W_nodes_mutrel))
 
-def _make_W_dests_combined(subtree_head, curr_parent, adj, anc, depth_frac, data_logmutrel, combiner):
+def _make_W_dests_combined(subtree_head, adj, anc, depth_frac, data_logmutrel):
+  curr_parent = _find_parent(subtree_head, adj)
   W_dests_uniform = _make_W_dests_uniform(subtree_head, curr_parent, adj)
   W_dests_mutrel = _make_W_dests_mutrel(subtree_head, curr_parent, adj, anc, depth_frac, data_logmutrel)
-  W_dests_stacked, W_dests = _combine_arrays(W_dests_uniform, W_dests_mutrel, combiner)
-  assert W_dests[subtree_head] == W_dests[curr_parent] == 0
-  assert np.isclose(1, np.sum(W_dests))
-  return (W_dests_stacked, W_dests)
+  return np.vstack((W_dests_uniform, W_dests_mutrel))
 
 def _generate_new_sample(old_samp, data_logmutrel, __calc_phi, __calc_llh_phi):
-  mode_weights = np.array([1 - hparams.gamma, hparams.gamma])
   # mode == 0: make uniform update
   # mode == 1: make mutrel-informed update
-  mode = _sample_cat(mode_weights)
-  combiner = np.array(mode_weights)[np.newaxis,:]
+  mode_node_weights = np.array([1 - hparams.gamma, hparams.gamma])
+  mode_dest_weights = np.array([1 - hparams.zeta,  hparams.zeta])
+  mode_node = _sample_cat(mode_node_weights)
+  mode_dest = _sample_cat(mode_dest_weights)
 
-  W_nodes_stacked_old, W_nodes_old = _make_W_nodes_combined(old_samp.adj, data_logmutrel, combiner)
-  B = _sample_cat(W_nodes_stacked_old[mode])
-  old_parent = _find_parent(B, old_samp.adj)
-  W_dests_stacked_old, W_dests_old = _make_W_dests_combined(
+  W_nodes_old = _make_W_nodes_combined(old_samp.adj, data_logmutrel)
+  B = _sample_cat(W_nodes_old[mode_node])
+  W_dests_old = _make_W_dests_combined(
     B,
-    old_parent,
     old_samp.adj,
     old_samp.anc,
     old_samp.depth_frac,
     data_logmutrel,
-    combiner
   )
 
-  A = _sample_cat(W_dests_stacked_old[mode])
+  A = _sample_cat(W_dests_old[mode_dest])
+  #A = _find_parent(B, common._true_adjm)
   new_adj = _modify_tree(old_samp.adj, old_samp.anc, A, B)
-  new_parent = _find_parent(B, new_adj)
-  new_anc = common.make_ancestral_from_adj(new_adj)
-  new_depth_frac = _calc_depth_frac(new_adj)
   new_phi = __calc_phi(new_adj)
   new_samp = TreeSample(
     adj = new_adj,
-    anc = new_anc,
-    depth_frac = new_depth_frac,
+    anc = common.make_ancestral_from_adj(new_adj),
+    depth_frac = _calc_depth_frac(new_adj),
     phi = new_phi,
     llh_phi = __calc_llh_phi(new_adj, new_phi),
   )
 
-  _, W_nodes_new = _make_W_nodes_combined(new_samp.adj, data_logmutrel, combiner)
-  _, W_dests_new = _make_W_dests_combined(
-    B,
-    new_parent,
+  # `A_prime` and `B_prime` correspond to the node choices needed to reverse
+  # the tree perturbation.
+  if old_samp.anc[B,A]:
+    # If `B` is ancestral to `A`, the tree perturbation swaps the nodes. Thus,
+    # simply invert the swap to reverse the move.
+    A_prime = B
+    B_prime = A
+  else:
+    # If `B` isn't ancestral to `A`, the tree perturbation moves the subtree
+    # headed by `B` so that `A` becomes its parent. To reverse the move, move
+    # the `B` subtree back under its old parent.
+    A_prime = _find_parent(B, old_samp.adj)
+    B_prime = B
+
+  W_nodes_new = _make_W_nodes_combined(new_samp.adj, data_logmutrel)
+  W_dests_new = _make_W_dests_combined(
+    B_prime,
     new_samp.adj,
     new_samp.anc,
     new_samp.depth_frac,
     data_logmutrel,
-    combiner,
   )
 
-  log_p_new_given_old  = np.log(W_nodes_old[B]) + np.log(W_dests_old[A])
-  log_p_old_given_new = np.log(W_nodes_new[B]) + np.log(W_dests_new[old_parent])
+  if common.debug.DEBUG:
+    _generate_new_sample.debug = (
+      (
+        B,
+        A,
+        _find_parent(B, common._true_adjm),
+        _find_parent(B, old_samp.adj),
+        old_samp.anc[B,A],
+      ),
+      mode_node,
+      mode_dest,
+      W_nodes_old[0],
+      W_nodes_old[1],
+      W_dests_old[0],
+      W_dests_old[1],
+      '%.3f' % np.max(W_nodes_old[1]),
+      '%.3f' % np.max(W_dests_old[1]),
+    )
+
+  log_p_B_new_given_old = np.log(np.dot(mode_node_weights, W_nodes_old[:,B]))
+  log_p_A_new_given_old = np.log(np.dot(mode_dest_weights, W_dests_old[:,A]))
+  # The need to use `A_prime` and `B_prime` here rather than `A` and `B`
+  # becomes apparent when you consider the case when `B` is ancestral to `A` in
+  # the old tree.
+  log_p_B_old_given_new = np.log(np.dot(mode_node_weights, W_nodes_new[:,B_prime]))
+  log_p_A_old_given_new = np.log(np.dot(mode_dest_weights, W_dests_new[:,A_prime]))
+
+  log_p_new_given_old = log_p_B_new_given_old + log_p_A_new_given_old
+  log_p_old_given_new = log_p_B_old_given_new + log_p_A_old_given_new
   return (new_samp, log_p_new_given_old, log_p_old_given_new)
 
 def _run_chain(data_logmutrel, supervars, superclusters, nsamples, thinned_frac, phi_method, phi_iterations, seed, progress_queue=None):
@@ -548,14 +572,10 @@ def _run_chain(data_logmutrel, supervars, superclusters, nsamples, thinned_frac,
     else:
       samp = old_samp
 
-    if I % record_every == 0:
-      samps.append(samp)
-    old_samp = samp
-    if accept:
-      accepted += 1
-
     def _print_debug():
-      true_adj, true_phi = _load_truth(common.debug._truthfn)
+      if not common.debug.DEBUG:
+        return
+      true_adj, true_phi = common._true_adjm, common._true_phi
       norm_phi_llh = -old_samp.phi.size * np.log(2)
       cols = (
         'iter',
@@ -568,6 +588,16 @@ def _run_chain(data_logmutrel, supervars, superclusters, nsamples, thinned_frac,
         'old_parents',
         'new_parents',
         'true_parents',
+        'node_error',
+        'nodes',
+        'mode_node',
+        'mode_dest',
+        'W_nodes_old_0',
+        'W_nodes_old_1',
+        'W_dests_old_0',
+        'W_dests_old_1',
+        'max_W_nodes_old_1',
+        'max_W_dests_old_1',
       )
       vals = (
         I,
@@ -580,13 +610,23 @@ def _run_chain(data_logmutrel, supervars, superclusters, nsamples, thinned_frac,
         _find_parents(old_samp.adj),
         _find_parents(new_samp.adj),
         _find_parents(true_adj),
+        _make_W_nodes_mutrel.node_error,
       )
-      debug(*['%s=%s' % (K, V) for K, V in zip(cols, vals)], sep='\t')
-    #_print_debug()
+      vals = vals + _generate_new_sample.debug
+      print(*['%s=%s' % (K, V) for K, V in zip(cols, vals)], sep='\t')
+    if common.DEBUG.debug:
+      _print_debug()
+
+    if I % record_every == 0:
+      samps.append(samp)
+    old_samp = samp
+    if accept:
+      accepted += 1
+
 
   accept_rate = accepted / (nsamples - 1)
   assert len(samps) == expected_total_trees
-  debug('accept_rate=%s' % accept_rate, 'total_trees=%s' % len(samps))
+  print('accept_rate=%s' % accept_rate, 'total_trees=%s' % len(samps))
   return (
     [S.adj     for S in samps],
     [S.phi     for S in samps],
@@ -610,6 +650,9 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin,
   assert trees_per_chain > 0
   assert 0 <= burnin <= 1
   assert 0 < thinned_frac <= 1
+
+  if common.debug.DEBUG:
+    _load_truth(common.debug._truthfn)
 
   jobs = []
   total = nchains * trees_per_chain

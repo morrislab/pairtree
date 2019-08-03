@@ -21,11 +21,16 @@ explanations = {
   ''',
 
   'gamma': '''
-    Proportion of tree modifications that should use mutrel-informed rather
-    than uniform perturbation
+    Proportion of tree modifications that should use mutrel-informed choice for
+    node to move, rather than uniform choice
   ''',
 
-  'pants': '''
+  'zeta': '''
+    Proportion of tree modifications that should use mutrel-informed choice for
+    destination to move node to, rather than uniform choice
+  ''',
+
+  'iota': '''
     Probability of initializing with mutrel-informed tree rather than fully
     branching tree when beginning chain
   '''
@@ -36,6 +41,9 @@ defaults = {
   'tau': 1.,
   'theta': 4.,
   'kappa': 1.,
-  'gamma': 0.75,
-  'pants': 0.75,
+  'gamma': 1,
+  'zeta': 1,
+  'iota': 0,
 }
+
+assert set(explanations.keys()) == set(defaults.keys())

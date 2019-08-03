@@ -29,3 +29,4 @@ Do hyperparam search
 Make Pairtree function offline by including copies of D3 and jQuery
 Put Jose's code in submodule
   Set default path to that submodule so you don't need to set LD_LIBRARY_PATH
+Make possible installation via Conda
