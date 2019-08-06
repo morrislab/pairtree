@@ -1,13 +1,4 @@
 explanations = {
-  'rho': '''
-    Weight of mutrel fit term when selecting node to move within tree, such
-    that we prefer nodes with high mutrel error
-  ''',
-
-  'tau': '''
-    Weight of depth term when selecting node to move within tree, such that we  prefer nodes deeper in tree
-  ''',
-
   'theta': '''
     Weight of ancestral pairwise probabilities when determining potential
     parent probability distribution for selected node while initializing tree,
@@ -37,13 +28,11 @@ explanations = {
 }
 
 defaults = {
-  'rho': 4.,
-  'tau': 1.,
   'theta': 4.,
   'kappa': 1.,
   'gamma': 0.7,
   'zeta': 0.7,
-  'iota': 0,
+  'iota': 0.7,
 }
 
 assert set(explanations.keys()) == set(defaults.keys())

@@ -16,7 +16,6 @@ from collections import namedtuple
 TreeSample = namedtuple('TreeSample', (
   'adj',
   'anc',
-  'depth_frac',
   'phi',
   'llh_phi',
 ))
@@ -178,27 +177,6 @@ def _modify_tree(adj, anc, A, B):
   np.fill_diagonal(adj, 1)
   return adj
 
-def _calc_depth_frac(adj):
-  K = len(adj)
-  root = 0
-  Z = np.copy(adj)
-  np.fill_diagonal(Z, 0)
-
-  depth = np.zeros(K)
-  stack = [root]
-  while len(stack) > 0:
-    P = stack.pop()
-    C = np.flatnonzero(Z[P])
-    if len(C) == 0:
-      continue
-    depth[C] = depth[P] + 1
-    stack += list(C)
-
-  assert depth[root] == 0
-  assert np.all(depth[:root] > 0) and np.all(depth[root+1:] > 0)
-  depth_frac = depth / np.max(depth)
-  return depth_frac
-
 def calc_binom_params(supervars):
   svids = common.extract_vids(supervars)
   V = np.array([supervars[svid]['var_reads'] for svid in svids])
@@ -243,14 +221,14 @@ def _make_W_nodes_mutrel(adj, anc, data_logmutrel):
   assert np.allclose(0, np.diag(pair_error))
   assert np.allclose(0, pair_error[0])
   assert np.allclose(0, pair_error[:,0])
-  pair_error = np.maximum(1e-10, pair_error)
+  pair_error = np.maximum(common._EPSILON, pair_error)
   node_error = np.sum(np.log(pair_error), axis=1)
   if common.debug.DEBUG:
     _make_W_nodes_mutrel.node_error = node_error
 
   weights = np.zeros(K)
   weights[1:] += _scaled_softmax(node_error[1:])
-  weights[1:] += 1e-10
+  weights[1:] += common._EPSILON
   weights /= np.sum(weights)
   assert weights[0] == 0
 
@@ -268,7 +246,7 @@ def _make_data_logmutrel(mutrel):
   valid_models = (Models.A_B, Models.B_A, Models.diff_branches)
   invalid_models = (Models.cocluster, Models.garbage)
 
-  alpha = 1e-10
+  alpha = common._EPSILON
   logrels = np.full(mutrel.rels.shape, np.nan)
   logrels[:,:,invalid_models] = -np.inf
   logrels[:,:,valid_models] = np.log(mutrel.rels[:,:,valid_models] + alpha)
@@ -338,7 +316,7 @@ def _calc_tree_logmutrel(adj, data_logmutrel):
   assert np.all(tree_logmutrel <= 0)
   return tree_logmutrel
 
-def _make_W_dests_mutrel(subtree_head, curr_parent, adj, anc, depth_frac, data_logmutrel):
+def _make_W_dests_mutrel(subtree_head, curr_parent, adj, anc, data_logmutrel):
   assert subtree_head > 0
   assert adj[curr_parent,subtree_head] == 1
   cluster_idx = subtree_head - 1
@@ -362,7 +340,7 @@ def _make_W_dests_mutrel(subtree_head, curr_parent, adj, anc, depth_frac, data_l
   weights = _scaled_softmax(logweights)
   # Since we end up taking logs, this can't be exactly zero. If the logweight
   # is extremely negative, then this would otherwise be exactly zero.
-  weights += 1e-10
+  weights += common._EPSILON
   weights[curr_parent] = 0
   weights[subtree_head] = 0
   weights /= np.sum(weights)
@@ -429,13 +407,11 @@ def _init_chain(seed, data_logmutrel, __calc_phi, __calc_llh_phi):
   _ensure_valid_tree(init_adj)
 
   init_anc = common.make_ancestral_from_adj(init_adj)
-  init_depth_frac = _calc_depth_frac(init_adj)
   init_phi = __calc_phi(init_adj)
 
   init_samp = TreeSample(
     adj = init_adj,
     anc = init_anc,
-    depth_frac = init_depth_frac,
     phi = init_phi,
     llh_phi = __calc_llh_phi(init_adj, init_phi),
   )
@@ -446,10 +422,10 @@ def _make_W_nodes_combined(adj, anc, data_logmutrel):
   W_nodes_mutrel = _make_W_nodes_mutrel(adj, anc, data_logmutrel)
   return np.vstack((W_nodes_uniform, W_nodes_mutrel))
 
-def _make_W_dests_combined(subtree_head, adj, anc, depth_frac, data_logmutrel):
+def _make_W_dests_combined(subtree_head, adj, anc, data_logmutrel):
   curr_parent = _find_parent(subtree_head, adj)
   W_dests_uniform = _make_W_dests_uniform(subtree_head, curr_parent, adj, anc)
-  W_dests_mutrel = _make_W_dests_mutrel(subtree_head, curr_parent, adj, anc, depth_frac, data_logmutrel)
+  W_dests_mutrel = _make_W_dests_mutrel(subtree_head, curr_parent, adj, anc, data_logmutrel)
   return np.vstack((W_dests_uniform, W_dests_mutrel))
 
 def _generate_new_sample(old_samp, data_logmutrel, __calc_phi, __calc_llh_phi):
@@ -466,7 +442,6 @@ def _generate_new_sample(old_samp, data_logmutrel, __calc_phi, __calc_llh_phi):
     B,
     old_samp.adj,
     old_samp.anc,
-    old_samp.depth_frac,
     data_logmutrel,
   )
 
@@ -477,7 +452,6 @@ def _generate_new_sample(old_samp, data_logmutrel, __calc_phi, __calc_llh_phi):
   new_samp = TreeSample(
     adj = new_adj,
     anc = common.make_ancestral_from_adj(new_adj),
-    depth_frac = _calc_depth_frac(new_adj),
     phi = new_phi,
     llh_phi = __calc_llh_phi(new_adj, new_phi),
   )
@@ -501,7 +475,6 @@ def _generate_new_sample(old_samp, data_logmutrel, __calc_phi, __calc_llh_phi):
     B_prime,
     new_samp.adj,
     new_samp.anc,
-    new_samp.depth_frac,
     data_logmutrel,
   )
 
