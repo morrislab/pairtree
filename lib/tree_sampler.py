@@ -221,12 +221,25 @@ def _find_parent(node, adj):
   assert len(parents) == 1
   return parents[0]
 
-def _make_W_nodes_mutrel(adj, data_logmutrel):
+def _scaled_softmax(A, R=100):
+  # Ensures `max(softmax(A)) / min(softmax(A)) = R`.
+  noninf = np.logical_not(np.isinf(A))
+  if np.sum(noninf) == 0:
+    return util.softmax(A)
+  delta = np.max(A[noninf]) - np.min(A[noninf])
+  if np.isclose(0, delta):
+    return util.softmax(A)
+  B = np.log(R) / delta
+  return util.softmax(B*A)
+
+def _make_W_nodes_mutrel(adj, anc, data_logmutrel):
   K = len(adj)
   assert adj.shape == (K, K)
 
   tree_logmutrel = _calc_tree_logmutrel(adj, data_logmutrel)
   pair_error = 1 - np.exp(tree_logmutrel)
+  #pair_error *= 1 - anc
+
   assert np.allclose(0, np.diag(pair_error))
   assert np.allclose(0, pair_error[0])
   assert np.allclose(0, pair_error[:,0])
@@ -236,14 +249,14 @@ def _make_W_nodes_mutrel(adj, data_logmutrel):
     _make_W_nodes_mutrel.node_error = node_error
 
   weights = np.zeros(K)
-  weights[1:] += util.softmax(node_error[1:])
-  weights[1:] = np.maximum(1e-10, weights[1:])
+  weights[1:] += _scaled_softmax(node_error[1:])
+  weights[1:] += 1e-10
   weights /= np.sum(weights)
-  assert weights[0] == 0 and np.all(weights[1:] > 0)
+  assert weights[0] == 0
 
   return weights
 
-def _make_W_nodes_uniform(adj):
+def _make_W_nodes_uniform(adj, anc):
   K = len(adj)
   weights = np.ones(K)
   weights[0] = 0
@@ -334,7 +347,9 @@ def _make_W_dests_mutrel(subtree_head, curr_parent, adj, anc, depth_frac, data_l
 
   logweights = np.full(K, -np.inf)
   for dest in range(K):
-    if dest in (curr_parent, subtree_head):
+    if dest == curr_parent:
+      continue
+    if dest == subtree_head:
       continue
     new_adj = _modify_tree(adj, anc, dest, subtree_head)
     tree_logmutrel = _calc_tree_logmutrel(new_adj, data_logmutrel)
@@ -344,16 +359,16 @@ def _make_W_dests_mutrel(subtree_head, curr_parent, adj, anc, depth_frac, data_l
   valid_logweights = np.delete(logweights, (curr_parent, subtree_head))
   assert not np.any(np.isinf(valid_logweights))
 
-  weights = util.softmax(logweights)
+  weights = _scaled_softmax(logweights)
   # Since we end up taking logs, this can't be exactly zero. If the logweight
   # is extremely negative, then this would otherwise be exactly zero.
-  weights = np.maximum(1e-10, weights)
+  weights += 1e-10
   weights[curr_parent] = 0
   weights[subtree_head] = 0
   weights /= np.sum(weights)
   return weights
 
-def _make_W_dests_uniform(subtree_head, curr_parent, adj):
+def _make_W_dests_uniform(subtree_head, curr_parent, adj, anc):
   K = len(adj)
   weights = np.ones(K)
   weights[subtree_head] = 0
@@ -426,14 +441,14 @@ def _init_chain(seed, data_logmutrel, __calc_phi, __calc_llh_phi):
   )
   return init_samp
 
-def _make_W_nodes_combined(adj, data_logmutrel):
-  W_nodes_uniform = _make_W_nodes_uniform(adj)
-  W_nodes_mutrel = _make_W_nodes_mutrel(adj, data_logmutrel)
+def _make_W_nodes_combined(adj, anc, data_logmutrel):
+  W_nodes_uniform = _make_W_nodes_uniform(adj, anc)
+  W_nodes_mutrel = _make_W_nodes_mutrel(adj, anc, data_logmutrel)
   return np.vstack((W_nodes_uniform, W_nodes_mutrel))
 
 def _make_W_dests_combined(subtree_head, adj, anc, depth_frac, data_logmutrel):
   curr_parent = _find_parent(subtree_head, adj)
-  W_dests_uniform = _make_W_dests_uniform(subtree_head, curr_parent, adj)
+  W_dests_uniform = _make_W_dests_uniform(subtree_head, curr_parent, adj, anc)
   W_dests_mutrel = _make_W_dests_mutrel(subtree_head, curr_parent, adj, anc, depth_frac, data_logmutrel)
   return np.vstack((W_dests_uniform, W_dests_mutrel))
 
@@ -445,7 +460,7 @@ def _generate_new_sample(old_samp, data_logmutrel, __calc_phi, __calc_llh_phi):
   mode_node = _sample_cat(mode_node_weights)
   mode_dest = _sample_cat(mode_dest_weights)
 
-  W_nodes_old = _make_W_nodes_combined(old_samp.adj, data_logmutrel)
+  W_nodes_old = _make_W_nodes_combined(old_samp.adj, old_samp.anc, data_logmutrel)
   B = _sample_cat(W_nodes_old[mode_node])
   W_dests_old = _make_W_dests_combined(
     B,
@@ -481,7 +496,7 @@ def _generate_new_sample(old_samp, data_logmutrel, __calc_phi, __calc_llh_phi):
     A_prime = _find_parent(B, old_samp.adj)
     B_prime = B
 
-  W_nodes_new = _make_W_nodes_combined(new_samp.adj, data_logmutrel)
+  W_nodes_new = _make_W_nodes_combined(new_samp.adj, new_samp.anc, data_logmutrel)
   W_dests_new = _make_W_dests_combined(
     B_prime,
     new_samp.adj,
@@ -498,8 +513,7 @@ def _generate_new_sample(old_samp, data_logmutrel, __calc_phi, __calc_llh_phi):
         B,
         (A, true_parent, old_parent),
       ),
-      mode_node,
-      mode_dest,
+      (mode_node, mode_dest),
       W_nodes_old[0],
       W_nodes_old[1],
       W_dests_old[0],
@@ -589,8 +603,7 @@ def _run_chain(data_logmutrel, supervars, superclusters, nsamples, thinned_frac,
         'true_parents',
         'node_error',
         'nodes',
-        'mode_node',
-        'mode_dest',
+        'sample_mode',
         'W_nodes_old_0',
         'W_nodes_old_1',
         'W_dests_old_0',

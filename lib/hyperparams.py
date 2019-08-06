@@ -41,8 +41,8 @@ defaults = {
   'tau': 1.,
   'theta': 4.,
   'kappa': 1.,
-  'gamma': 1,
-  'zeta': 1,
+  'gamma': 0.7,
+  'zeta': 0.7,
   'iota': 0,
 }
 

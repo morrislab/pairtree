@@ -55,5 +55,8 @@ lol57: big K, singlechain, gamma = zeta = 0
 lol58: big K, singlechain, gamma = zeta = iota = 0
 lol59: dunno
 lol60: small K, singlechain, fixed bugs, gamma=zeta=1, iota=0
+lol61: small K, singlechain, try scaled softmax, gamma=zeta=0.7
+lol62: big K, singlechain, try scaled softmax, gamma=zeta=0.7
+lol63: big K, singlechain, don't zero out the descendant relations when selecting node to move, gamma=zeta=0.7
 
 Interesting: lol9 does as poorly as most other lol runs, and much worse than lol4 and lol8
