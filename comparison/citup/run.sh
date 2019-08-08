@@ -23,6 +23,7 @@ function convert_inputs {
   for ssmfn in $PAIRTREE_INPUTS_DIR/*.ssm; do
     sampid=$(basename $ssmfn | cut -d. -f1)
     echo "python3 $SCRIPTDIR/convert_inputs.py " \
+      "--use-supervars" \
       "$PAIRTREE_INPUTS_DIR/$sampid.ssm" \
       "$PAIRTREE_INPUTS_DIR/$sampid.params.json" \
       "$INDIR/$sampid.snv" \
@@ -37,7 +38,7 @@ function run_citup {
     outdir="$OUTDIR/$runid"
     clusterfn+="$INDIR/${runid}.cluster "
     # Does this need to be `clusters + 1`?
-    num_clusters=$(cat $clusterfn | sort | uniq | wc -l)
+    let num_clusters=$(cat $clusterfn | sort | uniq | wc -l)+1
 
     cmd="mkdir -p $outdir && cd $outdir &&"
     cmd+="TIMEFORMAT='%R %U %S'; time ("
@@ -60,9 +61,27 @@ function run_citup {
   done
 }
 
+function convert_outputs {
+  for outdir in $OUTDIR/*; do
+    runid=$(basename $outdir)
+    resultfn="$outdir/$runid.results.hdf5"
+    [[ -f $resultfn ]] || continue
+
+    cmd="cd $outdir && "
+    cmd+="python3 $SCRIPTDIR/convert_outputs.py "
+    cmd+="$resultfn "
+    cmd+="$INDIR/$runid.vid "
+    cmd+="$PAIRTREE_INPUTS_DIR/$runid.ssm "
+    cmd+="$PAIRTREE_INPUTS_DIR/$runid.params.json "
+
+    echo $cmd
+  done
+}
+
 function main {
   #convert_inputs
-  run_citup
+  #run_citup
+  convert_outputs
 }
 
 main

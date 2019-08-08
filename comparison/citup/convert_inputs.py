@@ -6,6 +6,7 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
 import common
 import inputparser
+import clustermaker
 
 def load_nongarb_vids(variants, garbage):
   vids = set(variants.keys())
@@ -35,6 +36,7 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('--use-supervars', action='store_true')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
   parser.add_argument('citup_snv_fn')
@@ -45,10 +47,17 @@ def main():
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.params_fn)
   clusters = params['clusters']
-  garbage = set(params['garbage'])
 
-  write_snvs(variants, garbage, args.citup_snv_fn, args.citup_vid_fn)
-  write_clusters(variants, garbage, clusters, args.citup_clusters_fn)
+  if args.use_supervars:
+    supervars = clustermaker.make_cluster_supervars(clusters, variants)
+    superclusters = clustermaker.make_superclusters(supervars)
+    garbage = set()
+    write_snvs(supervars, garbage, args.citup_snv_fn, args.citup_vid_fn)
+    write_clusters(supervars, garbage, superclusters, args.citup_clusters_fn)
+  else:
+    garbage = set(params['garbage'])
+    write_snvs(variants, garbage, args.citup_snv_fn, args.citup_vid_fn)
+    write_clusters(variants, garbage, clusters, args.citup_clusters_fn)
 
 if __name__ == '__main__':
   main()
