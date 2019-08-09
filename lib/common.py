@@ -53,6 +53,25 @@ def make_ancestral_from_adj(adj):
   #assert np.array_equal(Z[root], np.ones(K))
   return Z
 
+def ensure_valid_tree(adj):
+  # I had several issues with subtle bugs in my tree initialization algorithm
+  # creating invalid trees. This function is useful to ensure that `adj`
+  # corresponds to a valid tree.
+  adj = np.copy(adj)
+  K = len(adj)
+  assert np.all(np.diag(adj) == 1)
+  np.fill_diagonal(adj, 0)
+  visited = set()
+
+  stack = [0]
+  while len(stack) > 0:
+    P = stack.pop()
+    assert P not in visited
+    visited.add(P)
+    C = list(np.flatnonzero(adj[P]))
+    stack += C
+  assert visited == set(range(K))
+
 def convert_adjlist_to_adjmatrix(adjlist):
   all_children = [child for C in adjlist.values() for child in C]
   root = 0

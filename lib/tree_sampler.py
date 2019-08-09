@@ -369,25 +369,6 @@ def _load_truth(truthfn):
   common._true_adjm = truth['adjm']
   common._true_phi = truth['phi']
 
-def _ensure_valid_tree(adj):
-  # I had several issues with subtle bugs in my tree initialization algorithm
-  # creating invalid trees. This function is useful to ensure that `adj`
-  # corresponds to a valid tree.
-  adj = np.copy(adj)
-  K = len(adj)
-  assert np.all(np.diag(adj) == 1)
-  np.fill_diagonal(adj, 0)
-  visited = set()
-
-  stack = [0]
-  while len(stack) > 0:
-    P = stack.pop()
-    assert P not in visited
-    visited.add(P)
-    C = list(np.flatnonzero(adj[P]))
-    stack += C
-  assert visited == set(range(K))
-
 def _init_chain(seed, data_logmutrel, __calc_phi, __calc_llh_phi):
   # Ensure each chain gets a new random state. I add chain index to initial
   # random seed to seed a new chain, so I must ensure that the seed is still in
@@ -404,7 +385,7 @@ def _init_chain(seed, data_logmutrel, __calc_phi, __calc_llh_phi):
     # aren't allowed to be parents of earlier ones) cases.
     K = len(data_logmutrel.rels) + 1
     init_adj = _init_cluster_adj_branching(K)
-  _ensure_valid_tree(init_adj)
+  common.ensure_valid_tree(init_adj)
 
   init_anc = common.make_ancestral_from_adj(init_adj)
   init_phi = __calc_phi(init_adj)
@@ -599,8 +580,7 @@ def _run_chain(data_logmutrel, supervars, superclusters, nsamples, thinned_frac,
       )
       vals = vals + _generate_new_sample.debug
       print(*['%s=%s' % (K, V) for K, V in zip(cols, vals)], sep='\t')
-    if common.debug.DEBUG:
-      _print_debug()
+    _print_debug()
 
     if I % record_every == 0:
       samps.append(samp)
