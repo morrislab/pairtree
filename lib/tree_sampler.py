@@ -588,7 +588,6 @@ def _run_chain(data_logmutrel, supervars, superclusters, nsamples, thinned_frac,
     if accept:
       accepted += 1
 
-
   accept_rate = accepted / (nsamples - 1)
   assert len(samps) == expected_total_trees
   print('accept_rate=%s' % accept_rate, 'total_trees=%s' % len(samps))
@@ -654,11 +653,12 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin,
     for C in range(nchains):
       results.append(_run_chain(data_logmutrel, supervars, superclusters, trees_per_chain, thinned_frac, phi_method, phi_iterations, seed + C + 1))
 
-  discard_first = round(burnin * trees_per_chain)
   merged_adj = []
   merged_phi = []
   merged_llh = []
   for A, P, L in results:
+    assert len(A) == len(P) == len(L) == len(results[0][0])
+    discard_first = round(burnin * len(A))
     merged_adj += A[discard_first:]
     merged_phi += P[discard_first:]
     merged_llh += L[discard_first:]
