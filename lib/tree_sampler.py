@@ -576,6 +576,7 @@ def _run_chain(data_logmutrel, supervars, superclusters, nsamples, thinned_frac,
   else:
     accept_rate = 1.
   assert len(samps) == expected_total_trees
+  # TODO: only print this if `--verbose` is set.
   print('accept_rate=%s' % accept_rate, 'total_trees=%s' % len(samps))
   return (
     [S.adj     for S in samps],
