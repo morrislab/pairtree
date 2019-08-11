@@ -62,72 +62,54 @@ def _init_cluster_adj_random(K):
   return cluster_adj
 
 def _init_cluster_adj_mutrels(data_logmutrel):
-  # Hyperparams:
-  #   * theta: weight of `B_A` pairwise probabilities
-  #   * kappa: weight of depth_frac
-
   K = len(data_logmutrel.rels) + 1
   adj = np.eye(K, dtype=np.int)
-  depth = np.zeros(K, dtype=np.int)
   in_tree = set((0,))
   remaining = set(range(1, K))
 
-  W_nodes      = np.zeros(K)
-  W_nodes[1:] += np.sum(np.exp(data_logmutrel.rels[:,:,Models.A_B]), axis=1)
-  # Root should never be selected.
-  assert W_nodes[0] == 0
+  W_nodes = np.zeros(K)
 
   while len(remaining) > 0:
-    if np.all(W_nodes[list(remaining)] == 0):
-      W_nodes[list(remaining)] = 1
-    W_nodes_norm = W_nodes / np.sum(W_nodes)
-    # nidx: node index
-    # cidx: cluster index
-    nidx = _sample_cat(W_nodes_norm)
-    cidx = nidx - 1
-    assert data_logmutrel.vids[cidx] == 'S%s' % cidx
+    nodeidxs = np.array(sorted(remaining))
+    relidxs = nodeidxs - 1
+    assert np.all(relidxs >= 0)
+    anc_logprobs = data_logmutrel.rels[np.ix_(relidxs, relidxs)][:,:,Models.A_B]
+    # These values are currently -inf, but we must replace these so that joint
+    # probabilities of being ancestral to remaining don't all become 0.
+    np.fill_diagonal(anc_logprobs, 0)
 
-    anc_probs = np.exp(data_logmutrel.rels[cidx,:,Models.B_A])
-    assert anc_probs[cidx] == 0
+    assert anc_logprobs.shape == (len(remaining), len(remaining))
+    log_W_nodes_remaining = np.sum(anc_logprobs, axis=1)
+    # Use really "soft" softmax.
+    W_nodes[nodeidxs] = _scaled_softmax(log_W_nodes_remaining)
 
-    if np.any(depth > 0):
-      depth_frac = depth / np.max(depth)
-    else:
-      # All nodes are at zero depth.
-      depth_frac = np.copy(depth)
-    assert depth_frac[0] == 0
+    # Root should never be selected.
+    assert W_nodes[0] == 0
+    assert np.isclose(1, np.sum(W_nodes))
+    assert np.all(W_nodes[list(in_tree)] == 0)
+    nidx = _sample_cat(W_nodes)
 
-    W_parents      = np.zeros(K)
-    W_parents[0]  += hparams.theta * (1 - np.max(anc_probs))
-    W_parents[1:] += hparams.theta * anc_probs
-    W_parents     += hparams.kappa * depth_frac
-    # `W_anc[nidx]` and `depth_frac[nidx]` should both have been zero.
-    assert W_parents[nidx] == 0
-
-    # Don't select a parent not yet in the tree.
-    W_parents[list(remaining)] = 0
-    W_parents_intree = W_parents[list(in_tree)]
-    # If all potential parents have zero weight (e.g., because their ancestral
-    # probabilities are zero), establish uniform distribution over them.
-    if np.all(W_parents_intree == 0):
-      W_parents_intree[:] = 1
-    # Normalize before setting minimum.
-    W_parents_intree /= np.sum(W_parents_intree)
-    W_parents_intree  = np.maximum(1e-5, W_parents[list(in_tree)])
-    # Renormalize.
-    W_parents_intree /= np.sum(W_parents_intree)
-    W_parents[list(in_tree)] = W_parents_intree
-
-    parent = _sample_cat(W_parents)
-    adj[parent,nidx] = 1
-    depth[nidx] = depth[parent] + 1
+    log_W_parents = np.full(K, -np.inf)
+    others = np.array(sorted(remaining - set((nidx,))))
+    truncated_logmutrel = mutrel.remove_variants_by_vidx(data_logmutrel, others - 1)
+    for parent in in_tree:
+      new_adj = np.copy(adj)
+      new_adj[parent,nidx] = 1
+      truncated_adj = util.remove_rowcol(new_adj, others)
+      tree_logmutrel = _calc_tree_logmutrel(truncated_adj, truncated_logmutrel, check_vids=False)
+      log_W_parents[parent] = np.sum(np.triu(tree_logmutrel))
+    W_parents = _scaled_softmax(log_W_parents)
+    assert np.all(W_parents[nodeidxs] == 0)
+    pidx = _sample_cat(W_parents)
+    adj[pidx,nidx] = 1
 
     remaining.remove(nidx)
     in_tree.add(nidx)
     W_nodes[nidx] = 0
 
   assert np.all(W_nodes == 0)
-  assert depth[0] == 0 and np.all(depth[1:] > 0)
+  assert len(in_tree) == K
+  assert len(remaining) == 0
   return adj
 
 def _modify_tree(adj, anc, A, B):
@@ -295,12 +277,13 @@ def _determine_node_rels(adj):
 
   return node_rels
 
-def _calc_tree_logmutrel(adj, data_logmutrel):
+def _calc_tree_logmutrel(adj, data_logmutrel, check_vids=True):
   node_rels = _determine_node_rels(adj)
   K = len(node_rels)
   assert node_rels.shape == (K, K)
   assert data_logmutrel.rels.shape == (K-1, K-1, len(Models._all))
-  assert list(data_logmutrel.vids) == ['S%s' % idx for idx in range(K-1)]
+  if check_vids:
+    assert list(data_logmutrel.vids) == ['S%s' % idx for idx in range(K-1)]
 
   idxs = np.broadcast_to(np.arange(K-1), shape=(K-1, K-1))
   rows = idxs.T
@@ -588,7 +571,10 @@ def _run_chain(data_logmutrel, supervars, superclusters, nsamples, thinned_frac,
     if accept:
       accepted += 1
 
-  accept_rate = accepted / (nsamples - 1)
+  if nsamples > 1:
+    accept_rate = accepted / (nsamples - 1)
+  else:
+    accept_rate = 1.
   assert len(samps) == expected_total_trees
   print('accept_rate=%s' % accept_rate, 'total_trees=%s' % len(samps))
   return (
