@@ -180,7 +180,7 @@ def merge_variants(to_merge, evidence, logprior):
     already_merged |= vidxs
     evidence = new_evidence
 
-  evidence = mutrel.remove_variants(evidence, already_merged)
+  evidence = mutrel.remove_variants_by_vidx(evidence, already_merged)
   posterior = mutrel.Mutrel(
     vids = evidence.vids,
     rels = _calc_posterior_full(evidence.rels, logprior),
