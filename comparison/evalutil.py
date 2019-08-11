@@ -3,6 +3,7 @@ import numpy as np
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+import util
 import mutrel
 import common
 from common import Models
@@ -95,10 +96,6 @@ def _distinguish_unique_trees(adjms, logweights, clusterings):
     np.array(counts),
   )
 
-def _softmax(V):
-  V = np.copy(V) - np.max(V)
-  return np.exp(V) / np.sum(np.exp(V))
-
 def _make_logweights(llhs, tree_weights):
   if tree_weights == 'llh':
     return np.copy(llhs)
@@ -123,7 +120,7 @@ def calc_mutrel_from_trees(adjms, llhs, clusterings, tree_weights):
   #
   # 1. (naive) Represent the associated samples `C` separate times in the softmax
   # 2. (smart) Set `W' = W + log(C)`, as `exp(W') = Cexp(W)`
-  weights = _softmax(uniq_logweights + np.log(counts))
+  weights = util.softmax(uniq_logweights + np.log(counts))
 
   vids = None
   for adjm, clustering, weight in zip(uniq_adjms, uniq_clusterings, weights):

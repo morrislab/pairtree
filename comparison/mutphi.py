@@ -8,6 +8,7 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import inputparser
 import common
+import util
 
 Mutphi = namedtuple('Mutphi', ('vids', 'assays', 'logprobs'))
 
@@ -29,7 +30,7 @@ def _calc_logprob(mphi, vids, variants, epsilon=1e-5):
 def calc_mutphi(cluster_phis, llhs, clusterings, weight_trees_by, ssmsfn):
   variants = inputparser.load_ssms(ssmsfn)
   logweights = evalutil._make_logweights(llhs, weight_trees_by)
-  weights = evalutil._softmax(logweights)
+  weights = util.softmax(logweights)
   assert len(cluster_phis) == len(llhs) == len(clusterings)
 
   vids = None
