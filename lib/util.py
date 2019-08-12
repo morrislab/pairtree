@@ -22,12 +22,12 @@ time_exec._ms = None
 def softmax(V):
   log_softmax = V - scipy.special.logsumexp(V)
   smax = np.exp(log_softmax)
-  assert np.isclose(np.sum(smax), 1)
   # The vector sum will be close to 1 at this point, but not close enough to
   # make np.random.choice happy -- sometimes it will issue the error
   # "probabilities do not sum to 1" from mtrand.RandomState.choice.
   # To fix this, renormalize the vector.
   smax /= np.sum(smax)
+  assert np.isclose(np.sum(smax), 1)
   return smax
 
 def remove_rowcol(arr, indices):
