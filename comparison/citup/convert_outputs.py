@@ -6,8 +6,11 @@ from collections import defaultdict
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import common
 import inputparser
+import evalutil
+import mutphi
 
 def replace_supervar_with_variants(clusters, mutass):
   expanded = {}
@@ -32,30 +35,105 @@ def load_phi(tid, resultfn):
   phi = pd.read_hdf(resultfn, f'trees/{tid}/clade_freq').to_numpy().T
   return phi
 
-def load_vids(vidfn):
-  with open(vidfn) as F:
-    vids = [vid.strip() for vid in F.readlines()]
-  return vids
+def load_list(listfn):
+  with open(listfn) as F:
+    vals = [L.strip() for L in F.readlines()]
+  return vals
 
 def load_mutass(tid, resultfn, vidfn):
-  assvec = pd.read_hdf(resultfn, f'trees/{tid}/variant_assignment').to_numpy()
-  vids = load_vids(vidfn)
-  assert len(assvec) == len(vids)
+  # Assignments are variants to tree nodes.
+  # Returns `mutass` dict, where `mutass[i]` is nodex index of variant `i`
 
+  # Definitions:
+  # `M` variants
+  # `C` clusters
+  # `N` nodes
+  # (we should have `N = C`)
+
+  # `varass`: `M`-length vector, where `varass[i]` is node index of variant `i`
+  # `vids`: `M`-length vector, where `vids[i]` is VID of variant `i` (CITUP doesn't use VIDs, so this is my own mapping that their code never sees)
+  varass = pd.read_hdf(resultfn, f'trees/{tid}/variant_assignment').to_numpy()
+  vids = load_list(vidfn)
+  assert len(varass) == len(vids)
+
+  # `mutass`: dict, where `mutass[n]` is VIDs associated with node `n`
   mutass = defaultdict(list)
-  for vid, cid in zip(vids, assvec):
-    mutass[cid].append(vid)
+  for vid, nid in zip(vids, varass):
+    mutass[nid].append(vid)
   return dict(mutass)
 
-def load_results(resultfn, vidfn, clusters, use_supervars):
+def load_mutass_using_clusters(tid, resultfn, vidfn, clustfn):
+  # Assignments are variants to tree nodes.
+  # Returns `mutass` dict, where `mutass[i]` is nodex index of variant `i`
+
+  # Definitions:
+  # `M` variants
+  # `C` clusters
+  # `N` nodes
+  # (we should have `N = C`)
+
+  # `clustass`: `C`-length vector, where `clustass[i]` is cluster index of variant `i`
+  # `vids`: `M`-length vector, where `vids[i]` is VID of variant `i` (CITUP doesn't use VIDs, so this is my own mapping that their code never sees)
+  clustass = [int(C) for C in load_list(clustfn)]
+  vids = load_list(vidfn)
+  assert len(clustass) == len(vids)
+
+  clusters = defaultdict(list)
+  for C, V in zip(clustass, vids):
+    clusters[C].append(V)
+  # If subsequent code accesses a nonexistent index in `clusters`, I want it to
+  # throw an exception, so convert to regular dict.
+  clusters = dict(clusters)
+
+  # Assignments are clusters to tree nodes.
+  # Returns `mutass`, which is dictionary giving tree nodes to VIDs.
+  # `clust2node`: `C`-length vector, where `clust2node[c]` is nodex index of cluster `c`
+  # `mutass`: dict, where `mutass[n]` is VIDs associated with node `n`
+  clust2node = pd.read_hdf(resultfn, f'trees/{tid}/cluster_assignment').to_numpy()
+  mutass = defaultdict(list)
+  for C, N in enumerate(clust2node):
+    # This mapping isn't guaranteed to be one-to-one -- sometimes we can have
+    # multiple clusters assigned to a single node.
+    mutass[N] += clusters[C]
+  return dict(mutass)
+
+def _extract_clustering(mutass, K):
+  clustering = [list(mutass[C]) if C in mutass else [] for C in range(K)]
+  return clustering
+
+def _check_results(results):
+  def _extract_members(clusters):
+    return set([vid for C in clusters for vid in C])
+
+  K, S = results[0]['phi'].shape
+  members = _extract_members(results[0]['clusters'])
+
+  for R in results:
+    assert R['adjm'].shape == (K, K)
+    assert R['phi'].shape == (K, S)
+    assert len(R['clusters']) == K
+    M = _extract_members(R['clusters'])
+    assert M == members
+
+def load_results(resultfn, vidfn, citup_clusters_fn, clusters, use_supervars):
+  # NB:
+  # * `clusters` are the Pairtree clusters, which we need only if we're using supervars
+  # * `citup_clusters_fn` lists the assignment of variants to clusters, which
+  #   we need only if CITUP used fixed clusters, which it does only when we're
+  #   using the QIP rather than the iterative approximation mode in CITUP.
+
   tree_ids = pd.read_hdf(resultfn, 'results/tree_id').to_numpy()
   llh = pd.read_hdf(resultfn, 'results/likelihood').to_numpy()
+  llh *= -1
   results = []
 
   for tid, tree_llh in zip(tree_ids, llh):
     adjm = load_tree(tid, resultfn)
     phi = load_phi(tid, resultfn)
-    mutass = load_mutass(tid, resultfn, vidfn)
+    if citup_clusters_fn is None:
+      mutass = load_mutass(tid, resultfn, vidfn)
+    else:
+      mutass = load_mutass_using_clusters(tid, resultfn, vidfn, citup_clusters_fn)
 
     K, S = phi.shape
     assert adjm.shape == (K, K)
@@ -69,11 +147,27 @@ def load_results(resultfn, vidfn, clusters, use_supervars):
     results.append({
       'adjm': adjm,
       'phi': phi,
-      'mutass': mutass,
+      'clusters': _extract_clustering(mutass, K),
       'llh': tree_llh,
     })
 
+  _check_results(results)
   return results
+
+def write_mutrels(results, garbage, weight_trees_by, mutrel_fn):
+  adjms = [R['adjm'] for R in results]
+  llhs = [R['llh'] for R in results]
+  clusterings = [R['clusters'] for R in results]
+  mrel = evalutil.calc_mutrel_from_trees(adjms, llhs, clusterings, weight_trees_by)
+  mrel = evalutil.add_garbage(mrel, garbage)
+  evalutil.save_sorted_mutrel(mrel, mutrel_fn)
+
+def write_mutphis(results, weight_trees_by, ssm_fn, mutphi_fn):
+  llhs = [R['llh'] for R in results]
+  cluster_phis = [R['phi'] for R in results]
+  clusterings = [R['clusters'] for R in results]
+  mphi = mutphi.calc_mutphi(cluster_phis, llhs, clusterings, weight_trees_by, ssm_fn)
+  mutphi.write_mutphi(mphi, mutphi_fn)
 
 def main():
   parser = argparse.ArgumentParser(
@@ -84,6 +178,7 @@ def main():
   parser.add_argument('--mutrel', dest='mutrel_fn')
   parser.add_argument('--mutphi', dest='mutphi_fn')
   parser.add_argument('--use-supervars', action='store_true')
+  parser.add_argument('--citup-clusters')
   parser.add_argument('citup_result_fn')
   parser.add_argument('citup_vid_fn')
   parser.add_argument('pairtree_ssm_fn')
@@ -92,11 +187,12 @@ def main():
 
   params = inputparser.load_params(args.pairtree_params_fn)
   clusters = params['clusters']
-  results = load_results(args.citup_result_fn, args.citup_vid_fn, clusters, args.use_supervars)
-  from IPython import embed
-  embed()
-  import sys
-  sys.exit()
+  results = load_results(args.citup_result_fn, args.citup_vid_fn, args.citup_clusters, clusters, args.use_supervars)
+
+  if args.mutrel_fn is not None:
+    write_mutrels(results, params['garbage'], args.weight_trees_by, args.mutrel_fn)
+  if args.mutphi_fn is not None:
+    write_mutphis(results, args.weight_trees_by, args.pairtree_ssm_fn, args.mutphi_fn)
 
 if __name__ == '__main__':
   main()

@@ -18,8 +18,8 @@ def write_snvs(variants, garbage, snv_fn, vid_fn):
 
   with open(snv_fn, 'w') as F:
     for vid in vids:
-      vaf = (variants[vid]['var_reads'] / variants[vid]['total_reads']).tolist()
-      print(*vaf, sep='\t', file=F)
+      ccf = (variants[vid]['var_reads'] / variants[vid]['total_reads'] / variants[vid]['omega_v']).tolist()
+      print(*ccf, sep='\t', file=F)
 
   with open(vid_fn, 'w') as F:
     print(*vids, sep='\n', file=F)

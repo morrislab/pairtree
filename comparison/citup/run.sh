@@ -1,34 +1,44 @@
 #!/bin/bash
+export OMP_NUM_THREADS=1
+
 BASEDIR=~/work/pairtree
 SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 CITUP_DIR=$HOME/.apps/anaconda2/bin
 
-#CITUP_MODE=qip
-CITUP_MODE=iter
-PARALLEL=80
+#CITUP_MODE=iter
+CITUP_MODE=qip
+USE_SUPERVARS=false
+PARALLEL=40
 
 BATCH=sims.citup
 PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
 #BATCH=steph.xeno.citup
 #PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 
-INDIR=$BASEDIR/scratch/inputs/$BATCH
-OUTDIR=$BASEDIR/scratch/results/$BATCH.$CITUP_MODE
+if [[ "$USE_SUPERVARS" == "true" ]]; then
+  suffix="supervars"
+else
+  suffix="rawvars"
+fi
 
-export OMP_NUM_THREADS=1
+INDIR=$BASEDIR/scratch/inputs/$BATCH.$suffix
+OUTDIR=$BASEDIR/scratch/results/$BATCH.$suffix.$CITUP_MODE
 
 function convert_inputs {
   mkdir -p $INDIR
 
   for ssmfn in $PAIRTREE_INPUTS_DIR/*.ssm; do
     sampid=$(basename $ssmfn | cut -d. -f1)
-    echo "python3 $SCRIPTDIR/convert_inputs.py " \
-      "--use-supervars" \
-      "$PAIRTREE_INPUTS_DIR/$sampid.ssm" \
-      "$PAIRTREE_INPUTS_DIR/$sampid.params.json" \
-      "$INDIR/$sampid.snv" \
-      "$INDIR/$sampid.vid" \
-      "$INDIR/$sampid.cluster"
+    cmd="python3 $SCRIPTDIR/convert_inputs.py "
+    if [[ "$USE_SUPERVARS" == "true" ]]; then
+      cmd+="--use-supervars "
+    fi
+    cmd+="$PAIRTREE_INPUTS_DIR/$sampid.ssm "
+    cmd+="$PAIRTREE_INPUTS_DIR/$sampid.params.json "
+    cmd+="$INDIR/$sampid.snv "
+    cmd+="$INDIR/$sampid.vid "
+    cmd+="$INDIR/$sampid.cluster"
+    echo $cmd
   done
 }
 
@@ -36,8 +46,7 @@ function run_citup {
   for snvfn in $INDIR/*.snv; do
     runid=$(basename $snvfn | cut -d. -f1)
     outdir="$OUTDIR/$runid"
-    clusterfn+="$INDIR/${runid}.cluster "
-    # Does this need to be `clusters + 1`?
+    clusterfn="$INDIR/${runid}.cluster"
     let num_clusters=$(cat $clusterfn | sort | uniq | wc -l)+1
 
     cmd="mkdir -p $outdir && cd $outdir &&"
@@ -69,6 +78,15 @@ function convert_outputs {
 
     cmd="cd $outdir && "
     cmd+="python3 $SCRIPTDIR/convert_outputs.py "
+    cmd+="--weight-trees-by llh "
+    if [[ "$USE_SUPERVARS" == "true" ]]; then
+      cmd+="--use-supervars "
+    fi
+    if [[ "$CITUP_MODE" == "qip" ]]; then
+      cmd+="--citup-clusters $INDIR/$runid.cluster "
+    fi
+    cmd+="--mutrel $outdir/$runid.mutrel.npz "
+    cmd+="--mutphi $outdir/$runid.mutphi.npz "
     cmd+="$resultfn "
     cmd+="$INDIR/$runid.vid "
     cmd+="$PAIRTREE_INPUTS_DIR/$runid.ssm "
@@ -80,8 +98,8 @@ function convert_outputs {
 
 function main {
   #convert_inputs
-  #run_citup
-  convert_outputs
+  run_citup
+  #convert_outputs
 }
 
 main
