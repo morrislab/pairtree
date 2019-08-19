@@ -1,7 +1,8 @@
 import pandas as pd
 import argparse
 import plotly
-import plotly.figure_factory as ff
+import plotly.graph_objs as go
+from plotly.subplots import make_subplots
 from collections import defaultdict
 import re
 import numpy as np
@@ -13,9 +14,9 @@ HAPPY_METHOD_NAMES = [
   ('truth', 'Truth'),
   ('pairtree_handbuilt', 'Pairtree (manually constructed trees)'),
   ('pairtree_single', 'Pairtree (single-chain)'),
-  ('pairtree_multi', 'Pairtree (multi-chain)'),
-  ('pastri', 'PASTRI'),
+  ('pairtree_multi', 'Pairtree'),
   ('lichee', 'LICHeE'),
+  ('pastri', 'PASTRI'),
   ('pplus_supervars', 'PhyloPlus'),
   ('pplus_allvars', 'PhyloPlus (unclustered)'),
   ('pwgs_supervars', 'PhyloWGS'),
@@ -114,6 +115,40 @@ def make_bar_trace(methods, complete, total, name=None):
     trace['name'] = name
   return trace
 
+def make_pie_traces(methods, complete, total):
+  methods = sort_methods(methods)
+  complete = np.array([complete[M] for M in methods])
+  total = np.array([total[M] for M in methods])
+  missing = total - complete
+
+  traces = [go.Pie(labels=('Succeeded', 'Failed'), values=(C, D), name=M) for (C, D, M) in zip(complete, missing, methods)]
+  return traces
+
+def make_pie_fig(methods, complete, total, name=None):
+  methods = sort_methods(methods)
+  complete = np.array([complete[M] for M in methods])
+  total = np.array([total[M] for M in methods])
+  missing = total - complete
+
+  traces = [go.Pie(
+    labels=('Succeeded', 'Failed'),
+    values=(C, D),
+    name=M,
+    textinfo='none',
+  ) for (C, D, M) in zip(complete, missing, methods)]
+
+  pie_fig = make_subplots(
+    rows = 1,
+    cols = len(traces),
+    specs = [len(traces)*[{'type': 'domain'}]],
+    subplot_titles=methods,
+  )
+  for idx, T in enumerate(traces):
+    pie_fig.add_trace(T, row=1, col=(idx+1))
+  if name is not None:
+    pie_fig.update_layout(title_text=name)
+  return pie_fig
+
 def _make_points(vals):
   methods = sort_methods(vals.keys())
   points = [(HAPPY_METHOD_NAMES.get(M, M), R) for M in methods for R in vals[M]]
@@ -211,7 +246,7 @@ def write_figs(figs, outfn):
       config = {
         'showLink': True,
         'toImageButtonOptions': {
-          'format': 'png',
+          'format': 'svg',
           'width': 750,
           'height': 450,
           'filename': imgfn,
@@ -260,7 +295,7 @@ def make_score_ytitle(score_type, plot_fn):
       ytitle = 'Frequency reconstruction differences from expert baseline'
     else:
       ytitle = 'Frequency reconstruction error'
-    ytitle += '<br>(Δbits / mutation / assay)'
+    ytitle += '<br>(Δbits / mutation / tissue sample)'
   elif score_type in ('cputime', 'walltime'):
     ytitle = 'Runtime (seconds)'
   else:
@@ -310,7 +345,9 @@ def main():
   }
 
   score_traces = []
-  completion_traces = []
+  completion_bar_traces = []
+  completion_pie_figs = []
+
   if args.S_threshold is not None:
     results = augment(results, 'S')
     parted_by_S = partition(results, methods, key='S')
@@ -330,7 +367,8 @@ def main():
         raise Exception('Unknown plot type %s' % args.plot_type)
 
       score_traces.append(score_trace)
-      completion_traces.append(make_bar_trace(methods, complete, total, name=names[group]))
+      completion_bar_traces.append(make_bar_trace(methods, complete, total, name=names[group]))
+      completion_pie_figs.append(make_pie_fig(methods, complete, total, name=names[group]))
   else:
     scores = {M: np.array(results[M]) for M in methods}
     total = {M: len(scores[M]) for M in methods}
@@ -340,8 +378,8 @@ def main():
     elif args.plot_type == 'violin':
       score_trace = make_violin_trace(scores, side='both', bandwidth=args.bandwidth)
     score_traces.append(score_trace)
-    completion_traces.append(make_bar_trace(methods, complete, total))
-
+    completion_bar_traces.append(make_bar_trace(methods, complete, total))
+    completion_pie_figs.append(make_pie_fig(methods, complete, total))
 
   figs = [
     make_fig(
@@ -357,14 +395,16 @@ def main():
         'violingroupgap': 0.0,
       },
     ),
+
     make_fig(
-      completion_traces,
+      completion_bar_traces,
       args.template,
       'Proportion of failed runs',
       max_y = None,
       layout_options = {'barmode': 'group'},
     ),
   ]
+  figs += completion_pie_figs
   write_figs(figs, args.plot_fn)
 
 if __name__ == '__main__':
