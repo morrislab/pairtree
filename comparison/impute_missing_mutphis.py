@@ -3,7 +3,7 @@ import numpy as np
 
 import os
 import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
 import inputparser
 import resultserializer
 import mutphi
@@ -65,7 +65,7 @@ def main():
   mutphi.write_mutphi(mphi, args.mutphi_fn)
 
   old, new = score(orig_mphi.logprobs), score(mphi.logprobs)
-  print('score_cmp', old, new, new - old, (new - old) > 0)
+  #print('score_cmp', old, new, new - old, (new - old) > 0)
 
 if __name__ == '__main__':
   main()
