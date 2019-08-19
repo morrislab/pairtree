@@ -4,7 +4,7 @@ import os
 import argparse
 import json
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import common
 import inputparser

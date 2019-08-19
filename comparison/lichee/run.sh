@@ -6,10 +6,10 @@ SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 LICHEE_DIR=$HOME/.apps/lichee/LICHeE/release
 NUM_TREES=3000
 
-#BATCH=sims.lichee
-#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
-BATCH=steph.xeno.lichee
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+BATCH=sims.lichee.testlol
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+#BATCH=steph.xeno.lichee
+#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 
 INDIR=$BASEDIR/scratch/inputs/$BATCH
 OUTDIR=$BASEDIR/scratch/results/$BATCH
@@ -85,8 +85,7 @@ function compute_phis {
     runid=$(basename $structfn | cut -d. -f1)
     resultsfn=$OUTDIR/$runid.results.npz
 
-    cmd="LD_LIBRARY_PATH=$HOME/tmp/jose/bin:$LD_LIBRARY_PATH "
-    cmd+="python3 $BASEDIR/basic.py "
+    cmd="python3 $BASEDIR/bin/pairtree "
     cmd+="--seed 1 "
     cmd+="--phi-fitter projection "
     cmd+="--parallel 0 "
@@ -131,9 +130,9 @@ function compute_mutphis {
 function main {
   #convert_inputs
   #run_lichee
-  #convert_outputs
-  #compute_phis
-  compute_mutphis
+  convert_outputs | parallel -j40 --halt 1 --eta
+  compute_phis | parallel -j40 --halt 1 --eta
+  compute_mutphis | parallel -j40 --halt 1 --eta
 }
 
 main
