@@ -58,5 +58,16 @@ lol60: small K, singlechain, fixed bugs, gamma=zeta=1, iota=0
 lol61: small K, singlechain, try scaled softmax, gamma=zeta=0.7
 lol62: big K, singlechain, try scaled softmax, gamma=zeta=0.7
 lol63: big K, singlechain, don't zero out the descendant relations when selecting node to move, gamma=zeta=0.7
+lol64: small K, singlechain, just make sure that small K performance is still good, gamma=zeta=0.7, iota=0
+lol65: small K, singlechain, check that mutrel-informed tree init is still good, gamma=zeta=0.7, iota=0.7
+lol66: big+small K, multichain, gamma=zeta=iota=0.7 -- hopefully final run for paper
+lol67: big K, singlechain, gamma=zeta=0, iota=0 -- are purely random tree moves any good?
+lol68: small K, singlechain, new tree init
+lol69: big+small K, multichain, gamma=zeta=iota=0.7 -- maybe final run for paper
+lol70: big K, singlechain, gamma=zeta=0, iota=0
+lol71: big K, singlechain, gamma=zeta=0, iota=1
+lol72: big K, singlechain, gamma=zeta=1, iota=0
+lol73: big K, singlechain, gamma=zeta=1, iota=1
+lol74: big K, singlechain, gamma=zeta=0.7, iota=0.7
 
 Interesting: lol9 does as poorly as most other lol runs, and much worse than lol4 and lol8
