@@ -8,16 +8,16 @@ BASEDIR=~/work/pairtree
 JOBDIR=~/jobs
 
 PARALLEL=40
-#TREE_CHAINS=$PARALLEL
-TREE_CHAINS=1
+TREE_CHAINS=$PARALLEL
 TREES_PER_CHAIN=3000
 PHI_ITERATIONS=10000
 PHI_FITTER=projection
 THINNED_FRAC=1.0
+BURNIN=0.333333
 
 BATCH=sims.pairtree
 PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
-PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.lol51
+PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.lol69
 #BATCH=steph.pairtree.multichain
 #PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 #PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/$BATCH
@@ -62,6 +62,7 @@ function run_pairtree {
       echo "#SBATCH --mail-type=NONE"
 
         #"--only-build-tensor" \
+        #"--verbose" \
       echo "mkdir -p $outdir && cd $outdir && " \
         "TIMEFORMAT='%R %U %S'; time (" \
         "OMP_NUM_THREADS=1 " \
@@ -74,6 +75,10 @@ function run_pairtree {
         "--phi-fitter $PHI_FITTER" \
         "--params $PAIRTREE_INPUTS_DIR/${runid}.params.json" \
         "--thinned-frac $THINNED_FRAC" \
+        "--burnin $BURNIN" \
+        "--gamma 0.7" \
+        "--zeta 0.7" \
+        "--iota 0.7" \
         "$PAIRTREE_INPUTS_DIR/$runid.ssm" \
         "$resultsfn" \
         ">$runid.stdout" \
@@ -81,13 +86,14 @@ function run_pairtree {
     ) #> $jobfn
     #sbatch $jobfn
     rm $jobfn
-  done #| grep python3 | parallel -j40 --halt 1 --joblog $logfn
+  done
 }
 
 function convert_outputs {
   for resultsfn in $PAIRTREE_RESULTS_DIR/*/*.results.npz; do
     outdir=$(dirname $resultsfn)
     runid=$(basename $resultsfn | cut -d. -f1)
+    #is_big_K $runid || continue
     is_run_complete $resultsfn || continue
 
     jobfn=$(mktemp)
@@ -150,8 +156,8 @@ function convert_outputs {
 }
 
 function main {
-  run_pairtree #| grep python3 | parallel -j80 --halt 1 --eta
-  #convert_outputs | grep python3 | parallel -j10 --halt 1 --eta
+  run_pairtree | grep python3 | parallel -j80 --halt 1 --eta
+  convert_outputs | grep python3 | parallel -j10 --halt 1 --eta
 }
 
 main
