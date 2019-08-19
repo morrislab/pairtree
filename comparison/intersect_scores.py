@@ -28,12 +28,14 @@ def main():
   # pairtree_tensor isn't included in the mutphi results, but we do want it in
   # the timing results. Assign a dummy value so that the "are all relevant
   # methods included?" checks below pass.
-  results_B = results_B.assign(pairtree_tensor = 1.1)
+  # (temporarily disabled since I'm not generating pairtree_tensor results right now)
+  #results_B = results_B.assign(pairtree_tensor = 1.1)
 
   methods_A = set(results_A) - set(['runid'])
   methods_B = set(results_B) - set(['runid'])
-  print(args.score_fn_A, args.score_fn_B, methods_A - methods_B)
-  print(args.score_fn_A, args.score_fn_B, methods_B - methods_A)
+  if methods_A != methods_B:
+    print(args.score_fn_A, args.score_fn_B, 'A - B', methods_A - methods_B)
+    print(args.score_fn_A, args.score_fn_B, 'B - A', methods_B - methods_A)
   assert methods_A == methods_B
   assert list(results_A['runid']) == list(results_B['runid'])
   assert (results_A['runid'] == results_B['runid']).all()
