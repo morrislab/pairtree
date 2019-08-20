@@ -15,6 +15,7 @@ HAPPY_METHOD_NAMES = [
   ('pairtree_handbuilt', 'Pairtree (manually constructed trees)'),
   ('pairtree_single', 'Pairtree (single-chain)'),
   ('pairtree_multi', 'Pairtree'),
+  ('citup', 'CITUP'),
   ('lichee', 'LICHeE'),
   ('pastri', 'PASTRI'),
   ('pplus_supervars', 'PhyloPlus'),
@@ -79,8 +80,6 @@ def partition(results, methods, key):
       R = V_results[M]
       failed = R == MISSING
       R_succ = R[np.logical_not(failed)]
-      if len(R_succ) == 0:
-        continue
       partitioned[V][M] = {
         'scores': R_succ,
         'complete': len(R_succ),
@@ -121,7 +120,12 @@ def make_pie_traces(methods, complete, total):
   total = np.array([total[M] for M in methods])
   missing = total - complete
 
-  traces = [go.Pie(labels=('Succeeded', 'Failed'), values=(C, D), name=M) for (C, D, M) in zip(complete, missing, methods)]
+  traces = [go.Pie(
+    labels = ('Succeeded', 'Failed'),
+    values = (C, D),
+    name = M,
+    sort = False,
+  ) for (C, D, M) in zip(complete, missing, methods)]
   return traces
 
 def make_pie_fig(methods, complete, total, name=None):
@@ -340,8 +344,8 @@ def main():
     'gt': 'positive',
   }
   names = {
-    'lte': 'Few tissue samples',
-    'gt': 'Many tissue samples',
+    'lte': '1, 3, or 10 tissue samples',
+    'gt': '30 or 100 tissue samples',
   }
 
   score_traces = []
