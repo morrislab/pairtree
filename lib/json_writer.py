@@ -3,7 +3,8 @@ import numpy as np
 import common
 
 def generate_treesumm(sampnames, clusters, adjmats, llh, phi):
-  clusters = [[]] + clusters.tolist()
+  clusters = list(clusters)
+  clusters = [[]] + clusters
   assert len(adjmats) == len(llh) == len(phi)
 
   result = {

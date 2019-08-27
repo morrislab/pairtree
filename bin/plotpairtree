@@ -81,11 +81,15 @@ def write_cluster_stats(clusters, garbage, supervars, variants, outf):
     print('<tr>%s</tr>' % rowhtml, file=outf)
   print('</tbody></table>', file=outf)
 
+def _find_best_tidx(results):
+  return np.argmax(results['llh'])
+
 def main():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('--tree-index')
   parser.add_argument('sampid')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
@@ -96,6 +100,11 @@ def main():
   results = resultserializer.load(args.results_fn)
   if 'clusters' not in results:
     return
+
+  if args.tree_index is not None:
+    tidx = args.tree_index
+  else:
+    tidx = _find_best_tidx(results)
 
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.params_fn)
@@ -108,13 +117,13 @@ def main():
       params['samples'],
       variants,
       results['clusters'],
-      results['adjm'],
-      results['llh'],
-      results['phi'],
+      np.array([results['adjm'][tidx]]),
+      np.array([results['llh'][tidx]]),
+      np.array([results['phi'][tidx]]),
       '%s.summ.json' % args.sampid,
       '%s.muts.json' % args.sampid,
     )
-    write_phi_json(results['phi'][-1], params['samples'], '%s.phi.json' % args.sampid)
+    write_phi_json(results['phi'][tidx], params['samples'], '%s.phi.json' % args.sampid)
 
   with open(args.out_fn, 'w') as outf:
     write_header(args.sampid, outf)
@@ -127,7 +136,7 @@ def main():
           'left': params['samples'][0],
           'right': params['samples'][0],
         }]
-      write_trees(args.sampid, len(results['adjm']) - 1, colourings, outf)
+      write_trees(args.sampid, 0, colourings, outf)
 
     if 'phi' in results:
       write_phi_matrix(args.sampid, outf)
@@ -145,7 +154,7 @@ def main():
       variants,
       supervars,
       results['garbage'],
-      results['phi'][-1] if 'phi' in results else None,
+      results['phi'][tidx] if 'phi' in results else None,
       params['samples'],
       should_correct_vaf=True,
       outf=outf,
