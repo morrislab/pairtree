@@ -1,7 +1,13 @@
-var IS_XENO = window.location.toString().indexOf('pairwise.xeno') > -1;
 IS_XENO = true;
 
-function TreePlotter() {
+function Plotter() {
+}
+
+Plotter.prototype.plot = function(results_fn, tree_container, phi_matrix_container) {
+  d3.json(results_fn, function(results) {
+    (new TreePlotter()).plot(0, results.parents, results.phi, results.llh, results.samples, tree_container);
+    (new PhiMatrix().plot(results.phi, results.samples, phi_matrix_container));
+  });
 }
 
 // Following two functions from https://stackoverflow.com/a/18473154.
@@ -39,6 +45,9 @@ function describeRect(x, y, width, height) {
   return d;
 }
 
+function TreePlotter() {
+}
+
 TreePlotter.prototype._calculate_max_depth = function(root) {
   var _calc_max_depth = function(node) {
     if(!node.hasOwnProperty('children')) {
@@ -56,9 +65,7 @@ TreePlotter.prototype._calculate_max_depth = function(root) {
 }
 
 TreePlotter.colours = {};
-TreePlotter.colours.diag = '#428bca';
-TreePlotter.colours.relapse = '#ca4242';
-TreePlotter.colours.other = '#d4b831';
+TreePlotter.colours.node = '#428bca';
 TreePlotter.colours.node_bg = '#ffffff';
 
 TreePlotter.prototype._label_node = function(node_id) {
@@ -140,18 +147,7 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops, left_samp
           }
         }
       }).attr('fill', function(d) {
-        // Use other_colour for xenos.
-        if(side === 'left') {
-          var base_colour = (left_sample.indexOf('X') > -1)  ? TreePlotter.colours.other : TreePlotter.colours.diag;
-        } else {
-          if(right_sample.indexOf('X') > -1) {
-            var base_colour = TreePlotter.colours.other;
-          } else if(left_sample !== right_sample) {
-            var base_colour = TreePlotter.colours.relapse;
-          } else {
-            var base_colour = TreePlotter.colours.diag;
-          }
-        }
+        var base_colour = TreePlotter.colours.node;
         return Util.rgba2hex(base_colour, d.data.opacities[side], TreePlotter.colours.node_bg);
       });
   };
@@ -198,19 +194,7 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops, left_samp
     }));
 }
 
-TreePlotter.prototype._find_max_ssms = function(populations) {
-  var max_ssms = 0;
-  for(var pop_id in populations) {
-    var pop = populations[pop_id];
-    if(pop.num_ssms > max_ssms)
-      max_ssms = pop.num_ssms;
-  }
-  return max_ssms;
-}
-
-TreePlotter.prototype._generate_tree_struct = function(sampnames, adjlist, pops, root_id, left_sample, right_sample) {
-  var max_ssms = this._find_max_ssms(pops);
-
+TreePlotter.prototype._generate_tree_struct = function(parents, phi, root_id, sampnames, left_sample, right_sample) {
   var left_index = sampnames.indexOf(left_sample);
   var right_index = sampnames.indexOf(right_sample);
   if(left_index === -1 || right_index === -1) {
@@ -219,19 +203,21 @@ TreePlotter.prototype._generate_tree_struct = function(sampnames, adjlist, pops,
 
   var _add_node = function(node_id, struct) {
     struct.name = node_id;
-
-    var num_ssms = pops[node_id]['num_ssms'];
-    struct.radius = TreeUtil.calc_radius(num_ssms /  max_ssms);
+    struct.radius = Math.sqrt(2000 / Math.PI);
     struct.opacities = {
-      'left':   pops[node_id]['cellular_prevalence'][left_index],
-      'right':  pops[node_id]['cellular_prevalence'][right_index],
+      'left': phi[node_id][left_index],
+      'right': phi[node_id][right_index],
     };
 
-    if(typeof adjlist[node_id] === 'undefined') {
-      return;
+    var children = [];
+    for(var idx = 0; idx < parents.length; idx++) {
+      if(parents[idx] === node_id) {
+        children.push(idx + 1);
+      }
     }
+
     struct.children = [];
-    adjlist[node_id].forEach(function(child_id) {
+    children.forEach(function(child_id) {
       var child = {};
       struct.children.push(child);
       _add_node(child_id, child);
@@ -243,51 +229,26 @@ TreePlotter.prototype._generate_tree_struct = function(sampnames, adjlist, pops,
   return root;
 }
 
-TreePlotter.prototype._calc_nlglh = function(tree) {
-  var K = Object.keys(tree.populations).length;
-  var S = tree.populations[tree.root]['cellular_prevalence'].length;
+TreePlotter.prototype._calc_nlglh = function(llh, K, S) {
   // Normalize LLH by casting into base 2 log (so we can think in bits), making
   // positive, and normalizing to number of factors in LH (i.e., number of
   // terms in LLH).
   // (K - 1)xS: size of phi matrix used for scoring how well phis allowed by tree fit data VAFs
   // K^2: size of cluster relation matrix
-  return -tree.llh / Math.log(2) / ((K - 1)*S*K*K);
+  return -llh / Math.log(2) / ((K - 1)*S);
 }
 
-TreePlotter.prototype.plot = function(summ_path, tidx, tname, left_sample, right_sample, container) {
+TreePlotter.prototype.plot = function(root, parents, phi, llh, sampnames, container) {
+  var K = phi.length;
+  var S = phi[0].length;
   container = d3.select(container).append('div');
+  var nlglh = this._calc_nlglh(llh, K, S);
+  container.append('h2').text('nlglh=' + nlglh.toFixed(3));
 
-  var self = this;
-  d3.json(summ_path, function(summary) {
-    var pops = summary.trees[tidx].populations;
-    var struct = summary.trees[tidx].structure;
-    var root = summary.trees[tidx].root;
-    var nlglh = self._calc_nlglh(summary.trees[tidx]);
-
-    container.append('h2').text(tname + ' tidx=' + tidx + ' nlglh=' + nlglh.toFixed(3) + ' left=' + left_sample + ' right=' + right_sample); 
-
-    if(struct[root].length !== 1) {
-      // Uncomment this if you want to disallow polyclonal trees.
-      //throw "Unexpected children from root " + summary.trees[tidx].root + ": " + struct[root];
-    }
-    var clonal = struct[root][0];
-
-    // Note to self: change "root" to "clonal" in the call below to eliminate
-    // the normal node 0 when drawing trees.
-    var root = self._generate_tree_struct(summary.params.samples, struct, pops, root, left_sample, right_sample);
-    self._draw_tree(root, container, Object.keys(pops).length, left_sample, right_sample);
-  });
-}
-
-function TreeUtil() {
-}
-
-TreeUtil.calc_radius = function(scale) {
-  var min_area = 700, max_area = 8000;
-  // scale must be in [0, 1].
-  //var area = min_area + scale*(max_area - min_area);
-  var area = 2000;
-  return Math.sqrt(area / Math.PI);
+  var left_sample = sampnames[0];
+  var right_sample = sampnames[0];
+  var root = this._generate_tree_struct(parents, phi, root, sampnames, left_sample, right_sample);
+  this._draw_tree(root, container, K, left_sample, right_sample);
 }
 
 function Util() {
@@ -342,51 +303,16 @@ PhiMatrix.prototype._calc_ccf = function(phi) {
   return ccf;
 }
 
-PhiMatrix.prototype._filter_samples = function(phi_matrix, sampnames, samps_to_keep) {
-  var filtered_samps = [];
-  var filtered_phi = [];
-  phi_matrix.forEach(function(row) {
-    filtered_phi.push([]);
+PhiMatrix.prototype.plot = function(phi, sampnames, container) {
+  // By default, this isn't actually CCF, but raw phi.
+  var ccf = this._calc_ccf(phi);
+  var popnames = ccf.map(function(d, i) { return 'Pop. ' + (i + 1); });
+  var sampcolours = sampnames.map(function(sampname) {
+    return '#000000';
   });
+  var popcolours = ColourAssigner.assign_colours(ccf.length);
 
-  samps_to_keep.forEach(function(samp) {
-    var sidx = sampnames.indexOf(samp);
-    if(sidx < 0) {
-      throw "Can't find " + samp + " in " + sampnames;
-    }
-    filtered_samps.push(samp);
-    phi_matrix.forEach(function(phi, pidx) {
-      filtered_phi[pidx].push(phi_matrix[pidx][sidx]);
-    });
-  });
-
-  return {'phi': filtered_phi, 'samples': filtered_samps};
-}
-
-PhiMatrix.prototype.plot = function(sampid, phi_path, container) {
-  var self = this;
-  var filters = {
-    //'SJBALL022609': ['D', 'dPDX 26', 'dPDX 8', 'dPDX 2', 'dPDX 15', 'dPDX 7', 'dPDX 14', 'dPDX 20', 'dPDX 29', 'R1', 'rPDX 25', 'rPDX 2', 'rPDX 17', 'rPDX 21']
-  };
-  d3.json(phi_path, function(phi_data) {
-    if(IS_XENO && filters.hasOwnProperty(sampid)) {
-      phi_data = self._filter_samples(
-        phi_data['phi'],
-        phi_data['samples'],
-        filters[sampid]
-      );
-    }
-
-    var ccf = self._calc_ccf(phi_data['phi']);
-    var popnames = ccf.map(function(d, i) { return 'Pop. ' + (i + 1); });
-    var sampnames = phi_data['samples'];
-    var sampcolours = sampnames.map(function(sampname) {
-      return sampname[0].toUpperCase() === 'D' ? TreePlotter.colours.diag : TreePlotter.colours.relapse;
-    });
-    var popcolours = ColourAssigner.assign_colours(ccf.length);
-
-    (new MatrixBar()).plot(ccf, popnames, popcolours, sampnames, sampcolours, container);
-  });
+  (new MatrixBar()).plot(ccf, popnames, popcolours, sampnames, sampcolours, container);
 }
 
 function MatrixBar() {
@@ -472,26 +398,6 @@ ColourAssigner.assign_colours = function(num_colours) {
     colours.push(scale[cidx]);
   }
   return colours;
-}
-
-function ClusterMatrix() {
-}
-
-ClusterMatrix.prototype.plot = function(clustermat_path, container) {
-  d3.json(clustermat_path, function(J) {
-    var clustermat = J.clustermat;
-    var row_labels = clustermat.map(function(row, idx) {
-      return idx === 0 ? 'Garbage' : 'Pop. ' + idx;
-    });
-    var col_labels = clustermat[0].map(function(col, idx) {
-      var letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      var popname = letters[idx - 1];
-      return idx === 0 ? 'Garbage' : 'Pop. ' + popname;
-    });
-    var row_colours = ColourAssigner.assign_colours(clustermat.length);
-    var col_label_colours = undefined;
-    (new MatrixBar()).plot(clustermat, row_labels, row_colours, col_labels, col_label_colours, container);
-  });
 }
 
 function VafMatrix(container) {
