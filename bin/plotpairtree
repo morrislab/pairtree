@@ -41,8 +41,7 @@ def _write_tree_json(adjm, llh, phi, variants, sampnames, treefn):
 def write_header(runid, outf):
   print('<meta charset="utf-8">', file=outf)
   print('<script type="text/javascript" src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>', file=outf)
-  print('<script src="https://d3js.org/d3.v4.min.js"></script>', file=outf)
-  print('<script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>', file=outf)
+  print('<script src="https://d3js.org/d3.v5.min.js"></script>', file=outf)
   print('<script type="text/javascript">%s</script>' % read_file('highlight_table_labels.js'), file=outf)
   print('<script type="text/javascript">%s</script>' % read_file('tree_plotter.js'), file=outf)
   print('<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">', file=outf)

@@ -4,7 +4,7 @@ function Plotter() {
 }
 
 Plotter.prototype.plot = function(results_fn, tree_container, phi_matrix_container) {
-  d3.json(results_fn, function(results) {
+  d3.json(results_fn).then(function(results) {
     (new TreePlotter()).plot(0, results.parents, results.phi, results.llh, results.samples, tree_container);
     (new PhiMatrix().plot(results.phi, results.samples, phi_matrix_container));
   });
