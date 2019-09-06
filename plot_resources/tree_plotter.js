@@ -1,14 +1,7 @@
-IS_XENO = true;
-
-function Plotter() {
-}
-
-Plotter.prototype.plot = function(results_fn, tree_container, phi_matrix_container) {
-  d3.json(results_fn).then(function(results) {
-    (new TreePlotter()).plot(0, results.parents, results.phi, results.llh, results.samples, tree_container);
-    (new PhiMatrix().plot(results.phi, results.samples, phi_matrix_container));
-  });
-}
+// 'letters' or 'digits'
+var LABEL_TYPE = 'digits';
+// 'circle' or 'square'
+var NODE_TYPE = 'circle';
 
 // Following two functions from https://stackoverflow.com/a/18473154.
 function polarToCartesian(centerX, centerY, radius, angleInDegrees) {
@@ -69,10 +62,7 @@ TreePlotter.colours.node = '#428bca';
 TreePlotter.colours.node_bg = '#ffffff';
 
 TreePlotter.prototype._label_node = function(node_id) {
-  // If we're examining a patient+xeno tree, label the node with the node_id.
-  // Otherwise, we're presumably examining a patient-only tree, so label it
-  // with a letter.
-  if(IS_XENO) {
+  if(LABEL_TYPE === 'digits') {
     return node_id;
   }
   // Restrict to valid alphabet range.
@@ -133,7 +123,7 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops, left_samp
     nodeEnter.append('svg:path')
       .attr('class', side + '_half')
       .attr('d', function(d) {
-        if (IS_XENO) {
+        if (NODE_TYPE === 'circle') {
           if(side === 'left') {
             return describeArc(0, 0, d.data.radius, 180, 360);
           } else {
@@ -152,7 +142,7 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops, left_samp
       });
   };
 
-  if(IS_XENO) {
+  if(NODE_TYPE === 'circle') {
     nodeEnter.append('svg:circle')
       .attr('class', 'outline')
       .attr('r', function(d) { return d.data.radius; });
@@ -303,19 +293,62 @@ PhiMatrix.prototype._calc_ccf = function(phi) {
   return ccf;
 }
 
-PhiMatrix.prototype.plot = function(phi, sampnames, container) {
-  // By default, this isn't actually CCF, but raw phi.
-  var ccf = this._calc_ccf(phi);
-  var popnames = ccf.map(function(d, i) { return 'Pop. ' + (i + 1); });
+PhiMatrix.prototype.plot = function(phi, sampnames, container, convert_to_ccf) {
+  if(convert_to_ccf) {
+    phi = this._calc_ccf(phi);
+  }
+
+  var popnames = phi.map(function(d, i) { return 'Pop. ' + (i + 1); });
   var sampcolours = sampnames.map(function(sampname) {
     return '#000000';
   });
-  var popcolours = ColourAssigner.assign_colours(ccf.length);
+  var popcolours = ColourAssigner.assign_colours(phi.length);
 
-  (new MatrixBar()).plot(ccf, popnames, popcolours, sampnames, sampcolours, container);
+  (new MatrixBar()).plot(phi, popnames, popcolours, sampnames, sampcolours, container);
+}
+
+function PhiErrorMatrix() {
+}
+
+PhiErrorMatrix.prototype._calc_error = function(phi, phi_hat) {
+  var error = [];
+  for(var i = 0; i < phi.length; i++) {
+    error.push([]);
+    for(var j = 0; j < phi[i].length; j++) {
+      error[i].push(Math.abs(phi[i][j] - phi_hat[i][j]));
+    }
+  }
+  return error;
+}
+
+PhiErrorMatrix.prototype._calc_total_error = function(error) {
+  var total = 0;
+  for(var i = 0; i < error.length; i++) {
+    for(var j = 0; j < error[i].length; j++) {
+      total += error[i][j];
+    }
+  }
+  return total;
+}
+
+PhiErrorMatrix.prototype.plot = function(phi, phi_hat, sampnames, container) {
+  var error = this._calc_error(phi, phi_hat);
+  d3.select(container).append('h3').text('Total error: ' + this._calc_total_error(error).toFixed(2));
+  (new PhiMatrix()).plot(error, sampnames, container);
 }
 
 function MatrixBar() {
+}
+
+MatrixBar.prototype._calc_col_label_height = function(col_labels) {
+  var max_length = 0;
+  var char_width = 15;
+  for(let label of col_labels) {
+    if(label.length > max_length) {
+      max_length = label.length;
+    }
+  }
+  return char_width * max_length;
 }
 
 MatrixBar.prototype.plot = function(mat, row_labels, row_colours, col_labels, col_label_colours, container) {
@@ -323,7 +356,7 @@ MatrixBar.prototype.plot = function(mat, row_labels, row_colours, col_labels, co
   var num_cols = mat[0].length;
   var cell_size = 50;
   var row_label_width = 100;
-  var col_label_height = 120;
+  var col_label_height = this._calc_col_label_height(col_labels);
   var font_size = '24px';
   var label_padding = 10;
 

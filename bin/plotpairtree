@@ -55,8 +55,16 @@ def _write_tree_html(runid, json_fn, outf):
   print('''
   <div id="trees"></div>
   <div id="phi_matrix" style="margin: 30px"><h2>Tree-constrained lineage frequencies</h2></div>
+  <div id="phi_hat_matrix" style="margin: 30px"><h2>Data-implied lineage frequencies</h2></div>
+  <div id="phi_error_matrix" style="margin: 30px"><h2>Tree-constrained lineage frequency error</h2></div>
+
   <script type="text/javascript">document.addEventListener('DOMContentLoaded', () => {
-    (new Plotter()).plot('%s', '#trees', '#phi_matrix');
+    d3.json('%s').then((results) => {
+      (new TreePlotter()).plot(0, results.parents, results.phi, results.llh, results.samples, '#trees');
+      (new PhiMatrix().plot(results.phi, results.samples, '#phi_matrix'));
+      (new PhiMatrix().plot(results.phi_hat, results.samples, '#phi_hat_matrix'));
+      (new PhiErrorMatrix()).plot(results.phi, results.phi_hat, results.samples, '#phi_error_matrix');
+    });
   });</script>
   ''' % json_fn, file=outf)
 
