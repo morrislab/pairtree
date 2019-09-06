@@ -25,18 +25,19 @@ def _find_parents(adj):
   assert np.all(np.sum(adj[:,1:], axis=0) == 1)
   return np.argmax(adj[:,1:], axis=0)
 
-def _write_tree_json(adjm, llh, phi, variants, sampnames, treefn):
+def _make_tree_json(adjm, llh, phi, variants, sampnames):
   phi_hat = _calc_phi_hat(variants)
   parents = _find_parents(adjm)
+  return {
+    'phi': phi.tolist(),
+    'phi_hat': phi_hat.tolist(),
+    'llh': llh,
+    'parents': _find_parents(adjm).tolist(),
+    'samples': sampnames,
+  }
 
-  with open(treefn, 'w') as outf:
-    json.dump({
-      'phi': phi.tolist(),
-      'phi_hat': phi_hat.tolist(),
-      'llh': llh,
-      'parents': _find_parents(adjm).tolist(),
-      'samples': sampnames,
-    }, outf)
+def _write_tree_json(tree_json, jsonfn):
+  json.dump(tree_json, jsonfn)
 
 def write_header(runid, outf):
   print('<meta charset="utf-8">', file=outf)
@@ -47,26 +48,27 @@ def write_header(runid, outf):
   print('<style type="text/css">%s</style>' % read_file('tree.css'), file=outf)
   print('<style type="text/css">%s</style>' % read_file('matrix.css'), file=outf)
   print('<style type="text/css">td, th, table { padding: 5px; margin: 0; border-collapse: collapse; font-weight: normal; } span { visibility: hidden; } td:hover > span { visibility: visible; } .highlighted { background-color: black !important; color: white; }</style>', file=outf)
-  print('<h1>%s</h1>' % runid, file=outf)
+  if runid is not None:
+    print('<h1>%s</h1>' % runid, file=outf)
 
-def _write_tree_html(runid, json_fn, outf):
+def _write_tree_html(runid, tree_json, outf):
   write_header(runid, outf)
 
   print('''
-  <div id="trees"></div>
+  <div id="trees"><h2>Tree</h2></div>
   <div id="phi_matrix" style="margin: 30px"><h2>Tree-constrained lineage frequencies</h2></div>
   <div id="phi_hat_matrix" style="margin: 30px"><h2>Data-implied lineage frequencies</h2></div>
   <div id="phi_error_matrix" style="margin: 30px"><h2>Tree-constrained lineage frequency error</h2></div>
 
   <script type="text/javascript">document.addEventListener('DOMContentLoaded', () => {
-    d3.json('%s').then((results) => {
-      (new TreePlotter()).plot(0, results.parents, results.phi, results.llh, results.samples, '#trees');
-      (new PhiMatrix().plot(results.phi, results.samples, '#phi_matrix'));
-      (new PhiMatrix().plot(results.phi_hat, results.samples, '#phi_hat_matrix'));
-      (new PhiErrorMatrix()).plot(results.phi, results.phi_hat, results.samples, '#phi_error_matrix');
-    });
+    var results = %s;
+
+    (new TreePlotter()).plot(0, results.parents, results.phi, results.llh, results.samples, '#trees');
+    (new PhiMatrix().plot(results.phi, results.samples, '#phi_matrix'));
+    (new PhiMatrix().plot(results.phi_hat, results.samples, '#phi_hat_matrix'));
+    (new PhiErrorMatrix()).plot(results.phi, results.phi_hat, results.samples, '#phi_error_matrix');
   });</script>
-  ''' % json_fn, file=outf)
+  ''' % tree_json, file=outf)
 
 def write_cluster_stats(clusters, garbage, supervars, variants, outf):
   cluster_dev = []
@@ -115,11 +117,11 @@ def main():
   parser.add_argument('--plot-pairwise-mle', action='store_true')
   parser.add_argument('--plot-vaf-matrix', action='store_true')
   parser.add_argument('--plot-cluster-stats', action='store_true')
-  parser.add_argument('runid')
+  parser.add_argument('--runid')
+  parser.add_argument('--tree-json', dest='tree_json_fn')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
   parser.add_argument('results_fn')
-  parser.add_argument('json_out_fn')
   parser.add_argument('html_out_fn')
   args = parser.parse_args()
 
@@ -134,19 +136,21 @@ def main():
   supervars = clustermaker.make_cluster_supervars(results['clusters'], variants)
   supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
 
-  _write_tree_json(
+  tree_json = _make_tree_json(
     results['adjm'][tidx],
     results['llh'][tidx],
     results['phi'][tidx],
     supervars,
     params['samples'],
-    args.json_out_fn,
   )
+  if args.tree_json_fn is not None:
+    with open(args.tree_json_fn, 'w') as F:
+      json.dump(tree_json, F)
 
   with open(args.html_out_fn, 'w') as outf:
     _write_tree_html(
       args.runid,
-      args.json_out_fn,
+      tree_json,
       outf,
     )
     if args.plot_vaf_matrix:
