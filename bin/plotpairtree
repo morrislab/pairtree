@@ -47,28 +47,37 @@ def write_header(runid, outf):
   print('<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">', file=outf)
   print('<style type="text/css">%s</style>' % read_file('tree.css'), file=outf)
   print('<style type="text/css">%s</style>' % read_file('matrix.css'), file=outf)
-  print('<style type="text/css">td, th, table { padding: 5px; margin: 0; border-collapse: collapse; font-weight: normal; } span { visibility: hidden; } td:hover > span { visibility: visible; } .highlighted { background-color: black !important; color: white; }</style>', file=outf)
+  print('<style type="text/css">.container { margin: 30px; } td, th, table { padding: 5px; margin: 0; border-collapse: collapse; font-weight: normal; } span { visibility: hidden; } td:hover > span { visibility: visible; } .highlighted { background-color: black !important; color: white; }</style>', file=outf)
   if runid is not None:
     print('<h1>%s</h1>' % runid, file=outf)
 
-def _write_tree_html(runid, tree_json, outf):
+def _js_on_load(js):
+  return '<script type="text/javascript">document.addEventListener("DOMContentLoaded", () => { %s });</script>' % js
+
+def _write_tree_html(runid, tree_json, plot_phi_hat, plot_phi_error, outf):
   write_header(runid, outf)
 
   print('''
-  <div id="trees"><h2>Tree</h2></div>
-  <div id="phi_matrix" style="margin: 30px"><h2>Tree-constrained lineage frequencies</h2></div>
-  <div id="phi_hat_matrix" style="margin: 30px"><h2>Data-implied lineage frequencies</h2></div>
-  <div id="phi_error_matrix" style="margin: 30px"><h2>Tree-constrained lineage frequency error</h2></div>
+  <div id="trees" class="container"><h2>Tree</h2></div>
+  <div id="phi_matrix" class="container"><h2>Tree-constrained lineage frequencies</h2></div>
 
-  <script type="text/javascript">document.addEventListener('DOMContentLoaded', () => {
-    var results = %s;
-
+  <script type="text/javascript">var results = %s;</script>
+  %s
+  ''' % (tree_json, _js_on_load('''
     (new TreePlotter()).plot(0, results.parents, results.phi, results.llh, results.samples, '#trees');
     (new PhiMatrix().plot(results.phi, results.samples, '#phi_matrix'));
-    (new PhiMatrix().plot(results.phi_hat, results.samples, '#phi_hat_matrix'));
-    (new PhiErrorMatrix()).plot(results.phi, results.phi_hat, results.samples, '#phi_error_matrix');
-  });</script>
-  ''' % tree_json, file=outf)
+  ''' % tree_json)), file=outf)
+
+  if plot_phi_hat:
+    print('''
+    <div id="phi_hat_matrix" class="container"><h2>Data-implied lineage frequencies</h2></div>
+    %s
+    ''' % _js_on_load('''(new PhiMatrix().plot(results.phi_hat, results.samples, '#phi_hat_matrix'));'''), file=outf)
+  if plot_phi_error:
+    print('''
+    <div id="phi_error_matrix" class="container"><h2>Tree-constrained lineage frequency error</h2></div>
+    %s
+    ''' % _js_on_load('''(new PhiErrorMatrix()).plot(results.phi, results.phi_hat, results.samples, '#phi_error_matrix');'''), file=outf)
 
 def write_cluster_stats(clusters, garbage, supervars, variants, outf):
   cluster_dev = []
@@ -116,6 +125,8 @@ def main():
   parser.add_argument('--plot-pairwise-separate', action='store_true')
   parser.add_argument('--plot-pairwise-mle', action='store_true')
   parser.add_argument('--plot-vaf-matrix', action='store_true')
+  parser.add_argument('--plot-phi-hat', action='store_true')
+  parser.add_argument('--plot-phi-error', action='store_true')
   parser.add_argument('--plot-cluster-stats', action='store_true')
   parser.add_argument('--runid')
   parser.add_argument('--tree-json', dest='tree_json_fn')
@@ -151,6 +162,8 @@ def main():
     _write_tree_html(
       args.runid,
       tree_json,
+      args.plot_phi_hat,
+      args.plot_phi_error,
       outf,
     )
     if args.plot_vaf_matrix:

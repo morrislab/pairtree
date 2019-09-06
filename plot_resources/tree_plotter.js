@@ -233,7 +233,7 @@ TreePlotter.prototype.plot = function(root, parents, phi, llh, sampnames, contai
   var S = phi[0].length;
   container = d3.select(container).append('div');
   var nlglh = this._calc_nlglh(llh, K, S);
-  container.append('h2').text('nlglh=' + nlglh.toFixed(3));
+  container.append('h3').text('nlglh=' + nlglh.toFixed(3));
 
   var left_sample = sampnames[0];
   var right_sample = sampnames[0];
