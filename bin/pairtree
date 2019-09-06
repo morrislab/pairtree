@@ -144,8 +144,7 @@ def main():
       )
       resultserializer.save(results, args.results_fn)
     else:
-      adjls = [inputparser.load_structure(struct) for struct in params['structures']]
-      adjms = [common.convert_adjlist_to_adjmatrix(adjl) for adjl in adjls]
+      adjms = [common.convert_parents_to_adjmatrix(struct) for struct in params['structures']]
       results['adjm'], results['phi'], results['llh'] = tree_sampler.use_existing_structures(
         adjms,
         supervars,

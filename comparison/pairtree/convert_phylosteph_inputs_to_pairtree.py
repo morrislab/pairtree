@@ -6,7 +6,7 @@ from collections import OrderedDict
 
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
 import inputparser
 import common
 
@@ -69,17 +69,24 @@ def convert_clusters(clusters):
   assert len(clusters[0]) == 0
   return clusters[1:]
 
-def write_pairtree_params(sampnames, garbage, clusters, structure, pairtree_params_fn):
+def write_pairtree_params(sampnames, garbage, clusters, parents, pairtree_params_fn):
   clusters = [['s%s' % V for V in C] for C in clusters]
   garbage = ['s%s' % V for V in garbage]
   params = {
     'samples': sampnames,
     'clusters': clusters,
-    'structure': structure,
+    'structures': [parents],
     'garbage': garbage,
   }
   with open(pairtree_params_fn, 'w') as F:
     json.dump(params, F)
+
+def convert_adjl_to_parents(adjl):
+  parents = {C: int(P) for P in adjl.keys() for C in adjl[P]}
+  nodes = range(1, len(parents) + 1)
+  assert set(parents.keys()) == set(nodes)
+  parents = [parents[C] for C in nodes]
+  return parents
 
 def main():
   parser = argparse.ArgumentParser(
@@ -101,8 +108,8 @@ def main():
   # Since we remove the empty first cluster, the indexing on `structure` is now
   # a little weird -- cluster `i` is now represented by `i + 1` in `structure`.
   # That's okay.
-  # TODO: I guess this means we need to change how we evaluate results in method comparison?
-  structure = hb['structure']
+  adjl = hb['structure']
+  parents = convert_adjl_to_parents(adjl)
 
   pwgs_params = inputparser.load_params(args.pwgs_params_fn)
   variants = load_phylowgs(args.pwgs_ssm_fn)
@@ -112,7 +119,7 @@ def main():
     garbage = []
 
   inputparser.write_ssms(variants, args.pairtree_ssm_fn)
-  write_pairtree_params(pwgs_params['samples'], garbage, clusters, structure, args.pairtree_params_fn)
+  write_pairtree_params(pwgs_params['samples'], garbage, clusters, parents, args.pairtree_params_fn)
 
 if __name__ == '__main__':
   main()

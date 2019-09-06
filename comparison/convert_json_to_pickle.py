@@ -17,8 +17,7 @@ def main():
   args = parser.parse_args()
 
   params = inputparser.load_params(args.params_fn)
-  adjlist = inputparser.load_structure(params['structure'])
-  adjm = common.convert_adjlist_to_adjmatrix(adjlist)
+  adjm = common.convert_parents_to_adjmatrix(params['structure'])
   with open(args.pickle_fn, 'wb') as outf:
     pickle.dump({
       'adjm': adjm,
