@@ -76,9 +76,6 @@ def print_vaftable_header(sampnames, show_cluster_members, outf):
   container = f'#{container_id}'
 
   print('<style>{container} .matrix td, {container} .matrix {{ padding: 5px; margin: 0; border-collapse: collapse; }} {container} .matrix th {{ transform: rotate(45deg); font-weight: normal !important; }} {container} .matrix span {{ visibility: hidden; }} {container} .matrix td:hover > span {{ visibility: visible; }}</style>'.format(container=container), file=outf)
-  print('''<script type="text/javascript">$(document).ready(function() {''', file=outf)
-  print(f'new VafMatrix("{container}");', file=outf)
-  print('});</script>', file=outf)
 
   print(f'<div id="{container_id}">', file=outf)
   print('<p><input type="text" class="filter" placeholder="s0,s1,..."></p>', file=outf)
@@ -94,6 +91,8 @@ def print_vaftable_header(sampnames, show_cluster_members, outf):
   header += munge_samp_names(sampnames)
   print(''.join(['<th>%s</th>' % H for H in header]), file=outf)
   print('</tr></thead><tbody>', file=outf)
+
+  print(f'<script type="text/javascript">new VafMatrix("{container}");</script>', file=outf)
 
 def print_vaftable_row(V, cls, bgcolour, should_correct_vaf, outf, visible=True):
   # Duplicate variant so we don't modify it.

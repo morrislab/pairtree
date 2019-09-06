@@ -40,7 +40,6 @@ def _write_tree_json(adjm, llh, phi, variants, sampnames, treefn):
 
 def write_header(runid, outf):
   print('<meta charset="utf-8">', file=outf)
-  print('<script type="text/javascript" src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>', file=outf)
   print('<script src="https://d3js.org/d3.v5.min.js"></script>', file=outf)
   print('<script type="text/javascript">%s</script>' % read_file('highlight_table_labels.js'), file=outf)
   print('<script type="text/javascript">%s</script>' % read_file('tree_plotter.js'), file=outf)
@@ -56,7 +55,7 @@ def _write_tree_html(runid, json_fn, outf):
   print('''
   <div id="trees"></div>
   <div id="phi_matrix" style="margin: 30px"><h2>Tree-constrained lineage frequencies</h2></div>
-  <script type="text/javascript">$(document).ready(function() {
+  <script type="text/javascript">document.addEventListener('DOMContentLoaded', () => {
     (new Plotter()).plot('%s', '#trees', '#phi_matrix');
   });</script>
   ''' % json_fn, file=outf)

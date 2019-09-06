@@ -401,53 +401,63 @@ ColourAssigner.assign_colours = function(num_colours) {
 }
 
 function VafMatrix(container) {
+  container = document.querySelector(container);
   this._configure_toggles(container);
   this._configure_filter(container);
 }
 
 VafMatrix.prototype._configure_toggles = function(container) {
-  $(container).find('.vafmatrix_toggles .btn').change(function() {
-    var E = $(this);
-    var active = E.hasClass('active');
-    var toggle_type = E.attr('class').split(/\s+/).filter(function(cls) { return cls.startsWith('toggle_'); })[0].replace(/^toggle_/, '');
-    var targets = $(container).find('.matrix tr').filter('.' + toggle_type);
+  container.querySelectorAll('.vafmatrix_toggles .btn').forEach((btn) => {
+    btn.addEventListener('click', (event) => {
+      var E = event.target;
+      for(let cls of E.classList) {
+        if(cls.startsWith('toggle_')) {
+          var toggle_type = cls.replace(/^toggle_/, '');
+        }
+      }
 
-    if(active) {
-      E.removeClass('active');
-      targets.hide();
-    } else {
-      E.addClass('active');
-      targets.show();
-    }
+      var targets = container.querySelectorAll('.matrix tr.' + toggle_type);
+      var is_active = E.classList.contains('active');
+      if(is_active) {
+        E.classList.remove('active');
+        var new_display = 'none';
+      } else {
+        E.classList.add('active');
+        var new_display = '';
+      }
+      for(let target of targets) {
+        target.style.display = new_display;
+      }
+    });
   });
 }
 
 VafMatrix.prototype._filter_rows = function(container, targets) {
-  var rows = $(container).find('.matrix tr');
+  var rows = container.querySelectorAll('.matrix tr');
   if(targets.length === 0) {
-    rows.show();
+    for(let row of rows) { row.style.display = ''; }
     return;
   }
 
-  var targets = rows.filter(function() {
-    var tid = $(this).find('.id').text();
-    return targets.includes(tid);
+  rows.forEach((row) => {
+    var tid = row.querySelector('.id').text().trim();
+    if(targets.includes(tid)) {
+      row.style.display = '';
+    } else {
+      row.style.display = 'none';
+    }
   });
-  var other = rows.not(targets);
-
-  targets.show();
-  other.hide();
 }
 
 VafMatrix.prototype._configure_filter = function(container) {
-  var filter = $(container).find('.filter');
-  var self = this;
-  filter.keydown(function(E) {
+  var filter = container.querySelector('.filter');
+  //var self = this;
+  filter.addEventListener('keydown', (E) => {
     if(E.which === 13) {
       E.preventDefault();
-      var targets = filter.val().trim().split(',');
-      targets = targets.map(function(T) { return T.trim(); });
-      targets = targets.filter(function(T) { return T !== ''; });
+      var targets = filter.value.trim().split(',');
+      targets = targets.map((T) => { return T.trim(); });
+      targets = targets.filter((T) => { return T !== ''; });
       self._filter_rows(container, targets);
     }
   });
