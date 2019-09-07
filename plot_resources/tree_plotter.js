@@ -298,7 +298,7 @@ PhiMatrix.prototype.plot = function(phi, sampnames, container, convert_to_ccf) {
     phi = this._calc_ccf(phi);
   }
 
-  var popnames = phi.map(function(d, i) { return 'Pop. ' + (i + 1); });
+  var popnames = phi.map(function(d, i) { return 'Pop. ' + i; });
   var sampcolours = sampnames.map(function(sampname) {
     return '#000000';
   });
@@ -310,7 +310,7 @@ PhiMatrix.prototype.plot = function(phi, sampnames, container, convert_to_ccf) {
 function PhiErrorMatrix() {
 }
 
-PhiErrorMatrix.prototype._calc_error = function(phi, phi_hat) {
+PhiErrorMatrix.prototype.calc_error = function(phi, phi_hat) {
   var error = [];
   for(var i = 0; i < phi.length; i++) {
     error.push([]);
@@ -332,18 +332,49 @@ PhiErrorMatrix.prototype._calc_total_error = function(error) {
 }
 
 PhiErrorMatrix.prototype.plot = function(phi, phi_hat, sampnames, container) {
-  var error = this._calc_error(phi, phi_hat);
+  var error = this.calc_error(phi, phi_hat);
   d3.select(container).append('h3').text('Total error: ' + this._calc_total_error(error).toFixed(2));
   (new PhiMatrix()).plot(error, sampnames, container);
+}
+
+function PhiInterleavedMatrix() {
+}
+
+PhiInterleavedMatrix.prototype.plot = function(phi, phi_hat, sampnames, container) {
+  var error = (new PhiErrorMatrix()).calc_error(phi, phi_hat);
+  var pop_colours = ColourAssigner.assign_colours(phi.length);
+
+  var interleaved = [];
+  var row_labels = [];
+  var row_colours = [];
+  for(var i = 0; i < phi.length; i++) {
+    interleaved.push(phi[i]);
+    interleaved.push(phi_hat[i]);
+    interleaved.push(error[i]);
+
+    row_labels.push('Pop. ' + i + ' tree');
+    row_labels.push('Pop. ' + i + ' data');
+    row_labels.push('Pop. ' + i + ' error');
+
+    row_colours.push(pop_colours[i]);
+    row_colours.push(pop_colours[i]);
+    row_colours.push('#000000');
+  }
+
+  var sampcolours = sampnames.map(function(sampname) {
+    return '#000000';
+  });
+
+  (new MatrixBar()).plot(interleaved, row_labels, row_colours, sampnames, sampcolours, container);
 }
 
 function MatrixBar() {
 }
 
-MatrixBar.prototype._calc_col_label_height = function(col_labels) {
+MatrixBar.prototype._calc_label_width = function(labels) {
   var max_length = 0;
   var char_width = 15;
-  for(let label of col_labels) {
+  for(let label of labels) {
     if(label.length > max_length) {
       max_length = label.length;
     }
@@ -355,8 +386,8 @@ MatrixBar.prototype.plot = function(mat, row_labels, row_colours, col_labels, co
   var num_rows = mat.length;
   var num_cols = mat[0].length;
   var cell_size = 50;
-  var row_label_width = 100;
-  var col_label_height = this._calc_col_label_height(col_labels);
+  var row_label_width = this._calc_label_width(row_labels);
+  var col_label_height = this._calc_label_width(col_labels);
   var font_size = '24px';
   var label_padding = 10;
 

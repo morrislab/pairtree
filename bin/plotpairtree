@@ -54,7 +54,7 @@ def write_header(runid, outf):
 def _js_on_load(js):
   return '<script type="text/javascript">document.addEventListener("DOMContentLoaded", () => { %s });</script>' % js
 
-def _write_tree_html(runid, tree_json, plot_phi_hat, plot_phi_error, outf):
+def _write_tree_html(runid, tree_json, plot_phi_hat, plot_phi_error, plot_phi_interleaved, outf):
   write_header(runid, outf)
 
   print('''
@@ -78,6 +78,11 @@ def _write_tree_html(runid, tree_json, plot_phi_hat, plot_phi_error, outf):
     <div id="phi_error_matrix" class="container"><h2>Lineage frequency error</h2></div>
     %s
     ''' % _js_on_load('''(new PhiErrorMatrix()).plot(results.phi, results.phi_hat, results.samples, '#phi_error_matrix');'''), file=outf)
+  if plot_phi_interleaved:
+    print('''
+    <div id="phi_interleaved_matrix" class="container"><h2>Interleaved lineage frequencies</h2></div>
+    %s
+    ''' % _js_on_load('''(new PhiInterleavedMatrix()).plot(results.phi, results.phi_hat, results.samples, '#phi_interleaved_matrix');'''), file=outf)
 
 def write_cluster_stats(clusters, garbage, supervars, variants, outf):
   cluster_dev = []
@@ -127,6 +132,7 @@ def main():
   parser.add_argument('--plot-vaf-matrix', action='store_true')
   parser.add_argument('--plot-phi-hat', action='store_true')
   parser.add_argument('--plot-phi-error', action='store_true')
+  parser.add_argument('--plot-phi-interleaved', action='store_true')
   parser.add_argument('--plot-cluster-stats', action='store_true')
   parser.add_argument('--runid')
   parser.add_argument('--tree-json', dest='tree_json_fn')
@@ -164,6 +170,7 @@ def main():
       tree_json,
       args.plot_phi_hat,
       args.plot_phi_error,
+      args.plot_phi_interleaved,
       outf,
     )
     if args.plot_vaf_matrix:
