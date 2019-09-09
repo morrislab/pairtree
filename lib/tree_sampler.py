@@ -182,14 +182,20 @@ def _find_parent(node, adj):
   return parents[0]
 
 def _scaled_softmax(A, R=100):
-  # Ensures `max(softmax(A)) / min(softmax(A)) = R`.
+  # Ensures `max(softmax(A)) / min(softmax(A)) <= R`.
+  #
+  # Typically, I use this as a "softer softmax", ensuring that the largest
+  # element in the softmax is at most 100x the magnitude of the smallest.
+  # Otherwise, given large differences between the minimum and maximum values,
+  # the softmax becomes even more sharply peaked, with one element absorbing
+  # effectively all mass.
   noninf = np.logical_not(np.isinf(A))
   if np.sum(noninf) == 0:
     return util.softmax(A)
   delta = np.max(A[noninf]) - np.min(A[noninf])
   if np.isclose(0, delta):
     return util.softmax(A)
-  B = np.log(R) / delta
+  B = min(1, np.log(R) / delta)
   return util.softmax(B*A)
 
 def _make_W_nodes_mutrel(adj, anc, data_logmutrel):
