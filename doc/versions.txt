@@ -69,5 +69,8 @@ lol71: big K, singlechain, gamma=zeta=0, iota=1
 lol72: big K, singlechain, gamma=zeta=1, iota=0
 lol73: big K, singlechain, gamma=zeta=1, iota=1
 lol74: big K, singlechain, gamma=zeta=0.7, iota=0.7
+lol75: big K, singlechain, use slightly revised softmax that prevents it getting too soft, gamma=zeta=0.7, iota=0.7
+lol76: big K, singlechain, gamma=zeta=iota=sqrt(0.5)
+lol77: big K, singlechain, random seed = 1337, gamma=zeta=iota=0.7
 
 Interesting: lol9 does as poorly as most other lol runs, and much worse than lol4 and lol8
