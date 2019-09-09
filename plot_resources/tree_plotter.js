@@ -348,12 +348,12 @@ PhiInterleavedMatrix.prototype.plot = function(phi, phi_hat, sampnames, containe
   var row_labels = [];
   var row_colours = [];
   for(var i = 0; i < phi.length; i++) {
-    interleaved.push(phi[i]);
     interleaved.push(phi_hat[i]);
+    interleaved.push(phi[i]);
     interleaved.push(error[i]);
 
-    row_labels.push('Pop. ' + i + ' tree');
     row_labels.push('Pop. ' + i + ' data');
+    row_labels.push('Pop. ' + i + ' tree');
     row_labels.push('Pop. ' + i + ' error');
 
     row_colours.push(pop_colours[i]);
