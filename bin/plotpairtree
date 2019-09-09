@@ -54,35 +54,38 @@ def write_header(runid, outf):
 def _js_on_load(js):
   return '<script type="text/javascript">document.addEventListener("DOMContentLoaded", () => { %s });</script>' % js
 
-def _write_tree_html(runid, tree_json, plot_phi_hat, plot_phi_error, plot_phi_interleaved, outf):
+def _write_tree_html(runid, tree_json, plot_phi, plot_phi_hat, plot_phi_error, plot_phi_interleaved, outf):
   write_header(runid, outf)
+  print('<script type="text/javascript">var results = %s;</script>' % tree_json, file=outf)
 
   print('''
   <div id="trees" class="container"><h2>Tree</h2></div>
-  <div id="phi_matrix" class="container"><h2>Tree-constrained lineage frequencies</h2></div>
-
-  <script type="text/javascript">var results = %s;</script>
   %s
-  ''' % (tree_json, _js_on_load('''
-    (new TreePlotter()).plot(0, results.parents, results.phi, results.llh, results.samples, '#trees');
-    (new PhiMatrix().plot(results.phi, results.samples, '#phi_matrix'));
-  ''' % tree_json)), file=outf)
+  ''' % _js_on_load('''(new TreePlotter()).plot(0, results.parents, results.phi, results.llh, results.samples, '#trees');'''), file=outf)
+
+  if plot_phi_interleaved:
+    print('''
+    <div id="phi_interleaved_matrix" class="container"><h2>Interleaved lineage frequencies</h2></div>
+    %s
+    ''' % _js_on_load('''(new PhiInterleavedMatrix()).plot(results.phi, results.phi_hat, results.samples, '#phi_interleaved_matrix');'''), file=outf)
+
+  if plot_phi:
+    print('''
+    <div id="phi_matrix" class="container"><h2>Tree-constrained lineage frequencies</h2></div>
+    %s
+    ''' % _js_on_load('''(new PhiMatrix()).plot(results.phi, results.samples, '#phi_matrix');'''), file=outf)
 
   if plot_phi_hat:
     print('''
     <div id="phi_hat_matrix" class="container"><h2>Data-implied lineage frequencies</h2></div>
     %s
     ''' % _js_on_load('''(new PhiMatrix().plot(results.phi_hat, results.samples, '#phi_hat_matrix'));'''), file=outf)
+
   if plot_phi_error:
     print('''
     <div id="phi_error_matrix" class="container"><h2>Lineage frequency error</h2></div>
     %s
     ''' % _js_on_load('''(new PhiErrorMatrix()).plot(results.phi, results.phi_hat, results.samples, '#phi_error_matrix');'''), file=outf)
-  if plot_phi_interleaved:
-    print('''
-    <div id="phi_interleaved_matrix" class="container"><h2>Interleaved lineage frequencies</h2></div>
-    %s
-    ''' % _js_on_load('''(new PhiInterleavedMatrix()).plot(results.phi, results.phi_hat, results.samples, '#phi_interleaved_matrix');'''), file=outf)
 
 def write_cluster_stats(clusters, garbage, supervars, variants, outf):
   cluster_dev = []
@@ -130,6 +133,7 @@ def main():
   parser.add_argument('--plot-pairwise-separate', action='store_true')
   parser.add_argument('--plot-pairwise-mle', action='store_true')
   parser.add_argument('--plot-vaf-matrix', action='store_true')
+  parser.add_argument('--plot-phi', action='store_true')
   parser.add_argument('--plot-phi-hat', action='store_true')
   parser.add_argument('--plot-phi-error', action='store_true')
   parser.add_argument('--plot-phi-interleaved', action='store_true')
@@ -168,6 +172,7 @@ def main():
     _write_tree_html(
       args.runid,
       tree_json,
+      args.plot_phi,
       args.plot_phi_hat,
       args.plot_phi_error,
       args.plot_phi_interleaved,
