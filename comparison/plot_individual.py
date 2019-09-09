@@ -121,7 +121,7 @@ def make_pie_traces(methods, complete, total):
   missing = total - complete
 
   traces = [go.Pie(
-    labels = ('Succeeded', 'Failed'),
+    labels = ('Proportion succeeded', 'Proportion failed'),
     values = (C, D),
     name = M,
     sort = False,
@@ -135,10 +135,12 @@ def make_pie_fig(methods, complete, total, name=None):
   missing = total - complete
 
   traces = [go.Pie(
-    labels=('Succeeded', 'Failed'),
-    values=(C, D),
-    name=M,
-    textinfo='none',
+    labels = ('Proportion succeeded', 'Proportion failed'),
+    values = (C, D),
+    name = M,
+    textinfo = 'none',
+    sort = False,
+    marker = {'colors': ['rgb(77,175,74)', 'rgb(228,26,28)']},
   ) for (C, D, M) in zip(complete, missing, methods)]
 
   pie_fig = make_subplots(
@@ -159,7 +161,7 @@ def _make_points(vals):
   X, Y = zip(*points)
   return (X, Y)
 
-def make_violin_trace(vals, side='both', group=None, name=None, bandwidth=None):
+def make_violin_trace(vals, side='both', group=None, name=None, bandwidth=None, colour=None):
   X, Y = _make_points(vals)
   trace = {
     'type': 'violin',
@@ -181,10 +183,13 @@ def make_violin_trace(vals, side='both', group=None, name=None, bandwidth=None):
     trace['legendgroup'] = group
   if name is not None:
     trace['name'] = name
+  if colour is not None:
+    trace['fillcolor'] = colour
+    trace['line_color'] = colour
 
   return trace
 
-def make_box_trace(vals, group=None, name=None):
+def make_box_trace(vals, group=None, name=None, colour=None):
   X, Y = _make_points(vals)
   trace = {
     'type': 'box',
@@ -195,6 +200,8 @@ def make_box_trace(vals, group=None, name=None):
     trace['legendgroup'] = group
   if name is not None:
     trace['name'] = name
+  if colour is not None:
+    trace['marker_color'] = colour
 
   return trace
 
@@ -347,6 +354,10 @@ def main():
     'lte': '1, 3, or 10 tissue samples',
     'gt': '30 or 100 tissue samples',
   }
+  colours = {
+    'lte':'rgb(55,126,184)',
+    'gt': 'rgb(152,78,163)',
+  }
 
   score_traces = []
   completion_bar_traces = []
@@ -364,9 +375,9 @@ def main():
       total = {M: vals[M]['total'] for M in methods}
 
       if args.plot_type == 'box':
-        score_trace = make_box_trace(scores, group=group, name=names[group])
+        score_trace = make_box_trace(scores, group=group, name=names[group], colour=colours[group])
       elif args.plot_type == 'violin':
-        score_trace = make_violin_trace(scores, side=sides[group], group=group, name=names[group], bandwidth=args.bandwidth)
+        score_trace = make_violin_trace(scores, side=sides[group], group=group, name=names[group], bandwidth=args.bandwidth, colour=colours[group])
       else:
         raise Exception('Unknown plot type %s' % args.plot_type)
 
