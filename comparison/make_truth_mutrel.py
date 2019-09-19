@@ -5,7 +5,7 @@ from numba import njit
 
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
 import mutrel
 import evalutil
 
@@ -105,6 +105,12 @@ def ensure_truth_found(truth, trees):
       return
   raise Exception('No truth found')
 
+def write_truth(adjms, phi, truth_fn):
+  N = len(adjms)
+  llhs = np.zeros(N)
+  phis = np.array([phi for _ in range(N)])
+  np.savez_compressed(truth_fn, adjm=adjms, phi=phis, llh=llhs)
+
 def main():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
@@ -113,6 +119,7 @@ def main():
   parser.add_argument('--enumerate-trees', action='store_true')
   parser.add_argument('sim_data_fn')
   parser.add_argument('mutrel_fn')
+  parser.add_argument('truth_fn')
   args = parser.parse_args()
 
   with open(args.sim_data_fn, 'rb') as dataf:
@@ -126,9 +133,11 @@ def main():
     trees = enum_trees(tau, phi, order, 'dfs')
     ensure_truth_found(simdata['adjm'], trees)
   else:
+    raise Exception('I have decided that making mutrels without enumerating trees is stupid')
     trees = [simdata['adjm']]
 
   write_mutrel(trees, clusters, simdata, args.mutrel_fn)
+  write_truth(trees, simdata['phi'], args.truth_fn)
 
 if __name__ == '__main__':
   main()
