@@ -169,11 +169,6 @@ def calc_binom_params(supervars):
   N = V + R
   return (V, N, omega_v)
 
-def _find_parents(adj):
-  adj = np.copy(adj)
-  np.fill_diagonal(adj, 0)
-  return np.argmax(adj[:,1:], axis=0)
-
 def _find_parent(node, adj):
   col = np.copy(adj[:,node])
   col[node] = 0
@@ -562,9 +557,9 @@ def _run_chain(data_logmutrel, supervars, superclusters, nsamples, thinned_frac,
         '%.3f' % (__calc_llh_phi(true_adj, true_phi) / norm_phi_llh),
         '%.3f' % log_p_new_given_old,
         '%.3f' % log_p_old_given_new,
-        _find_parents(old_samp.adj),
-        _find_parents(new_samp.adj),
-        _find_parents(true_adj),
+        util.find_parents(old_samp.adj),
+        util.find_parents(new_samp.adj),
+        util.find_parents(true_adj),
         _make_W_nodes_mutrel.node_error,
       )
       vals = vals + _generate_new_sample.debug

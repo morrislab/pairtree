@@ -13,26 +13,21 @@ import numpy as np
 import vaf_plotter
 import relation_plotter
 import json
+import util
 
 def read_file(fn):
   basedir = os.path.join(os.path.dirname(__file__), '..', 'plot_resources')
   with open(os.path.join(basedir, fn)) as F:
     return F.read()
 
-def _find_parents(adj):
-  adj = np.copy(adj)
-  np.fill_diagonal(adj, 0)
-  assert np.all(np.sum(adj[:,1:], axis=0) == 1)
-  return np.argmax(adj[:,1:], axis=0)
-
 def _make_tree_json(adjm, llh, phi, variants, sampnames):
   phi_hat = _calc_phi_hat(variants)
-  parents = _find_parents(adjm)
+  parents = util.find_parents(adjm)
   return {
     'phi': phi.tolist(),
     'phi_hat': phi_hat.tolist(),
     'llh': llh,
-    'parents': _find_parents(adjm).tolist(),
+    'parents': util.find_parents(adjm).tolist(),
     'samples': sampnames,
   }
 

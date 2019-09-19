@@ -49,3 +49,9 @@ def remove_rowcol(arr, indices):
 
   assert np.array_equal(arr.shape, shape)
   return arr
+
+def find_parents(adj):
+  adj = np.copy(adj)
+  np.fill_diagonal(adj, 0)
+  assert np.all(np.sum(adj[:,1:], axis=0) == 1)
+  return np.argmax(adj[:,1:], axis=0)
