@@ -61,6 +61,12 @@ def compute_tree_jsd(adjms1, probs1, adjms2, probs2):
     assert len(A) == len(P)
     A_probs = {}
     for _A, _P in zip(A, P):
+      # Sometimes LLH is so negative that the softmax of it ends up being
+      # actually zero. Pretend that such trees weren't sampled.
+      # Actually, since we use the halved-weight to create the mixture, it's this
+      # value that needs to be nonzero.
+      if 0.5*_P == 0:
+        continue
       key = hash(util.find_parents(_A).tobytes())
       M[key] += 0.5 * _P
       assert key not in A_probs
@@ -69,9 +75,6 @@ def compute_tree_jsd(adjms1, probs1, adjms2, probs2):
 
   A_probs1 = _dostuff(adjms1, probs1)
   A_probs2 = _dostuff(adjms2, probs2)
-  a1 = set(A_probs1)
-  a2 = set(A_probs2)
-
   for arr in (M, A_probs1, A_probs2):
     V = np.array(list(arr.values()))
     assert np.isclose(1, np.sum(V)) and np.all(V >= 0)
@@ -101,9 +104,18 @@ def compute_parents_jsd(pardist1, pardist2):
   kld1 = compute_parents_kld(pardist1, M)
   kld2 = compute_parents_kld(pardist2, M)
   jsd = 0.5*(kld1 + kld2)
+  assert np.allclose(1, jsd[jsd > 1])
+  jsd = np.minimum(1, jsd)
   assert np.all(jsd >= 0) and np.all(jsd <= 1)
   joint_jsd = np.sum(jsd)
   return joint_jsd
+
+def compute_indices(sampled, truth):
+  sampled = set([util.find_parents(A).tobytes() for A in sampled])
+  truth = set([util.find_parents(A).tobytes() for A in truth])
+  truth_recovered = len(sampled & truth) / len(truth)
+  jaccard = len(sampled & truth) / len(sampled | truth)
+  return (truth_recovered, jaccard)
 
 def process(results, truth):
   merged = resolve_unique(results['adjm'], results['llh'])
@@ -139,6 +151,7 @@ def process(results, truth):
   results['H_trees_pairtree_3'] = calc_entropy(probs3)
   results['H_parents_truth'] = truth_parentropy
   results['H_parents_pairtree'] = parentropy
+  results['prop_truth_recovered'], results['jaccard'] = compute_indices(unique_adjm, truth['adjm'])
   results['jsd_trees'] = compute_tree_jsd(unique_adjm, probs3, truth['adjm'], truth_probs)
   results['jsd_parents'] = compute_parents_jsd(pard, truth_pard)
   results['jsd_parents_per_node'] = compute_parents_jsd(pard, truth_pard) / K
@@ -163,9 +176,9 @@ def main():
   parser.add_argument('results_fn')
   args = parser.parse_args()
 
-  results = resultserializer.load(args.results_fn)
+  results = np.load(args.results_fn)
   if args.truth_fn is not None:
-    truth = resultserializer.load(args.truth_fn)
+    truth = np.load(args.truth_fn)
   else:
     truth = None
   process(results, truth)
