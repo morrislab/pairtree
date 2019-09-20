@@ -117,9 +117,9 @@ def main():
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--enumerate-trees', action='store_true')
+  parser.add_argument('--mutrel', dest='mutrel_fn')
+  parser.add_argument('--truth', dest='truth_fn')
   parser.add_argument('sim_data_fn')
-  parser.add_argument('mutrel_fn')
-  parser.add_argument('truth_fn')
   args = parser.parse_args()
 
   with open(args.sim_data_fn, 'rb') as dataf:
@@ -136,8 +136,10 @@ def main():
     raise Exception('I have decided that making mutrels without enumerating trees is stupid')
     trees = [simdata['adjm']]
 
-  write_mutrel(trees, clusters, simdata, args.mutrel_fn)
-  write_truth(trees, simdata['phi'], args.truth_fn)
+  if args.mutrel_fn is not None:
+    write_mutrel(trees, clusters, simdata, args.mutrel_fn)
+  if args.truth_fn is not None:
+    write_truth(trees, simdata['phi'], args.truth_fn)
 
 if __name__ == '__main__':
   main()
