@@ -75,7 +75,7 @@ def make_mutrel(trees, clusters):
   soft_mutrel = None
 
   for adjm in trees:
-    mrel = mutrel.make_mutrel_tensor_from_cluster_adj(adjm, clusters)
+    mrel = evalutil.make_mutrel_tensor_from_cluster_adj(adjm, clusters)
     if soft_mutrel is None:
       soft_mutrel = mrel
     else:
