@@ -11,8 +11,6 @@ PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.lol69
 TRUTH_DIR=$BASEDIR/scratch/results/sims.truth
 SCORESDIR=$BASEDIR/scratch/scores
 
-PARALLEL=10
-
 source $SCRIPTDIR/util.sh
 
 function compute_entropy {
@@ -49,12 +47,13 @@ function plot {
   cmd="python3 $SCRIPTDIR/plot_entropy.py "
   cmd+="$SCORESDIR/entropy.txt "
   cmd+="$SCORESDIR/entropy.html"
-  echo $cmd
+  echo $cmd | bash
 }
 
 function main {
-  #compute_entropy | parallel -j$PARALLEL --halt 1 --eta
-  combine
+  #compute_entropy | grep -v -e K30_ -e K100_ | parallel -j80 --halt 1 --eta
+  #compute_entropy | grep    -e K30_ -e K100_ | parallel -j10 --halt 1 --eta
+  #combine
   plot
 }
 

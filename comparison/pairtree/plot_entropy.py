@@ -75,6 +75,11 @@ def main():
   args = parser.parse_args()
 
   results = pd.read_csv(args.entropy_fn)
+  results['H_trees_pairtree_3_minus_H_trees_truth'] = results['H_trees_pairtree_3'] - results['H_trees_truth']
+  results['H_parents_pairtree_minus_H_trees_pairtree_3'] = results['H_parents_pairtree'] - results['H_trees_pairtree_3']
+  results['H_parents_truth_minus_H_trees_truth'] = results['H_parents_truth'] - results['H_trees_truth']
+  results['H_parents_pairtree_minus_H_parents_truth'] = results['H_parents_pairtree'] - results['H_parents_truth']
+
   html = ''
   for key, logy in (
     (('true_trees', True)), 
@@ -84,11 +89,18 @@ def main():
     (('H_trees_pairtree_3', False)), 
     (('H_parents_truth', False)), 
     (('H_parents_pairtree', False)), 
-    (('prop_truth_recovered', False)), 
-    (('jaccard', False)), 
-    (('jsd_trees', False)), 
-    (('jsd_parents', False)), 
-    (('jsd_parents_per_node', False)), 
+    (('H_trees_pairtree_3_minus_H_trees_truth', False)),
+    (('H_parents_pairtree_minus_H_parents_truth', False)),
+    (('H_parents_pairtree_minus_H_trees_pairtree_3', False)),
+    (('H_parents_truth_minus_H_trees_truth', False)),
+    (('prop_truth_recovered', False)),
+    (('jaccard', False)),
+    (('jsd_trees', False)),
+    (('jsd_parents_sum', False)),
+    (('jsd_parents_mean', False)),
+    (('jsd_parents_max', False)),
+    (('jsd_parents_phi_mean', False)),
+    (('jsd_parents_phi_max', False)),
   ):
     html += plot(results, key, logy)
 

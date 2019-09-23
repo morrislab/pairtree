@@ -107,8 +107,7 @@ def compute_parents_jsd(pardist1, pardist2):
   assert np.allclose(1, jsd[jsd > 1])
   jsd = np.minimum(1, jsd)
   assert np.all(jsd >= 0) and np.all(jsd <= 1)
-  joint_jsd = np.sum(jsd)
-  return joint_jsd
+  return jsd
 
 def compute_indices(sampled, truth):
   sampled = set([util.find_parents(A).tobytes() for A in sampled])
@@ -116,6 +115,10 @@ def compute_indices(sampled, truth):
   truth_recovered = len(sampled & truth) / len(truth)
   jaccard = len(sampled & truth) / len(sampled | truth)
   return (truth_recovered, jaccard)
+
+def make_sorted(arr, N=10):
+  arr = np.array(sorted(arr, reverse=True))[:N]
+  return np.array2string(arr, suppress_small=True, separator=' ')
 
 def process(results, truth):
   merged = resolve_unique(results['adjm'], results['llh'])
@@ -139,6 +142,9 @@ def process(results, truth):
 
   top_probs = 10
   good_thresh = 1e-3
+  jsd_parents = compute_parents_jsd(pard, truth_pard)
+  jsd_parents_phi_mean = jsd_parents * np.mean(truth['phi'][0,1:], axis=1)
+  jsd_parents_phi_max  = jsd_parents * np.max(truth['phi'][0,1:], axis=1)
 
   results = {}
   results['true_trees'] = truth_num
@@ -153,11 +159,17 @@ def process(results, truth):
   results['H_parents_pairtree'] = parentropy
   results['prop_truth_recovered'], results['jaccard'] = compute_indices(unique_adjm, truth['adjm'])
   results['jsd_trees'] = compute_tree_jsd(unique_adjm, probs3, truth['adjm'], truth_probs)
-  results['jsd_parents'] = compute_parents_jsd(pard, truth_pard)
-  results['jsd_parents_per_node'] = compute_parents_jsd(pard, truth_pard) / K
-  results['top_probs_1'] = np.array(sorted(probs1, reverse=True)[:top_probs])
-  results['top_probs_2'] = np.array(sorted(probs2, reverse=True)[:top_probs])
-  results['top_probs_3'] = np.array(sorted(probs3, reverse=True)[:top_probs])
+  results['jsd_parents_sum'] = np.sum(jsd_parents)
+  results['jsd_parents_mean'] = np.sum(jsd_parents) / K
+  results['jsd_parents_max'] = np.max(jsd_parents)
+  results['jsd_parents'] = jsd_parents
+  results['jsd_parents_phi_mean'] = np.max(jsd_parents_phi_mean)
+  results['jsd_parents_phi_max'] = np.max(jsd_parents_phi_max)
+  results['jsd_parents_phi_mean_top10'] = make_sorted(jsd_parents_phi_mean)
+  results['jsd_parents_phi_max_top10']  = make_sorted(jsd_parents_phi_max)
+  results['top_probs_1_top10'] = make_sorted(probs1)
+  results['top_probs_2_top10'] = make_sorted(probs2)
+  results['top_probs_3_top10'] = make_sorted(probs3)
 
   keys = list(results.keys())
   vals = [results[key] for key in keys]
