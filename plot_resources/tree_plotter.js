@@ -228,12 +228,12 @@ TreePlotter.prototype._calc_nlglh = function(llh, K, S) {
   return -llh / Math.log(2) / ((K - 1)*S);
 }
 
-TreePlotter.prototype.plot = function(root, parents, phi, llh, sampnames, container) {
+TreePlotter.prototype.plot = function(root, parents, phi, llh, prob, sampnames, container) {
   var K = phi.length;
   var S = phi[0].length;
   container = d3.select(container).append('div');
   var nlglh = this._calc_nlglh(llh, K, S);
-  container.append('h3').text('nlglh=' + nlglh.toFixed(3));
+  container.append('h3').text('nlglh=' + nlglh.toFixed(3) + ' prob=' + prob.toFixed(3));
 
   var left_sample = sampnames[0];
   var right_sample = sampnames[0];

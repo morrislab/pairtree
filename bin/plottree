@@ -20,19 +20,22 @@ def read_file(fn):
   with open(os.path.join(basedir, fn)) as F:
     return F.read()
 
-def _make_tree_json(adjm, llh, phi, variants, sampnames):
+def _make_tree_json(struct, count, llh, prob, phi, variants, sampnames):
   phi_hat = _calc_phi_hat(variants)
-  parents = util.find_parents(adjm)
-  return {
+  tree = {
     'phi': phi.tolist(),
     'phi_hat': phi_hat.tolist(),
-    'llh': llh,
-    'parents': util.find_parents(adjm).tolist(),
+    'llh': float(llh),
+    'prob': float(prob),
+    'count': int(count),
+    'parents': struct.tolist(),
     'samples': sampnames,
   }
+  return json.dumps(tree)
 
 def _write_tree_json(tree_json, jsonfn):
-  json.dump(tree_json, jsonfn)
+  with open(jsonfn, 'w') as F:
+    print(tree_json, file=F)
 
 def write_header(runid, outf):
   print('<meta charset="utf-8">', file=outf)
@@ -51,12 +54,12 @@ def _js_on_load(js):
 
 def _write_tree_html(runid, tree_json, plot_phi, plot_phi_hat, plot_phi_error, plot_phi_interleaved, outf):
   write_header(runid, outf)
-  print('<script type="text/javascript">var results = %s;</script>' % tree_json, file=outf)
+  print("<script type=\"text/javascript\">var tree_json = '%s'; var results = JSON.parse(tree_json);</script>" % tree_json, file=outf)
 
   print('''
   <div id="trees" class="container"><h2>Tree</h2></div>
   %s
-  ''' % _js_on_load('''(new TreePlotter()).plot(0, results.parents, results.phi, results.llh, results.samples, '#trees');'''), file=outf)
+  ''' % _js_on_load('''(new TreePlotter()).plot(0, results.parents, results.phi, results.llh, results.prob, results.samples, '#trees');'''), file=outf)
 
   if plot_phi_interleaved:
     print('''
@@ -134,7 +137,7 @@ def main():
   parser.add_argument('--plot-phi-interleaved', action='store_true')
   parser.add_argument('--plot-cluster-stats', action='store_true')
   parser.add_argument('--runid')
-  parser.add_argument('--tree-json', dest='tree_json_fn')
+  parser.add_argument('--tree-json', dest='tree_json_fn', help='Additional external file in which to store JSON, which is already stored statically in the HTML file')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
   parser.add_argument('results_fn')
@@ -153,15 +156,16 @@ def main():
   supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
 
   tree_json = _make_tree_json(
-    results['adjm'][tidx],
+    results['struct'][tidx],
+    results['count'][tidx],
     results['llh'][tidx],
+    results['prob'][tidx],
     results['phi'][tidx],
     supervars,
     params['samples'],
   )
   if args.tree_json_fn is not None:
-    with open(args.tree_json_fn, 'w') as F:
-      json.dump(tree_json, F)
+    _write_tree_json(tree_json, args.tree_json_fn)
 
   with open(args.html_out_fn, 'w') as outf:
     _write_tree_html(
