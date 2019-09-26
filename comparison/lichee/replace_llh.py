@@ -5,7 +5,7 @@ import numpy as np
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
-import common
+import util
 import inputparser
 
 def main():
@@ -22,7 +22,7 @@ def main():
   pairtree_results = {K: pairtree_results[K] for K in pairtree_results}
 
   for adjm, struct in zip(pairtree_results['adjm'], params['structures']):
-    implied_adjm = common.convert_parents_to_adjmatrix(struct)
+    implied_adjm = util.convert_parents_to_adjmatrix(struct)
     assert np.array_equal(implied_adjm, adjm)
 
   pairtree_results['llh'] = -1*np.array(params['scores'])

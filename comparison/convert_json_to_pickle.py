@@ -3,9 +3,9 @@ import pickle
 
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-import common
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
 import inputparser
+import util
 
 def main():
   parser = argparse.ArgumentParser(
@@ -17,7 +17,7 @@ def main():
   args = parser.parse_args()
 
   params = inputparser.load_params(args.params_fn)
-  adjm = common.convert_parents_to_adjmatrix(params['structure'])
+  adjm = util.convert_parents_to_adjmatrix(params['structure'])
   with open(args.pickle_fn, 'wb') as outf:
     pickle.dump({
       'adjm': adjm,

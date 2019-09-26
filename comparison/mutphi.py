@@ -29,7 +29,7 @@ def _calc_logprob(mphi, vids, variants, epsilon=1e-5):
 
 def calc_mutphi(cluster_phis, llhs, clusterings, weight_trees_by, ssmsfn):
   variants = inputparser.load_ssms(ssmsfn)
-  logweights = evalutil._make_logweights(llhs, weight_trees_by)
+  logweights = evalutil.make_logweights(llhs, weight_trees_by)
   weights = util.softmax(logweights)
   assert len(cluster_phis) == len(llhs) == len(clusterings)
 
@@ -47,7 +47,7 @@ def calc_mutphi(cluster_phis, llhs, clusterings, weight_trees_by, ssmsfn):
     if np.isclose(0, weight):
       continue
 
-    cluster_phi = evalutil._fix_rounding_errors(cluster_phi)
+    cluster_phi = evalutil.fix_rounding_errors(cluster_phi)
     assert np.all(0 <= cluster_phi) and np.all(cluster_phi <= 1)
     V, membership = evalutil.make_membership_mat(clustering)
     mphi = np.dot(membership, cluster_phi)

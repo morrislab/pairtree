@@ -33,3 +33,19 @@ Make possible installation via Conda
 
 Make exceptions when running in multichain produce a sensible exception
 I don't seem to handle garbage variants in mutphi eval -- bah
+
+Fix tree_plotter.js's PhiMatrix to compute CCF correctly for polyclonal trees
+
+Mutrel modifications:
+  1. Test if mutrel creation from Pairtree still works
+  2. Remove mutrel creation from truth -- make it use same codebase, where Pairtree results are fed into mtrel-creating code
+  3. Remove `make_logweights` -- switch to always using LLH
+  4. Update mutphi creation to use new code
+Change format Pairtree writes to disk -- don't write duplicate samples
+  Allow three posterior weight modes:
+    1. Uniform
+    2. Only LLH
+    3. LLH & counts
+Should I make Lichee just output a Pairtree file that doesn't have phis?
+
+Replace adjacency matrices with parent vectors throughout code

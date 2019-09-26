@@ -102,12 +102,6 @@ def convert_adj_matrix_to_json_adjlist(adjm):
 
   return adjl
 
-def convert_parents_to_adjmatrix(parents):
-  K = len(parents) + 1
-  adjm = np.eye(K)
-  adjm[parents,np.arange(1, K)] = 1
-  return adjm
-
 def agglo_children_to_adjlist(children, nleaves):
   assert len(children) == nleaves - 1
   adjlist = {}

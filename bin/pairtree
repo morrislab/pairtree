@@ -16,6 +16,7 @@ import tree_sampler
 import clustermaker
 import resultserializer
 import hyperparams
+import util
 
 def _parse_args():
   parser = argparse.ArgumentParser(
@@ -143,7 +144,7 @@ def main():
         parallel,
       )
     else:
-      adjms = [common.convert_parents_to_adjmatrix(struct) for struct in params['structures']]
+      adjms = [util.convert_parents_to_adjmatrix(struct) for struct in params['structures']]
       adjm, phi, llh = tree_sampler.use_existing_structures(
         adjms,
         supervars,

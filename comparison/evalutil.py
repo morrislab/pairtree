@@ -10,7 +10,7 @@ from common import Models
 
 np.seterr(divide='raise', invalid='raise')
 
-def _fix_rounding_errors(mat):
+def fix_rounding_errors(mat):
   # Floating point error means that some entires can slightly exceed 1, even if
   # constituents of average obey the constraint `0 <= entry <= 1`. Ensure this
   # doesn't happen by much.
@@ -96,17 +96,32 @@ def _distinguish_unique_trees(adjms, logweights, clusterings):
     np.array(counts),
   )
 
-def _make_logweights(llhs, tree_weights):
-  if tree_weights == 'llh':
+def make_logweights(llhs, weight_type):
+  if weight_type == 'llh':
     return np.copy(llhs)
-  elif tree_weights == 'uniform':
+  elif weight_type == 'uniform':
     return np.zeros(len(llhs))
   else:
-    raise Exception('Unknown tree_weights=%s' % tree_weights)
+    raise Exception('Unknown weight_type=%s' % weight_type)
 
-def calc_mutrel_from_trees(adjms, llhs, clusterings, tree_weights):
-  logweights = _make_logweights(llhs, tree_weights)
+def make_mutrel_from_trees_and_unique_clusterings(adjms, llhs, clusterings, weight_type):
+  '''
+  Relative to `make_mutrel_from_trees_and_single_clustering`, this function is
+  slower and more memory intensive, but also more flexible. It differs in three
+  respects:
+
+  1. It doesn't assume that the user has already computed counts for all unique
+  samples -- i.e., it allows duplicate samples and performs the counting
+  itself.
+
+  2. It allows unique clusterings for every sample.
+
+  3. It works on parent vectors rather than adjacency matrices.
+  '''
+  assert len(adjms) == len(llhs) == len(clusterings)
+  logweights = make_logweights(llhs, weight_type)
   uniq_adjms, uniq_clusterings, uniq_logweights, counts = _distinguish_unique_trees(adjms, logweights, clusterings)
+
   # Oftentimes, we will have many samples of the same adjacency matrix paired
   # with the same clustering. This will produce the same mutrel. As computing
   # the mutrel from adjm + clustering is expensive, we want to avoid repeating
@@ -124,7 +139,7 @@ def calc_mutrel_from_trees(adjms, llhs, clusterings, tree_weights):
 
   vids = None
   for adjm, clustering, weight in zip(uniq_adjms, uniq_clusterings, weights):
-    mrel = make_mutrel_tensor_from_cluster_adj(adjm, clustering)
+    mrel = make_mutrel_from_cluster_adj(adjm, clustering)
     if vids is None:
       vids = mrel.vids
       soft_mutrel = np.zeros(mrel.rels.shape)
@@ -132,11 +147,31 @@ def calc_mutrel_from_trees(adjms, llhs, clusterings, tree_weights):
       assert mrel.vids == vids
     soft_mutrel += weight * mrel.rels
 
-  soft_mutrel = _fix_rounding_errors(soft_mutrel)
+  soft_mutrel = fix_rounding_errors(soft_mutrel)
   return mutrel.Mutrel(
     vids = vids,
     rels = soft_mutrel,
   )
+
+def make_mutrel_from_trees_and_single_clustering(structs, llhs, counts, clustering):
+  weights = util.softmax(llhs + np.log(counts))
+  vids = None
+
+  for struct, weight in zip(structs, weights):
+    adjm = util.convert_parents_to_adjmatrix(struct)
+    crel = make_clustrel_from_cluster_adj(adjm)
+
+    if vids is None:
+      vids = crel.vids
+      soft_clustrel = np.zeros(crel.rels.shape)
+    else:
+      assert crel.vids == vids
+    soft_clustrel += weight * crel.rels
+
+  soft_clustrel = fix_rounding_errors(soft_clustrel)
+  clustrel = mutrel.Mutrel(rels=soft_clustrel, vids=vids)
+  mrel = make_mutrel_from_clustrel(clustrel, clustering)
+  return mrel
 
 def make_membership_mat(clusters):
   vids = common.sort_vids([vid for C in clusters for vid in C])
@@ -151,7 +186,7 @@ def make_membership_mat(clusters):
     membership[members,cidx] = 1
   return (vids, membership)
 
-def make_mutrel_tensor_from_cluster_adj(cluster_adj, clusters):
+def make_mutrel_from_cluster_adj(cluster_adj, clusters):
   '''
   * `M` = # of mutations
   * `K` = # of clusters
@@ -164,34 +199,61 @@ def make_mutrel_tensor_from_cluster_adj(cluster_adj, clusters):
   Returns:
   an `MxMx5` binary mutation relation tensor
   '''
-  K = len(clusters)
-  M = sum([len(clus) for clus in clusters])
+  clustrel = make_clustrel_from_cluster_adj(cluster_adj)
+  mutrel = make_mutrel_from_clustrel(clustrel, clusters)
+  return mutrel
+
+def make_clustrel_from_cluster_adj(cluster_adj):
+  '''
+  * `K` = # of clusters (including empty first cluster)
+
+  Arguments:
+  `cluster_adj`: a `KxK` adjacency matrix, where `cluster_adj[a,b] = 1` iff
+  `a = b` or `b` is a child of `a`
+
+  Returns:
+  a `KxKx5` binary mutation relation tensor
+  '''
+  K = len(cluster_adj)
   assert cluster_adj.shape == (K, K)
-
-  vids = common.sort_vids([vid for cluster in clusters for vid in cluster])
-  vidmap = {vid: vidx for vidx, vid in enumerate(vids)}
-  clusters = [[vidmap[vid] for vid in cluster] for cluster in clusters]
-
   cluster_anc = common.make_ancestral_from_adj(cluster_adj)
-  # In determining A_B relations, don't want to set mutaitons (i,j), where i
+  # In determining A_B relations, don't want to set mutations (i,j), where i
   # and j are in same cluster, to 1.
+  assert np.all(1 == cluster_anc[0])
   np.fill_diagonal(cluster_anc, 0)
-  mrel = np.zeros((M, M, len(Models._all)))
 
-  for k in range(K):
-    self_muts = np.array(clusters[k])
-    desc_clusters = np.flatnonzero(cluster_anc[k])
-    desc_muts = np.array([vidx for cidx in desc_clusters for vidx in clusters[cidx]])
+  clustrel = np.zeros((K, K, len(Models._all)))
+  clustrel[:,:,Models.cocluster] = np.eye(K)
+  clustrel[:,:,Models.A_B] = cluster_anc
+  clustrel[:,:,Models.B_A] = clustrel[:,:,Models.A_B].T
 
-    if len(self_muts) > 0:
-      mrel[self_muts[:,None,None], self_muts[None,:,None], Models.cocluster] = 1
-    if len(self_muts) > 0 and len(desc_muts) > 0:
-      mrel[self_muts[:,None,None], desc_muts[None,:,None], Models.A_B] = 1
-
-  mrel[:,:,Models.B_A] = mrel[:,:,Models.A_B].T
   existing = (Models.cocluster, Models.A_B, Models.B_A)
-  already_filled = np.sum(mrel[:,:,existing], axis=2)
-  mrel[already_filled == 0,Models.diff_branches] = 1
-  assert np.array_equal(np.ones((M,M)), np.sum(mrel, axis=2))
+  already_filled = np.sum(clustrel[:,:,existing], axis=2)
+  clustrel[already_filled == 0, Models.diff_branches] = 1
 
-  return Mutrel(vids=vids, rels=mrel)
+  assert np.array_equal(np.ones((K,K)), np.sum(clustrel, axis=2))
+  vids = ['S%s' % idx for idx in range(K - 1)]
+  clustrel = mutrel.Mutrel(vids=vids, rels=clustrel[1:,1:])
+  mutrel.check_posterior_sanity(clustrel.rels)
+  return clustrel
+
+def make_mutrel_from_clustrel(clustrel, clusters):
+  mutrel.check_posterior_sanity(clustrel.rels)
+  assert len(clusters[0]) == 0
+  vids, membership = make_membership_mat(clusters[1:])
+  # K: number of non-empty clusters
+  M, K = membership.shape
+
+  num_models = len(Models._all)
+  mrel = np.zeros((M, M, num_models))
+  assert clustrel.rels.shape == (K, K, num_models)
+
+  for modelidx in range(num_models):
+    mut_vs_cluster = np.dot(membership, clustrel.rels[:,:,modelidx]) # MxK
+    mrel[:,:,modelidx] = np.dot(mut_vs_cluster, membership.T)
+  mutrel.check_posterior_sanity(mrel)
+
+  return mutrel.Mutrel(
+    vids = vids,
+    rels = mrel,
+  )

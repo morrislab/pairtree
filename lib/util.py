@@ -55,3 +55,9 @@ def find_parents(adj):
   np.fill_diagonal(adj, 0)
   assert np.all(np.sum(adj[:,1:], axis=0) == 1)
   return np.argmax(adj[:,1:], axis=0)
+
+def convert_parents_to_adjmatrix(parents):
+  K = len(parents) + 1
+  adjm = np.eye(K)
+  adjm[parents,np.arange(1, K)] = 1
+  return adjm
