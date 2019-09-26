@@ -577,12 +577,11 @@ def _run_chain(data_logmutrel, supervars, superclusters, nsamples, thinned_frac,
   else:
     accept_rate = 1.
   assert len(samps) == expected_total_trees
-  # TODO: only print this if `--verbose` is set.
-  print('accept_rate=%s' % accept_rate, 'total_trees=%s' % len(samps))
   return (
     [S.adj     for S in samps],
     [S.phi     for S in samps],
     [S.llh_phi for S in samps],
+    accept_rate,
   )
 
 def use_existing_structures(adjms, supervars, superclusters, phi_method, phi_iterations, parallel=0):
@@ -644,11 +643,44 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin,
   merged_adj = []
   merged_phi = []
   merged_llh = []
-  for A, P, L in results:
+  accept_rates = []
+  for A, P, L, accept_rate in results:
     assert len(A) == len(P) == len(L) == len(results[0][0])
     discard_first = round(burnin * len(A))
     merged_adj += A[discard_first:]
     merged_phi += P[discard_first:]
     merged_llh += L[discard_first:]
+    accept_rates.append(accept_rate)
   assert len(merged_adj) == len(merged_phi) == len(merged_llh)
-  return (merged_adj, merged_phi, merged_llh)
+  return (merged_adj, merged_phi, merged_llh, accept_rates)
+
+def compute_posterior(adjms, phis, llhs):
+  unique = {}
+
+  for A, P, L in zip(adjms, phis, llhs):
+    parents = util.find_parents(A)
+    H = hash(parents.tobytes())
+    if H in unique:
+      assert np.isclose(L, unique[H]['llh'])
+      assert np.allclose(P, unique[H]['phi'])
+      assert np.array_equal(parents, unique[H]['struct'])
+      unique[H]['count'] += 1
+    else:
+      unique[H] = {
+        'struct': parents,
+        'phi': P,
+        'llh': L,
+        'count': 1,
+      }
+
+  unique = sorted(unique.values(), key = lambda T: -(np.log(T['count']) + T['llh']))
+  unzipped = {key: np.array([U[key] for U in unique]) for key in unique[0].keys()}
+  unzipped['prob'] = util.softmax(np.log(unzipped['count']) + unzipped['llh'])
+
+  return (
+    unzipped['struct'],
+    unzipped['count'],
+    unzipped['phi'],
+    unzipped['llh'],
+    unzipped['prob'],
+  )

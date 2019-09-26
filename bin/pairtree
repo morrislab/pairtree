@@ -127,9 +127,9 @@ def main():
   # Add empty initial cluster, which serves as tree root.
   superclusters.insert(0, [])
 
-  if 'adjm' not in results:
+  if 'struct' not in results:
     if 'structures' not in params:
-      results['adjm'], results['phi'], results['llh'] = tree_sampler.sample_trees(
+      adjm, phi, llh, results['accept_rate'] = tree_sampler.sample_trees(
         results['clustrel_posterior'],
         supervars,
         superclusters,
@@ -142,10 +142,9 @@ def main():
         seed,
         parallel,
       )
-      resultserializer.save(results, args.results_fn)
     else:
       adjms = [common.convert_parents_to_adjmatrix(struct) for struct in params['structures']]
-      results['adjm'], results['phi'], results['llh'] = tree_sampler.use_existing_structures(
+      adjm, phi, llh = tree_sampler.use_existing_structures(
         adjms,
         supervars,
         superclusters,
@@ -153,7 +152,9 @@ def main():
         args.phi_iterations,
         parallel
       )
-      resultserializer.save(results, args.results_fn)
+
+    results['struct'], results['count'], results['phi'], results['llh'], results['prob'] = tree_sampler.compute_posterior(adjm, phi, llh)
+    resultserializer.save(results, args.results_fn)
 
 if __name__ == '__main__':
   main()
