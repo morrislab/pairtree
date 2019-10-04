@@ -342,9 +342,11 @@ def main():
       results.loc[present,M] -= results.loc[present,args.baseline]
 
   if args.score_type == 'mutrel':
-    set_missing_to(results, methods, 1)
     for M in methods:
-      results[M] *= 100
+      present = results[M] != MISSING
+      results.loc[present,M] *= 100
+    if args.plot_type == 'violin':
+      set_missing_to(results, methods, 1)
 
   sides = {
     'lte': 'negative',
