@@ -49,3 +49,6 @@ Change format Pairtree writes to disk -- don't write duplicate samples
 Should I make Lichee just output a Pairtree file that doesn't have phis?
 
 Replace adjacency matrices with parent vectors throughout code
+Remove "--use-subset"
+Figure out why creating mutrels for Pairtere takes so much memory
+In reporting nlglh, should I subtract off nlglh of the MLE phis?

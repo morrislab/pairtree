@@ -5,7 +5,6 @@ import numpy as np
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
-import util
 import inputparser
 
 def main():
@@ -21,9 +20,9 @@ def main():
   pairtree_results = np.load(args.pairtree_results_fn)
   pairtree_results = {K: pairtree_results[K] for K in pairtree_results}
 
-  for adjm, struct in zip(pairtree_results['adjm'], params['structures']):
-    implied_adjm = util.convert_parents_to_adjmatrix(struct)
-    assert np.array_equal(implied_adjm, adjm)
+  assert len(pairtree_results['struct']) == len(params['structures'])
+  for struct1, struct2 in zip(pairtree_results['struct'], params['structures']):
+    assert np.array_equal(np.array(struct1), np.array(struct2))
 
   pairtree_results['llh'] = -1*np.array(params['scores'])
   np.savez_compressed(args.pairtree_results_fn, **pairtree_results)

@@ -6,13 +6,13 @@ SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 LICHEE_DIR=$HOME/.apps/lichee/LICHeE/release
 NUM_TREES=3000
 
-BATCH=sims.lichee.testlol
+BATCH=sims.lichee
 PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
 #BATCH=steph.xeno.lichee
 #PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 
 INDIR=$BASEDIR/scratch/inputs/$BATCH
-OUTDIR=$BASEDIR/scratch/results/$BATCH
+OUTBASE=$BASEDIR/scratch/results/$BATCH
 
 export OMP_NUM_THREADS=1
 
@@ -30,60 +30,52 @@ function convert_inputs {
 }
 
 function run_lichee {
-  mkdir -p $OUTDIR
-  cd $OUTDIR
+  mkdir -p $OUTBASE
+  cd $OUTBASE
 
   for snvfn in $INDIR/*.snv; do
     runid=$(basename $snvfn | cut -d. -f1)
+    outd="$OUTBASE/$runid"
 
     echo "(command -v java > /dev/null || module load java) && " \
-      "cd $OUTDIR &&" \
+      "mkdir -p $outd && cd $outd &&" \
       "TIMEFORMAT='%R %U %S'; time (java -jar $LICHEE_DIR/lichee.jar" \
       "-build" \
       "-i $INDIR/$runid.snv" \
-      "-o $OUTDIR/$runid.trees" \
+      "-o $outd/$runid.trees" \
       "-clustersFile $INDIR/$runid.cluster" \
       "-maxVAFAbsent 0.005" \
       "-minVAFPresent 0.005" \
       "-n 0" \
       "-s $NUM_TREES" \
-      ">  $OUTDIR/$runid.stdout" \
-      "2> $OUTDIR/$runid.stderr) 2>$runid.time"
+      ">  $outd/$runid.stdout" \
+      "2> $outd/$runid.stderr) 2>$outd/$runid.time"
   done
 }
 
 function convert_outputs {
-  cd $OUTDIR
-  for treesfn in $OUTDIR/*.trees; do
+  cd $OUTBASE
+  for treesfn in $OUTBASE/*/*.trees; do
     runid=$(basename $treesfn | cut -d. -f1)
-    for weight_trees_by in llh; do
-      cmd="python3 $SCRIPTDIR/convert_outputs.py "
-      cmd+="--weight-trees-by $weight_trees_by "
-      cmd+="--mutrel $OUTDIR/$runid.$weight_trees_by.mutrel.npz "
-      cmd+="$INDIR/$runid.snv "
-      cmd+="$OUTDIR/$runid.trees "
-      cmd+="$PAIRTREE_INPUTS_DIR/$runid.params.json "
-
-      # Only output mutrels for `K <= 10`.
-      if ! [[ $runid =~ K30 || $runid =~ K100 ]]; then
-        echo $cmd
-      fi
-    done
+    outd=$(dirname $treesfn)
 
     cmd="python3 $SCRIPTDIR/convert_outputs.py "
-    cmd+="--structures $OUTDIR/$runid.params.json "
+    cmd+="--mutrel $outd/$runid.mutrel.npz "
+    cmd+="--structures $outd/$runid.params.json "
     cmd+="$INDIR/$runid.snv "
-    cmd+="$OUTDIR/$runid.trees "
+    cmd+="$outd/$runid.trees "
     cmd+="$PAIRTREE_INPUTS_DIR/$runid.params.json "
+
     echo $cmd
   done
 }
 
 function compute_phis {
-  cd $OUTDIR
-  for structfn in $OUTDIR/*.params.json; do
+  cd $OUTBASE
+  for structfn in $OUTBASE/*/*.params.json; do
     runid=$(basename $structfn | cut -d. -f1)
-    resultsfn=$OUTDIR/$runid.results.npz
+    outd=$(dirname $structfn)
+    resultsfn=$outd/$runid.results.npz
 
     cmd="python3 $BASEDIR/bin/pairtree "
     cmd+="--seed 1 "
@@ -102,37 +94,34 @@ function compute_phis {
 }
 
 function compute_mutphis {
-  cd $OUTDIR
+  cd $OUTBASE
 
-  for resultsfn in $OUTDIR/*.results.npz; do
+  for resultsfn in $OUTBASE/*/*.results.npz; do
     runid=$(basename $resultsfn | cut -d. -f1)
+    outd=$(dirname $resultsfn)
     ssmfn=${PAIRTREE_INPUTS_DIR}/${runid}.ssm 
+    mutphifn=$outd/$runid.mutphi.npz
 
-    for weight_trees_by in llh; do
-      mutphifn=$OUTDIR/$runid.$weight_trees_by.mutphi.npz
+    cmd="python3 $BASEDIR/comparison/pairtree/make_mutphis.py "
+    cmd+="$resultsfn "
+    cmd+="$ssmfn "
+    cmd+="$mutphifn "
 
-      cmd="python3 $BASEDIR/comparison/pairtree/make_mutphis.py "
-      cmd+="--weight-trees-by $weight_trees_by "
-      cmd+="--ssms $ssmfn "
-      cmd+="$resultsfn "
-      cmd+="$mutphifn "
+    cmd+="&& python3 $BASEDIR/comparison/impute_missing_mutphis.py "
+    cmd+="$ssmfn "
+    cmd+="$PAIRTREE_INPUTS_DIR/${runid}.params.json "
+    cmd+="$mutphifn "
 
-      cmd+="&& python3 $BASEDIR/comparison/impute_missing_mutphis.py "
-      cmd+="$ssmfn "
-      cmd+="$PAIRTREE_INPUTS_DIR/${runid}.params.json "
-      cmd+="$mutphifn "
-
-      echo $cmd
-    done
+    echo $cmd
   done
 }
 
 function main {
   #convert_inputs
   #run_lichee
-  convert_outputs | parallel -j40 --halt 1 --eta
+  convert_outputs | sort --random-sort | parallel -j8 --halt 1 --eta
   compute_phis | parallel -j40 --halt 1 --eta
-  compute_mutphis | parallel -j40 --halt 1 --eta
+  compute_mutphis | parallel -j80 --halt 1 --eta
 }
 
 main

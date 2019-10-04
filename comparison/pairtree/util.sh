@@ -1,5 +1,5 @@
 function is_run_complete {
-  if ([[ -f $1 ]] && unzip -l $1 | grep "adjm.npy" > /dev/null); then
+  if ([[ -f $1 ]] && unzip -l $1 | grep "struct.npy" > /dev/null); then
     return 0
   else
     return 1

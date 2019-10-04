@@ -586,10 +586,12 @@ def _run_chain(data_logmutrel, supervars, superclusters, nsamples, thinned_frac,
 
 def use_existing_structures(adjms, supervars, superclusters, phi_method, phi_iterations, parallel=0):
   V, N, omega_v = calc_binom_params(supervars)
+  K = len(supervars)
   phis = []
   llhs = []
 
   for adjm in adjms:
+    assert adjm.shape == (K+1, K+1)
     phi, eta = phi_fitter.fit_phis(adjm, superclusters, supervars, method=phi_method, iterations=phi_iterations, parallel=parallel)
     llh = _calc_llh_phi(phi, V, N, omega_v)
     phis.append(phi)
@@ -654,7 +656,7 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin,
   assert len(merged_adj) == len(merged_phi) == len(merged_llh)
   return (merged_adj, merged_phi, merged_llh, accept_rates)
 
-def compute_posterior(adjms, phis, llhs):
+def compute_posterior(adjms, phis, llhs, sort_by_llh=True):
   unique = {}
 
   for A, P, L in zip(adjms, phis, llhs):
@@ -673,7 +675,10 @@ def compute_posterior(adjms, phis, llhs):
         'count': 1,
       }
 
-  unique = sorted(unique.values(), key = lambda T: -(np.log(T['count']) + T['llh']))
+  if sort_by_llh:
+    unique = sorted(unique.values(), key = lambda T: -(np.log(T['count']) + T['llh']))
+  else:
+    unique = list(unique.values())
   unzipped = {key: np.array([U[key] for U in unique]) for key in unique[0].keys()}
   unzipped['prob'] = util.softmax(np.log(unzipped['count']) + unzipped['llh'])
 

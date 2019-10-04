@@ -21,9 +21,15 @@ def main():
     simdata = pickle.load(dataf)
   clusters = [[]] + simdata['clusters']
 
-  llh = 0
-  weight_trees_by = 'uniform'
-  mphi = mutphi.calc_mutphi([simdata['phi']], [llh], [clusters], weight_trees_by, args.ssm_fn)
+  llhs = [0]
+  counts = [1]
+  mphi = mutphi.calc_mutphi(
+    [simdata['phi']],
+    llhs,
+    [clusters],
+    args.ssm_fn,
+    counts,
+  )
   mutphi.write_mutphi(mphi, args.mutphi_fn)
 
 if __name__ == '__main__':

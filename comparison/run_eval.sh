@@ -5,7 +5,7 @@ SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 BASEDIR=~/work/pairtree
 RESULTSDIR=$BASEDIR/scratch/results
 SCORESDIR=$BASEDIR/scratch/scores
-PARALLEL=40
+PARALLEL=80
 
 function para {
   parallel -j$PARALLEL --halt 1
@@ -17,12 +17,9 @@ function make_sims_truth {
   for datafn in $PAIRTREE_INPUTS_DIR/*.data.pickle; do
     runid=$(basename $datafn | cut -d. -f1)
 
-    cmd="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_truth_mutrel.py "
-    if [[ $BATCH == "sims" && !($runid =~ K30 || $runid =~ K100) ]]; then
-      cmd+="--enumerate-trees "
-    fi
+    cmd="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/enum_true_trees.py "
     cmd+="$datafn "
-    cmd+="$TRUTH_DIR/$runid.mutrel.npz"
+    cmd+="$TRUTH_DIR/$runid.results.npz "
     echo $cmd
 
     cmd="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_truth_mutphi.py "
@@ -30,7 +27,16 @@ function make_sims_truth {
     cmd+="$PAIRTREE_INPUTS_DIR/$runid.ssm "
     cmd+="$TRUTH_DIR/$runid.mutphi.npz"
     echo $cmd
-  done
+  done | parallel -j80 --halt 1 --eta
+
+  for resultsfn in $TRUTH_DIR/*.results.npz; do
+    runid=$(basename $resultsfn | cut -d. -f1)
+
+    cmd="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/pairtree/make_mutrels.py "
+    cmd+="--trees-mutrel $TRUTH_DIR/$runid.mutrel.npz "
+    cmd+="$TRUTH_DIR/$runid.results.npz "
+    echo $cmd
+  done | parallel -j10 --halt 1 --eta
 }
 
 function make_mle_mutphis {
@@ -59,31 +65,32 @@ function make_results_paths {
     truth_path="${BATCH}.pairtree.hbstruct/${runid}.pairtree_trees.all.llh.${result_type}.npz"
     paths+="truth=$truth_path "
     paths+="pairtree_multi=${BATCH}.pairtree.multichain/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
-    paths+="pairtree_single=${BATCH}.pairtree.singlechain/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
-    paths+="pwgs_allvars=${BATCH}.pwgs.allvars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
-    paths+="pplus_allvars=${BATCH}.pwgs.allvars/$runid/$runid.pwgs_trees_multi_llh.$result_type.npz "
+    #paths+="pairtree_single=${BATCH}.pairtree.singlechain/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
+    #paths+="pwgs_allvars=${BATCH}.pwgs.allvars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
+    #paths+="pplus_allvars=${BATCH}.pwgs.allvars/$runid/$runid.pwgs_trees_multi_llh.$result_type.npz "
     paths+="pwgs_supervars=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
-    paths+="pplus_supervars=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_llh.$result_type.npz "
+    #paths+="pplus_supervars=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_llh.$result_type.npz "
     paths+="lichee=${BATCH}.xeno.lichee/$runid.llh.$result_type.npz "
-    if [[ $result_type == mutrel ]]; then
-      paths+="pairtree_tensor=${BATCH}.pairtree.onlytensor/${runid}/${runid}.pairtree_clustrel.mutrel.npz "
-    fi
+    #if [[ $result_type == mutrel ]]; then
+    #  paths+="pairtree_tensor=${BATCH}.pairtree.onlytensor/${runid}/${runid}.pairtree_clustrel.mutrel.npz "
+    #fi
   elif [[ $BATCH == sims ]]; then
     paths+="truth=${TRUTH_DIR}/$runid.$result_type.npz "
-    paths+="pwgs_supervars=sims.pwgs.supervars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
+    paths+="pwgs_supervars=sims.pwgs.supervars/$runid/$runid.pwgs_trees_single.$result_type.npz "
     paths+="pastri=${BATCH}.pastri.informative/$runid/$runid.pastri_trees_llh.$result_type.npz "
-    for foo in $(seq 29 51); do
-      paths+="pairtree_lol${foo}=sims.pairtree.lol${foo}/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
-    done
+    #for foo in $(seq 69 77); do
+    #  paths+="pairtree_lol${foo}=sims.pairtree.lol${foo}/${runid}/${runid}.trees_${result_type}.npz "
+    #done
     #paths+="pairtree_single=sims.pairtree.singlechain/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
-    #paths+="pairtree_multi=sims.pairtree.multichain/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
-    #paths+="pairtree_quad=sims.pairtree.quadchain/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
-    paths+="pairtree_single_old=sims.pairtree.projection.singlechain.old_proposals/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
-    paths+="pairtree_multi_old=sims.pairtree.projection.multichain.old_proposals/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
-    paths+="lichee=sims.lichee/$runid.llh.$result_type.npz "
     #if [[ $result_type == mutrel ]]; then
-    #  paths+="pairtree_tensor=sims.pairtree.onlytensor/${runid}/$runid.pairtree_clustrel.$result_type.npz "
+    #  paths+="pairtree_clustrel=sims.pairtree.multichain/${runid}/${runid}.clustrel_${result_type}.npz "
     #fi
+    paths+="pairtree_multi=sims.pairtree.multichain/${runid}/${runid}.trees_${result_type}.npz "
+    #paths+="pairtree_quad=sims.pairtree.quadchain/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
+    #paths+="pairtree_single_old=sims.pairtree.projection.singlechain.old_proposals/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
+    #paths+="pairtree_multi_old=sims.pairtree.projection.multichain.old_proposals/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
+    paths+="lichee=sims.lichee/$runid/$runid.$result_type.npz "
+    paths+="citup=sims.citup.rawvars.qip/$runid/$runid.$result_type.npz "
   fi
 
   echo $paths
@@ -162,13 +169,14 @@ function eval_runtime {
     for timetype in cpu wall; do
       cmd="python3 $SCRIPTDIR/eval_runtime.py "
       cmd+="--time-type $timetype "
+      cmd+="citup=$RESULTSDIR/sims.citup.rawvars.qip/$runid/$runid.time "
       cmd+="lichee=$RESULTSDIR/sims.lichee/$runid.time "
-      cmd+="pairtree_tensor=$RESULTSDIR/sims.pairtree.onlytensor/$runid/$runid.time "
-      cmd+="pairtree_single=$RESULTSDIR/sims.pairtree.singlechain/$runid/$runid.time "
+      #cmd+="pairtree_tensor=$RESULTSDIR/sims.pairtree.onlytensor/$runid/$runid.time "
+      #cmd+="pairtree_single=$RESULTSDIR/sims.pairtree.singlechain/$runid/$runid.time "
       cmd+="pairtree_multi=$RESULTSDIR/sims.pairtree.multichain/$runid/$runid.time "
-      cmd+="pairtree_quad=$RESULTSDIR/sims.pairtree.quadchain/$runid/$runid.time "
-      cmd+="pairtree_single_old=$RESULTSDIR/sims.pairtree.projection.singlechain.old_proposals/$runid/$runid.time "
-      cmd+="pairtree_multi_old=$RESULTSDIR/sims.pairtree.projection.multichain.old_proposals/$runid/$runid.time "
+      #cmd+="pairtree_quad=$RESULTSDIR/sims.pairtree.quadchain/$runid/$runid.time "
+      #cmd+="pairtree_single_old=$RESULTSDIR/sims.pairtree.projection.singlechain.old_proposals/$runid/$runid.time "
+      #cmd+="pairtree_multi_old=$RESULTSDIR/sims.pairtree.projection.multichain.old_proposals/$runid/$runid.time "
       cmd+="pastri=$RESULTSDIR/sims.pastri.informative/$runid/$runid.time "
       cmd+="pwgs_supervars=$RESULTSDIR/sims.pwgs.supervars/$runid/$runid.time "
       cmd+="> $SCORESDIR/$BATCH/$runid.${timetype}time.txt "
@@ -246,6 +254,8 @@ function plot_individual {
   fi
   if [[ $ptype == "mutrel" ]]; then
     cmd+="--bandwidth 1 "
+  elif [[ $ptype == "mutphi" ]]; then
+    cmd+="--bandwidth 0.13 "
   elif [[ $ptype =~ time$ ]]; then
     cmd+="--bandwidth 0.07 "
   fi
@@ -264,21 +274,20 @@ function plot_individual {
 }
 
 function plot_results_sims {
-  #make_sims_truth
-  #make_mle_mutphis
+  #eval_mutrels | parallel -j2 --halt 1 --eta
+  eval_mutphis | para
 
-  (eval_mutrels; eval_mutphis) | para
-  compile_scores mutrel
-  compile_scores mutphi
-  partition_by_K mutrel
-  partition_by_K mutphi
+  #for type in mutrel mutphi; do
+  #  compile_scores $type
+  #  partition_by_K $type
+  #done
 
-  # Don't plot mutrel for bigK, since these results don't exist.
   (
     basefn="$SCORESDIR/$BATCH"
-    plot_individual mutrel violin $basefn.mutrel.smallK.{txt,html}
-    plot_individual mutphi box $basefn.mutphi.smallK.{txt,html}
-    plot_individual mutphi box $basefn.mutphi.bigK.{txt,html}
+    for ksize in smallK bigK; do
+      plot_individual mutrel box $basefn.mutrel.$ksize.{txt,html}
+      plot_individual mutphi box    $basefn.mutphi.$ksize.{txt,html}
+    done
   ) | para
 }
 
@@ -311,9 +320,9 @@ function plot_runtime {
   remove_missing
   partition_by_K cputime
   partition_by_K walltime
-  for ktype in bigK smallK; do
+  for ksize in bigK smallK; do
     for ttype in cputime walltime; do
-      basefn="$SCORESDIR/$BATCH.$ttype.$ktype"
+      basefn="$SCORESDIR/$BATCH.$ttype.$ksize"
       plot_individual $ttype violin $basefn.{txt,html}
     done
   done | para
@@ -324,6 +333,8 @@ function main {
   export PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
   export TRUTH_DIR=$RESULTSDIR/sims.truth
   export MLE_MUTPHIS_DIR=$RESULTSDIR/${BATCH}.mle_unconstrained
+  #make_sims_truth
+  #make_mle_mutphis
   plot_results_sims
   #plot_runtime
 

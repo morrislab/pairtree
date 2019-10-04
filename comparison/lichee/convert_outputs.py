@@ -3,20 +3,21 @@ import sys
 import os
 import argparse
 import json
+import numpy as np
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import common
 import inputparser
 import evalutil
+import util
 
-def write_mutrels(adjls, scores, clusters, lichee_garbage, true_garbage, weight_trees_by, mutrel_fn):
+def write_mutrels(structs, scores, clusters, lichee_garbage, true_garbage, mutrel_fn):
+  assert len(structs) == len(scores)
   clusters = [[]] + list(clusters)
-  clusterings = [clusters for _ in range(len(adjls))]
-  assert len(clusterings) == len(adjls) == len(scores)
-  adjms = [common.convert_adjlist_to_adjmatrix(adjl) for adjl in adjls]
+  counts = np.ones(len(structs))
 
-  mrel = evalutil.calc_mutrel_from_trees(adjms, scores, clusterings, weight_trees_by)
+  mrel = evalutil.make_mutrel_from_trees_and_single_clustering(structs, scores, counts, clusters)
   mrel = evalutil.add_garbage(mrel, lichee_garbage)
   mrel = evalutil.add_garbage(mrel, true_garbage)
   evalutil.save_sorted_mutrel(mrel, mutrel_fn)
@@ -119,11 +120,11 @@ def find_garbage(lichee_clusters, true_clusters):
   garbage = true_clustered - lichee_clustered
   return common.sort_vids(garbage)
 
-def write_params(clusters, garbage, adjls, sampnames, scores, params_fn):
+def write_params(clusters, garbage, structs, sampnames, scores, params_fn):
   params = {
     'clusters': clusters,
     'garbage': garbage,
-    'structures': adjls,
+    'structures': [S.tolist() for S in structs],
     'scores': scores,
     'samples': sampnames,
   }
@@ -146,7 +147,6 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('--weight-trees-by', choices=('llh', 'uniform'), default='uniform')
   parser.add_argument('--mutrel', dest='mutrel_fn')
   parser.add_argument('--structures', dest='struct_fn')
   parser.add_argument('lichee_snv_fn')
@@ -156,18 +156,19 @@ def main():
 
   snv_indices = parse_snv_indices(args.lichee_snv_fn)
   clusters, adjls, scores = load_results(args.trees_fn, snv_indices)
+  structs = [util.find_parents(common.convert_adjlist_to_adjmatrix(adjl)) for adjl in adjls]
   params = inputparser.load_params(args.pairtree_params_fn)
   true_clusters = params['clusters']
   true_garbage = params['garbage']
   lichee_garbage = find_garbage(clusters, true_clusters)
 
   if args.mutrel_fn is not None:
-    write_mutrels(adjls, scores, clusters, lichee_garbage, true_garbage, args.weight_trees_by, args.mutrel_fn)
+    write_mutrels(structs, scores, clusters, lichee_garbage, true_garbage, args.mutrel_fn)
   if args.struct_fn is not None:
     write_params(
       clusters,
       true_garbage + lichee_garbage,
-      adjls,
+      structs,
       params['samples'],
       scores,
       args.struct_fn,

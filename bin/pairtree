@@ -154,7 +154,7 @@ def main():
         parallel
       )
 
-    results['struct'], results['count'], results['phi'], results['llh'], results['prob'] = tree_sampler.compute_posterior(adjm, phi, llh)
+    results['struct'], results['count'], results['phi'], results['llh'], results['prob'] = tree_sampler.compute_posterior(adjm, phi, llh, False)
     resultserializer.save(results, args.results_fn)
 
 if __name__ == '__main__':

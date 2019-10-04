@@ -5,7 +5,7 @@ import numpy as np
 
 sys.path += [
   os.path.join(os.path.dirname(__file__), '..'),
-  os.path.join(os.path.dirname(__file__), '..', '..'),
+  os.path.join(os.path.dirname(__file__), '..', '..', 'lib'),
   os.path.expanduser('~/.apps/phylowgs')
 ]
 from pwgsresults.result_loader import ResultLoader
@@ -55,7 +55,6 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('--weight-trees-by', choices=('llh', 'uniform'), default='uniform')
   parser.add_argument('--trees-mutrel')
   parser.add_argument('--use-supervars', action='store_true')
   parser.add_argument('--phi', dest='mutphifn')
@@ -82,13 +81,13 @@ def main():
   adjms, llhs, phis, clusterings = convert_results(results, base_clusters, args.use_supervars)
 
   if args.trees_mutrel is not None:
-    mrel = evalutil.calc_mutrel_from_trees(adjms, llhs, clusterings, args.weight_trees_by)
+    mrel = evalutil.make_mutrel_from_trees_and_unique_clusterings(adjms, llhs, clusterings)
     if args.use_supervars:
       mrel = evalutil.add_garbage(mrel, params['garbage'])
     evalutil.save_sorted_mutrel(mrel, args.trees_mutrel)
 
   if args.mutphifn is not None:
-    mphi = mutphi.calc_mutphi(phis, llhs, clusterings, args.weight_trees_by, args.pairtree_ssm_fn)
+    mphi = mutphi.calc_mutphi(phis, llhs, clusterings, args.pairtree_ssm_fn)
     mutphi.write_mutphi(mphi, args.mutphifn)
 
 if __name__ == '__main__':

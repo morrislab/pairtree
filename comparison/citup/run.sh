@@ -10,10 +10,10 @@ CITUP_MODE=qip
 USE_SUPERVARS=false
 PARALLEL=40
 
-BATCH=sims.citup
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
-#BATCH=steph.xeno.citup
-#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+#BATCH=sims.citup
+#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+BATCH=steph.xeno.citup
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 
 if [[ "$USE_SUPERVARS" == "true" ]]; then
   suffix="supervars"
@@ -43,11 +43,15 @@ function convert_inputs {
 }
 
 function run_citup {
-  for snvfn in $INDIR/*.snv; do
-    runid=$(basename $snvfn | cut -d. -f1)
+  #for snvfn in $INDIR/*.snv; do
+  for runid in SJBALL022610 SJBALL031 SJETV047 SJETV010nohypermut SJBALL022614 SJMLL026 SJBALL022611 SJERG009 SJETV010 SJETV043 SJBALL022613 SJMLL039 SJBALL022612 SJBALL036 SJBALL022609 SJBALL022610steph SJETV010stephR1 SJETV010stephR1R2 SJETV010stephR2; do
+    snvfn=$INDIR/$runid.snv
+    [[ -f $snvfn ]] || continue
+    #runid=$(basename $snvfn | cut -d. -f1)
     outdir="$OUTDIR/$runid"
     clusterfn="$INDIR/${runid}.cluster"
     let num_clusters=$(cat $clusterfn | sort | uniq | wc -l)+1
+    [[ -f $outdir/${runid}.results.hdf5 ]] && continue
 
     cmd="mkdir -p $outdir && cd $outdir &&"
     cmd+="TIMEFORMAT='%R %U %S'; time ("

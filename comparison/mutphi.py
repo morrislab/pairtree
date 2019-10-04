@@ -27,11 +27,14 @@ def _calc_logprob(mphi, vids, variants, epsilon=1e-5):
   assert np.all(log_px <= 0)
   return log_px
 
-def calc_mutphi(cluster_phis, llhs, clusterings, weight_trees_by, ssmsfn):
-  variants = inputparser.load_ssms(ssmsfn)
-  logweights = evalutil.make_logweights(llhs, weight_trees_by)
-  weights = util.softmax(logweights)
+def calc_mutphi(cluster_phis, llhs, clusterings, ssmsfn, counts=None):
   assert len(cluster_phis) == len(llhs) == len(clusterings)
+  if counts is None:
+    adjms = len(cluster_phis)*[np.array([])]
+    _, cluster_phis, llhs, clusterings, counts = evalutil.distinguish_unique_trees(adjms, cluster_phis, llhs, clusterings)
+
+  variants = inputparser.load_ssms(ssmsfn)
+  weights = util.softmax(llhs + np.log(counts))
 
   vids = None
   # TODO: make assays meaningful, rather than just always setting it to None.

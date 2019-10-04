@@ -49,62 +49,40 @@ def save_sorted_mutrel(mrel, mrelfn):
   mutrel.check_posterior_sanity(mrel.rels)
   np.savez_compressed(mrelfn, rels=mrel.rels, vids=mrel.vids)
 
-def _distinguish_unique_trees(adjms, logweights, clusterings):
-  # Uncomment these two lines to short-circuit the "distinguish unique trees"
-  # behaviour.
-  #M = len(adjms)
-  #return (adjms, clusterings, logweights, np.ones(M))
-  used_logweights = set()
-  uniq_adjms = []
-  uniq_clusterings = []
-  uniq_logweights = []
-  counts = []
+def distinguish_unique_trees(adjms, phis, llhs, clusterings):
+  unique = {}
 
-  for adjm, logweight, clustering in zip(adjms, logweights, clusterings):
-    clustering = tuple((set(C) for C in clustering))
-    for idx in range(len(uniq_adjms)):
-      # Note that having the same clustering and adjm as a previous sample
-      # doesn't imply that the LLH will be close -- PWGS may have assigned
-      # different phis between two such samples, leading to a different LLH.
-      # This wil not, however, be a problem for Pairtree, since it will always
-      # have the same inter-sample LLH in these cases.
-      #
-      # We use `used_logweights` as a cheap O(1) lookup for whether we've
-      # already seen a sampled `(adjm, logweight, clustering)` triplet,
-      # avoiding a quadratic scan through the lists when unnecessary. This
-      # relies on the logweights of equivalent samples being identical rather
-      # than just close, but that's okay -- we expect that two truly identical
-      # samples should have the same LLH, as LLH calculation should be
-      # deterministic.
-      if logweight in used_logweights and \
-      uniq_logweights[idx] == logweight and \
-      uniq_clusterings[idx] == clustering and \
-      np.array_equal(uniq_adjms[idx], adjm):
-        counts[idx] += 1
-        break
+  for adjm, phi, llh, clustering in zip(adjms, phis, llhs, clusterings):
+    hashable_clustering = tuple((frozenset(C) for C in clustering))
+    H = hash((
+      adjm.tobytes(),
+      phi.tobytes(),
+      llh,
+      hashable_clustering,
+    ))
+
+    if H in unique:
+      unique[H]['count'] += 1
     else:
-      uniq_adjms.append(adjm)
-      uniq_clusterings.append(clustering)
-      uniq_logweights.append(logweight)
-      used_logweights.add(logweight)
-      counts.append(1)
+      unique[H] = {
+        'adjm': adjm,
+        'phi': phi,
+        'llh': llh,
+        'clustering': clustering,
+        'count': 1,
+      }
 
+  unique = list(unique.values())
+  unzipped = {key: [U[key] for U in unique] for key in unique[0].keys()}
   return (
-    uniq_adjms,
-    uniq_clusterings,
-    np.array(uniq_logweights),
-    np.array(counts),
+    unzipped['adjm'],
+    unzipped['phi'],
+    unzipped['llh'],
+    unzipped['clustering'],
+    unzipped['count'],
   )
 
-def make_logweights(llhs, weight_type):
-  if weight_type == 'llh':
-    return np.copy(llhs)
-  elif weight_type == 'uniform':
-    return np.zeros(len(llhs))
-  else:
-    raise Exception('Unknown weight_type=%s' % weight_type)
-
-def make_mutrel_from_trees_and_unique_clusterings(adjms, llhs, clusterings, weight_type):
+def make_mutrel_from_trees_and_unique_clusterings(adjms, llhs, clusterings):
   '''
   Relative to `make_mutrel_from_trees_and_single_clustering`, this function is
   slower and more memory intensive, but also more flexible. It differs in three
@@ -119,8 +97,8 @@ def make_mutrel_from_trees_and_unique_clusterings(adjms, llhs, clusterings, weig
   3. It works on parent vectors rather than adjacency matrices.
   '''
   assert len(adjms) == len(llhs) == len(clusterings)
-  logweights = make_logweights(llhs, weight_type)
-  uniq_adjms, uniq_clusterings, uniq_logweights, counts = _distinguish_unique_trees(adjms, logweights, clusterings)
+  phis = len(adjms) * [np.array([])]
+  adjms, _, llhs, clusterings, counts = distinguish_unique_trees(adjms, phis, llhs, clusterings)
 
   # Oftentimes, we will have many samples of the same adjacency matrix paired
   # with the same clustering. This will produce the same mutrel. As computing
@@ -128,17 +106,16 @@ def make_mutrel_from_trees_and_unique_clusterings(adjms, llhs, clusterings, weig
   # this unnecessarily. Instead, we just modify the associated weight of the
   # the pairing to reflect this.
   #
-  # Weights are stored in log space. To get linear-space weights, we take the
-  # softmax of the logweights. Observe that if we have `C` copies of the
-  # logweight `W`, we obtain equivalent post-softmax linear-space weights under
-  # either of the following two methods:
+  # Observe that if we have `C` copies of the LLH `W`, we obtain
+  # equivalent post-softmax linear-space weights under either of the following
+  # two methods:
   #
   # 1. (naive) Represent the associated samples `C` separate times in the softmax
   # 2. (smart) Set `W' = W + log(C)`, as `exp(W') = Cexp(W)`
-  weights = util.softmax(uniq_logweights + np.log(counts))
+  weights = util.softmax(llhs + np.log(counts))
 
   vids = None
-  for adjm, clustering, weight in zip(uniq_adjms, uniq_clusterings, weights):
+  for adjm, clustering, weight in zip(adjms, clusterings, weights):
     mrel = make_mutrel_from_cluster_adj(adjm, clustering)
     if vids is None:
       vids = mrel.vids
@@ -237,7 +214,7 @@ def make_clustrel_from_cluster_adj(cluster_adj):
   mutrel.check_posterior_sanity(clustrel.rels)
   return clustrel
 
-def make_mutrel_from_clustrel(clustrel, clusters):
+def make_mutrel_from_clustrel(clustrel, clusters, check_sanity=True):
   mutrel.check_posterior_sanity(clustrel.rels)
   assert len(clusters[0]) == 0
   vids, membership = make_membership_mat(clusters[1:])
@@ -251,7 +228,11 @@ def make_mutrel_from_clustrel(clustrel, clusters):
   for modelidx in range(num_models):
     mut_vs_cluster = np.dot(membership, clustrel.rels[:,:,modelidx]) # MxK
     mrel[:,:,modelidx] = np.dot(mut_vs_cluster, membership.T)
-  mutrel.check_posterior_sanity(mrel)
+  # Disable check to improve performance. Since this is called for each tree
+  # (for methods that don't have a fixed clustering), it can be prohibitively
+  # slow -- it was consuming >50% of the total runtime for LICHeE's output
+  # conversion.
+  #mutrel.check_posterior_sanity(mrel)
 
   return mutrel.Mutrel(
     vids = vids,

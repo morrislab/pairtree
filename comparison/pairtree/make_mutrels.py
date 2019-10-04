@@ -6,7 +6,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
 import resultserializer
 import evalutil
-import pairtree_util
 import util
 import numpy as np
 
@@ -15,7 +14,6 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('--use-subset', type=int)
   parser.add_argument('--clustrel-mutrel')
   parser.add_argument('--trees-mutrel')
   parser.add_argument('pairtree_results_fn')
@@ -25,9 +23,6 @@ def main():
   clusters = [[]] + list(results['clusters'])
   garbage = list(results['garbage'])
   all_vids = set([V for C in results['clusters'] for V in C] + garbage)
-
-  if args.use_subset is not None:
-    pairtree_util.choose_subset(results, args.use_subset)
 
   if args.trees_mutrel is not None:
     tree_mutrel = evalutil.make_mutrel_from_trees_and_single_clustering(results['struct'], results['llh'], results['count'], clusters)

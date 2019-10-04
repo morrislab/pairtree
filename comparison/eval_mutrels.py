@@ -27,7 +27,7 @@ def discard_garbage(mutrels, clustered, garbage, ignore_garbage_for):
     if mutrels[name] is None:
       continue
     vids = mutrels[name].vids
-    assert set(vids) == clustered | garbage
+    assert set(vids) == clustered | garbage, 'vids do not match expected set for %s' % name
 
     gidxs = [idx for idx, vid in enumerate(vids) if vid in garbage]
     if name not in ignore_garbage_for:
