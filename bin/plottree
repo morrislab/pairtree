@@ -105,9 +105,6 @@ def write_cluster_stats(clusters, garbage, supervars, variants, outf):
     print('<tr>%s</tr>' % rowhtml, file=outf)
   print('</tbody></table>', file=outf)
 
-def _find_best_tidx(results):
-  return np.argmax(results['llh'])
-
 def _extract_mat(variants, key):
   mat = np.array([V[key] for V in variants])
   return mat
@@ -127,7 +124,7 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('--tree-index')
+  parser.add_argument('--tree-index', type=int)
   parser.add_argument('--plot-pairwise-separate', action='store_true')
   parser.add_argument('--plot-pairwise-mle', action='store_true')
   parser.add_argument('--plot-vaf-matrix', action='store_true')
@@ -148,7 +145,7 @@ def main():
   if args.tree_index is not None:
     tidx = args.tree_index
   else:
-    tidx = _find_best_tidx(results)
+    tidx = 0
 
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.params_fn)
