@@ -22,7 +22,7 @@ HAPPY_METHOD_NAMES = [
   ('pplus_allvars', 'PhyloPlus (unclustered)'),
   ('pwgs_supervars', 'PhyloWGS'),
   ('pwgs_allvars', 'PhyloWGS (unclustered)'),
-  ('pairtree_tensor', 'Pairs tensor'),
+  ('pairtree_clustrel', 'Pairs tensor'),
   ('mle_unconstrained', 'MLE lineage frequencies'),
 ]
 SORTED_METHODS = [M for M, M_full in HAPPY_METHOD_NAMES]
@@ -114,40 +114,30 @@ def make_bar_trace(methods, complete, total, name=None):
     trace['name'] = name
   return trace
 
-def make_pie_traces(methods, complete, total):
-  methods = sort_methods(methods)
-  complete = np.array([complete[M] for M in methods])
-  total = np.array([total[M] for M in methods])
-  missing = total - complete
-
-  traces = [go.Pie(
-    labels = ('Proportion succeeded', 'Proportion failed'),
-    values = (C, D),
-    name = M,
-    sort = False,
-  ) for (C, D, M) in zip(complete, missing, methods)]
-  return traces
-
 def make_pie_fig(methods, complete, total, name=None):
   methods = sort_methods(methods)
+  happy_methods = [HAPPY_METHOD_NAMES.get(M, M) for M in methods]
   complete = np.array([complete[M] for M in methods])
   total = np.array([total[M] for M in methods])
   missing = total - complete
 
   traces = [go.Pie(
-    labels = ('Proportion succeeded', 'Proportion failed'),
+    labels = ('Percent succeeded', 'Percent failed'),
     values = (C, D),
-    name = M,
+    name = HAPPY_METHOD_NAMES.get(M, M),
     textinfo = 'none',
     sort = False,
-    marker = {'colors': ['rgb(77,175,74)', 'rgb(228,26,28)']},
+    marker = {
+      'colors': ['rgb(255,255,255)', 'rgb(228,26,28)'],
+      'line': {'color': 'rgba(0,0,0,0.5)', 'width': 2},
+    },
   ) for (C, D, M) in zip(complete, missing, methods)]
 
   pie_fig = make_subplots(
     rows = 1,
     cols = len(traces),
     specs = [len(traces)*[{'type': 'domain'}]],
-    subplot_titles=methods,
+    subplot_titles=happy_methods,
   )
   for idx, T in enumerate(traces):
     pie_fig.add_trace(T, row=1, col=(idx+1))
@@ -184,8 +174,11 @@ def make_violin_trace(vals, side='both', group=None, name=None, bandwidth=None, 
   if name is not None:
     trace['name'] = name
   if colour is not None:
-    trace['fillcolor'] = colour
-    trace['line_color'] = colour
+    assert colour.startswith('rgb(')
+    assert colour.endswith(')')
+    triplet = 'rgba(' + colour[4:-1]
+    trace['fillcolor'] = triplet + ',0.5)'
+    trace['line_color'] = triplet + ',1.0)'
 
   return trace
 
@@ -211,7 +204,8 @@ def make_ticks(traces):
   maxY = np.ceil(np.max(Y))
   N = int(maxY - minY)
   tickvals = np.linspace(minY, maxY, num=(N+1))
-  ticktext = 10**tickvals
+  assert np.allclose(tickvals, tickvals.astype(np.int))
+  ticktext = ['10<sup>%.0f</sup>' % T for T in tickvals]
   return (tickvals, ticktext)
 
 def make_fig(traces, template, ytitle, max_y=None, layout_options=None, log_y_axis=False):
@@ -391,7 +385,7 @@ def main():
     total = {M: len(scores[M]) for M in methods}
     complete = {M: np.sum(scores[M] != MISSING) for M in methods}
     if args.plot_type == 'box':
-      score_trace = make_box_trace(scores)
+      score_trace = make_box_trace(scores, colour=colours['lte'])
     elif args.plot_type == 'violin':
       score_trace = make_violin_trace(scores, side='both', bandwidth=args.bandwidth)
     score_traces.append(score_trace)
