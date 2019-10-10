@@ -7,7 +7,7 @@ SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 BASEDIR=~/work/pairtree
 
 BATCH=sims.pairtree
-PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.lol69
+PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.multichain
 TRUTH_DIR=$BASEDIR/scratch/results/sims.truth
 SCORESDIR=$BASEDIR/scratch/scores
 
@@ -21,7 +21,7 @@ function compute_entropy {
 
     cmd="cd $outdir && "
     cmd+="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/compute_entropy.py "
-    cmd+="--truth $TRUTH_DIR/$runid.results.npz "
+    cmd+="--truth $TRUTH_DIR/$runid/$runid.results.npz "
     cmd+="$resultsfn "
     cmd+="> $outdir/$runid.entropy.txt"
     echo $cmd
@@ -51,9 +51,9 @@ function plot {
 }
 
 function main {
-  #compute_entropy | grep -v -e K30_ -e K100_ | parallel -j80 --halt 1 --eta
-  #compute_entropy | grep    -e K30_ -e K100_ | parallel -j10 --halt 1 --eta
-  #combine
+  compute_entropy | grep -v -e K30_ -e K100_ | parallel -j80 --halt 1 --eta
+  compute_entropy | grep    -e K30_ -e K100_ | parallel -j10 --halt 1 --eta
+  combine
   plot
 }
 

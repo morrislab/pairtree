@@ -62,20 +62,19 @@ function make_results_paths {
   fi
 
   if [[ $BATCH == steph ]]; then
-    truth_path="${BATCH}.pairtree.hbstruct/${runid}.pairtree_trees.all.llh.${result_type}.npz"
-    paths+="truth=$truth_path "
-    paths+="pairtree_multi=${BATCH}.pairtree.multichain/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
+    paths+="truth=${TRUTH_DIR}/$runid/${runid}.trees_${result_type}.npz "
+    paths+="pairtree_multi=${BATCH}.pairtree.multichain/${runid}/${runid}.trees_${result_type}.npz "
     #paths+="pairtree_single=${BATCH}.pairtree.singlechain/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
     #paths+="pwgs_allvars=${BATCH}.pwgs.allvars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
     #paths+="pplus_allvars=${BATCH}.pwgs.allvars/$runid/$runid.pwgs_trees_multi_llh.$result_type.npz "
     paths+="pwgs_supervars=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_single_llh.$result_type.npz "
     #paths+="pplus_supervars=${BATCH}.pwgs.supervars/$runid/$runid.pwgs_trees_multi_llh.$result_type.npz "
-    paths+="lichee=${BATCH}.xeno.lichee/$runid.llh.$result_type.npz "
+    paths+="lichee=${BATCH}.xeno.lichee/$runid/$runid.$result_type.npz "
     #if [[ $result_type == mutrel ]]; then
     #  paths+="pairtree_tensor=${BATCH}.pairtree.onlytensor/${runid}/${runid}.pairtree_clustrel.mutrel.npz "
     #fi
   elif [[ $BATCH == sims ]]; then
-    paths+="truth=${TRUTH_DIR}/$runid.$result_type.npz "
+    paths+="truth=${TRUTH_DIR}/$runid/${runid}.trees_${result_type}.npz "
     paths+="pwgs_supervars=sims.pwgs.supervars/$runid/$runid.pwgs_trees_single.$result_type.npz "
     paths+="pastri=${BATCH}.pastri.informative/$runid/$runid.pastri_trees_llh.$result_type.npz "
     #for foo in $(seq 69 77); do
@@ -100,7 +99,7 @@ function eval_mutrels {
   cd $RESULTSDIR
   mkdir -p $SCORESDIR/$BATCH
 
-  for truthfn in $(ls $TRUTH_DIR/*.mutrel.npz | sort --random-sort); do
+  for truthfn in $(ls $TRUTH_DIR/*/*.trees_mutrel.npz | sort --random-sort); do
     runid=$(basename $truthfn | cut -d. -f1)
     mutrels=$(make_results_paths $runid mutrel)
 
@@ -123,7 +122,7 @@ function eval_mutphis {
   cd $RESULTSDIR
   mkdir -p $SCORESDIR/$BATCH
 
-  for mutphifn in $(ls $TRUTH_DIR/*.mutphi.npz | sort --random-sort); do
+  for mutphifn in $(ls $TRUTH_DIR/*/*.trees_mutphi.npz | sort --random-sort); do
     runid=$(basename $mutphifn | cut -d. -f1)
     mutphis=$(make_results_paths $runid mutphi)
 
@@ -170,7 +169,7 @@ function eval_runtime {
       cmd="python3 $SCRIPTDIR/eval_runtime.py "
       cmd+="--time-type $timetype "
       cmd+="citup=$RESULTSDIR/sims.citup.rawvars.qip/$runid/$runid.time "
-      cmd+="lichee=$RESULTSDIR/sims.lichee/$runid.time "
+      cmd+="lichee=$RESULTSDIR/sims.lichee/$runid/$runid.time "
       #cmd+="pairtree_tensor=$RESULTSDIR/sims.pairtree.onlytensor/$runid/$runid.time "
       #cmd+="pairtree_single=$RESULTSDIR/sims.pairtree.singlechain/$runid/$runid.time "
       cmd+="pairtree_multi=$RESULTSDIR/sims.pairtree.multichain/$runid/$runid.time "
@@ -257,7 +256,7 @@ function plot_individual {
   elif [[ $ptype == "mutphi" ]]; then
     cmd+="--bandwidth 0.13 "
   elif [[ $ptype =~ time$ ]]; then
-    cmd+="--bandwidth 0.07 "
+    cmd+="--bandwidth 0.18 "
   fi
   if [[ $ptype == "mutphi" && $BATCH == "sims" ]]; then
     cmd+="--baseline truth "
@@ -275,7 +274,7 @@ function plot_individual {
 
 function plot_results_sims {
   #eval_mutrels | parallel -j2 --halt 1 --eta
-  eval_mutphis | para
+  #eval_mutphis | para
 
   #for type in mutrel mutphi; do
   #  compile_scores $type
@@ -286,7 +285,7 @@ function plot_results_sims {
     basefn="$SCORESDIR/$BATCH"
     for ksize in smallK bigK; do
       plot_individual mutrel box $basefn.mutrel.$ksize.{txt,html}
-      plot_individual mutphi box    $basefn.mutphi.$ksize.{txt,html}
+      plot_individual mutphi box $basefn.mutphi.$ksize.{txt,html}
     done
   ) | para
 }
@@ -299,7 +298,7 @@ function plot_results_steph {
   compile_scores mutphi
   (
     basefn="$SCORESDIR/$BATCH"
-    plot_individual mutrel violin $basefn.mutrel.{txt,html}
+    plot_individual mutrel box $basefn.mutrel.{txt,html}
     plot_individual mutphi box $basefn.mutphi.{txt,html}
   ) | para
 }
@@ -315,11 +314,11 @@ function remove_missing {
 }
 
 function plot_runtime {
-  eval_runtime | para
-  compile_runtime
-  remove_missing
-  partition_by_K cputime
-  partition_by_K walltime
+  #eval_runtime | para
+  #compile_runtime
+  #remove_missing
+  #partition_by_K cputime
+  #partition_by_K walltime
   for ksize in bigK smallK; do
     for ttype in cputime walltime; do
       basefn="$SCORESDIR/$BATCH.$ttype.$ksize"
@@ -335,8 +334,8 @@ function main {
   export MLE_MUTPHIS_DIR=$RESULTSDIR/${BATCH}.mle_unconstrained
   #make_sims_truth
   #make_mle_mutphis
-  plot_results_sims
-  #plot_runtime
+  #plot_results_sims
+  plot_runtime
 
   #export BATCH=steph
   #export PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
