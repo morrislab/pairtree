@@ -40,10 +40,12 @@ def _calc_phi_std(truth_fn):
     truth = pickle.load(F)
 
   phi_std = np.std(truth['phi'], axis=1)
+  phi_mean = np.mean(truth['phi'], axis=1)
   depth = _calc_depth(truth['adjm'])
   num_desc = _calc_num_desc(truth['adjm'])
   df = pd.DataFrame({
     'phi_std': phi_std[1:],
+    'phi_mean': phi_mean[1:],
     'depth': depth,
     'num_desc': num_desc,
   })
@@ -56,28 +58,35 @@ def _process(truth_fns):
   return conjoined
 
 def plot(df, plot_fn):
-  fig = px.box(df, x='num_desc', y='phi_std')
+  figs = []
+  for Y in ('phi_std', 'phi_mean'):
+    figs.append(px.box(df, x='num_desc', y=Y))
 
   K = np.max(df.num_desc)
   N = np.linspace(start=np.min(df.num_desc), stop=np.max(df.num_desc), num=1000)
-  var_sum = np.sqrt( (N/K) * (1 - N/K)/(K + 1) )
-  lol = pd.DataFrame({'N': N, 'var_sum': var_sum})
-  fig.add_scatter(x=lol.N, y=lol.var_sum)
+  sum_var = np.sqrt( (N/K) * (1 - N/K)/(K + 1) )
+  sum_mean = N/K
 
-  html = plotly.offline.plot(
-    fig,
-    output_type = 'div',
-    #include_plotlyjs = False,
-    config = {
-      'showLink': True,
-      'toImageButtonOptions': {
-        'format': 'png',
-        'width': 750,
-        'height': 450,
-        'filename': os.path.basename(plot_fn).rsplit('.', 1)[0],
+  analytical = pd.DataFrame({'N': N, 'sum_var': sum_var, 'sum_mean': sum_mean})
+  figs[0].add_scatter(x=analytical.N, y=analytical.sum_var)
+  figs[1].add_scatter(x=analytical.N, y=analytical.sum_mean)
+
+  html = ''
+  for idx, F in enumerate(figs):
+    html += plotly.offline.plot(
+      F,
+      output_type = 'div',
+      #include_plotlyjs = False,
+      config = {
+        'showLink': True,
+        'toImageButtonOptions': {
+          'format': 'png',
+          'width': 750,
+          'height': 450,
+          'filename': '%s_%s' % (os.path.basename(plot_fn).rsplit('.', 1)[0], idx),
+        },
       },
-    },
-  )
+    )
   with open(plot_fn, 'w') as F:
     print(html, file=F)
 
