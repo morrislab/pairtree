@@ -66,6 +66,9 @@ def _fit_etas(adj, A, ref_reads, var_reads, method, iterations, parallel, eta_in
   Z = common.make_ancestral_from_adj(adj)
   M, K = A.shape
   _, S = ref_reads.shape
+  # Numba only supports dot products on float arrays, not int arrays.
+  A = A.astype(np.float64)
+  Z = Z.astype(np.float64)
 
   if eta_init is None:
     phi_implied = 2*(var_reads / (ref_reads + var_reads))
