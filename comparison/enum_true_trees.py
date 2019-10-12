@@ -14,26 +14,27 @@ import util
 @njit
 def enum_trees(tau, phi, order, traversal):
   assert traversal == 'dfs' or traversal == 'bfs'
+  epsilon = 1e-10
   K = len(tau)
   expected_colsum = np.ones(K)
   expected_colsum[0] = 0
 
   first_partial = np.copy(tau)
   np.fill_diagonal(first_partial, 0)
-  first_delta = np.copy(phi)
-  partial_trees = [(1, first_partial, first_delta)]
+  first_childsum = np.zeros(phi.shape)
+  partial_trees = [(1, first_partial, first_childsum)]
   completed_trees = []
 
   while len(partial_trees) > 0:
     if traversal == 'dfs':
-      to_resolve, P, delta = partial_trees.pop()
+      to_resolve, P, childsum = partial_trees.pop()
     else:
-      to_resolve, P, delta = partial_trees.pop(0)
-      #to_resolve, P, delta = partial_trees[0]
-      #partial_trees = partial_trees[1:]
+      to_resolve, P, childsum = partial_trees.pop(0)
     if to_resolve == K:
+      diff = phi - childsum
       assert np.all(expected_colsum == np.sum(P, axis=0))
-      assert np.all(0 <= delta) and np.all(delta <= 1)
+      assert np.all(0 <= childsum + epsilon) and np.all(childsum <= 1 + epsilon)
+      assert np.all(childsum <= phi + epsilon)
       np.fill_diagonal(P, 1)
       completed_trees.append(P)
       continue
@@ -41,14 +42,17 @@ def enum_trees(tau, phi, order, traversal):
     R = order[to_resolve]
     parents = np.nonzero(P[:,R])[0]
     for parent in parents:
+      childsum_prime = np.copy(childsum[parent])
+      childsum_prime += phi[R]
+      if np.any(childsum_prime > phi[parent] + epsilon):
+        continue
+      new_childsum = np.copy(childsum)
+      new_childsum[parent] = childsum_prime
       P_prime = np.copy(P)
       P_prime[:,R] = 0
       P_prime[parent,R] = 1
-      if np.any(delta[parent] - phi[R] < 0):
-        continue
-      delta_prime = np.copy(delta)
-      delta_prime[parent] -= phi[R]
-      partial_trees.append((to_resolve + 1, P_prime, delta_prime))
+      partial_trees.append((to_resolve + 1, P_prime, new_childsum))
+
   return completed_trees
 
 @njit
@@ -79,13 +83,12 @@ def ensure_truth_found(truth, trees):
       return
   raise Exception('No truth found')
 
-def write_truth(adjms, phi, clusters, garbage, results_fn):
-  N = len(adjms)
+def write_truth(structs, phi, clusters, garbage, results_fn):
+  N = len(structs)
   llhs = np.zeros(N)
   probs = np.ones(N) / N
   phis = np.array([phi for _ in range(N)])
   counts = np.ones(N)
-  structs = [util.find_parents(A) for A in adjms]
 
   np.savez_compressed(
     results_fn,
@@ -98,25 +101,49 @@ def write_truth(adjms, phi, clusters, garbage, results_fn):
     garbage = garbage,
   )
 
+def check_true_delta(struct, phi):
+  import accupy
+  delta = np.zeros(phi.shape)
+  queue = [0]
+  while len(queue) > 0:
+    parent = queue.pop()
+    children = np.flatnonzero(struct == parent) + 1
+    delta[parent] = accupy.fsum(np.vstack((phi[parent], -phi[children])))
+    queue += children.tolist()
+  # Because of numerical errors some elements may be less than zero.
+  # This may occur for any one of three reasons:
+  #   1. Numerical errors in sampling the `eta` values, such that a sample's etas sum to >1
+  #   2. Numerical error in summing phis as "sum of eta of all descendants"
+  #   3. Numerical error in the computation of the delta within this function
+  # We use `accupy.fsum()` to correct reason 3 to the greatest extent possible,
+  # but, of course, this does nothing to help us if the errors result from
+  # reason 1 or reason 2.
+  assert np.all(np.isclose(0, delta[delta < 0]))
+  assert np.all(delta <= 1)
+
 def main():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('--check-delta', action='store_true')
   parser.add_argument('sim_data_fn')
   parser.add_argument('results_fn')
   args = parser.parse_args()
 
   with open(args.sim_data_fn, 'rb') as dataf:
     simdata = pickle.load(dataf)
+  if args.check_delta:
+    check_true_delta(simdata['structure'], simdata['phi'])
 
   phi = simdata['phi']
   order = make_order(phi)
   tau = make_tau(phi, order)
-  trees = enum_trees(tau, phi, order, 'dfs')
-  ensure_truth_found(simdata['adjm'], trees)
+  adjms = enum_trees(tau, phi, order, 'dfs')
+  structs = [util.find_parents(A) for A in adjms]
+  ensure_truth_found(simdata['structure'], structs)
   write_truth(
-    trees,
+    structs,
     simdata['phi'],
     simdata['clusters'],
     simdata['vids_garbage'],
