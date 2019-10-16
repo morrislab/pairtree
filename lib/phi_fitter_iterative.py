@@ -13,6 +13,20 @@ from numba import njit
 #   mut_phi: Mx1, per-mutation phis
 
 @njit
+def softmax(V):
+  B = np.max(V)
+  log_sum = B + np.log(np.sum(np.exp(V - B)))
+  log_softmax = V - log_sum
+  smax = np.exp(log_softmax)
+  # The vector sum will be close to 1 at this point, but not close enough to
+  # make np.random.choice happy -- sometimes it will issue the error
+  # "probabilities do not sum to 1" from mtrand.RandomState.choice.
+  # To fix this, renormalize the vector.
+  smax /= np.sum(smax)
+  #assert np.isclose(np.sum(smax), 1)
+  return smax
+
+@njit
 def calc_mut_p(A, Z, psi):
   eta = softmax(psi) # Kx1
   phi = np.dot(Z, eta) # Kx1
@@ -51,9 +65,11 @@ def fit_eta_S(eta_S, var_reads_S, ref_reads_S, A, Z, method, iterations):
   psi_S = np.log(eta_S)
 
   if method == 'graddesc':
-    psi_S = grad_desc(var_reads_S, ref_reads_S, A, Z, psi_S, iterations, convergence_threshold=1e-30)
+    psi_S = grad_desc(var_reads_S, ref_reads_S, A, Z, psi_S, iterations, convergence_threshold=1e-30, analytic=True)
+  elif method == 'graddesc_numerical':
+    psi_S = grad_desc(var_reads_S, ref_reads_S, A, Z, psi_S, iterations, convergence_threshold=1e-30, analytic=False)
   elif method == 'rprop':
-    psi_S = rprop(var_reads_S, ref_reads_S, A, Z, psi_S, iterations, convergence_threshold=1e-4)
+    psi_S = rprop(var_reads_S, ref_reads_S, A, Z, psi_S, iterations, convergence_threshold=1e-5)
   else:
     raise Exception('Unknown psi fitter')
 
@@ -76,8 +92,10 @@ def _fit_etas(adj, A, ref_reads, var_reads, method, iterations, parallel, eta_in
     phi_implied = np.insert(phi_implied, 0, 1, axis=0)
     # Since phi = Z.eta, we have eta = (Z^-1)phi.
     eta = np.dot(np.linalg.inv(Z), phi_implied).T
+  elif str(eta_init) == 'dirichlet':
+    eta = np.random.dirichlet(alpha = K*[1e0], size = S)
   else:
-    eta = eta_init.T
+    eta = np.copy(eta_init.T)
   assert eta.shape == (S, K)
 
   if parallel > 0:
@@ -89,9 +107,8 @@ def _fit_etas(adj, A, ref_reads, var_reads, method, iterations, parallel, eta_in
         # If no negative elements are in eta, we have the analytic solution.
         # Otherwise, set the negative elements to zero to provide an initial
         # starting point, then run the optimizer.
-        if np.any(eta[s] < 0):
-          modified_samples.append(s)
-          futures.append(ex.submit(fit_eta_S, eta[s], var_reads[:,s], ref_reads[:,s], A, Z, method, iterations))
+        modified_samples.append(s)
+        futures.append(ex.submit(fit_eta_S, eta[s], var_reads[:,s], ref_reads[:,s], A, Z, method, iterations))
       with progressbar(total=len(futures), desc='Fitting phis', unit='sample', dynamic_ncols=True) as pbar:
         for F in concurrent.futures.as_completed(futures):
           pbar.update()
@@ -99,8 +116,7 @@ def _fit_etas(adj, A, ref_reads, var_reads, method, iterations, parallel, eta_in
       eta[s] = F.result()
   else:
     for s in range(S):
-      if np.any(eta[s] < 0):
-        eta[s] = fit_eta_S(eta[s], var_reads[:,s], ref_reads[:,s], A, Z, method, iterations)
+      eta[s] = fit_eta_S(eta[s], var_reads[:,s], ref_reads[:,s], A, Z, method, iterations)
 
   return eta.T
 
@@ -132,6 +148,7 @@ def calc_grad(var_reads, ref_reads, A, Z, psi):
   grad = 0.5 * np.sum(grad_elem, axis=0) / M
   return grad
 
+@njit
 def calc_grad_numerical(var_reads, ref_reads, A, Z, psi):
   _, K = A.shape
   grad = np.zeros(K)
@@ -143,14 +160,16 @@ def calc_grad_numerical(var_reads, ref_reads, A, Z, psi):
   return grad
 
 @njit
-def grad_desc(var_reads, ref_reads, A, Z, psi, iterations, convergence_threshold):
+def grad_desc(var_reads, ref_reads, A, Z, psi, iterations, convergence_threshold, analytic=True):
   learn_rate = 1e-4
   last_llh = -np.inf
   last_psi = psi
 
   for I in range(iterations):
-    grad = calc_grad(var_reads, ref_reads, A, Z, psi)
-    #grad_num = calc_grad_numerical(var_reads, ref_reads, A, Z, psi)
+    if analytic:
+      grad = calc_grad(var_reads, ref_reads, A, Z, psi)
+    else:
+      grad = calc_grad_numerical(var_reads, ref_reads, A, Z, psi)
     #print(grad - grad_num)
 
     step = learn_rate * grad
@@ -195,12 +214,6 @@ def rprop(var_reads, ref_reads, A, Z, psi, iterations, convergence_threshold):
     psi += sign * step
 
   return psi
-
-@njit
-def softmax(X):
-  b = np.max(X)
-  logS = X - (b + np.log(np.sum(np.exp(X - b))))
-  return np.exp(logS)
 
 def extract_mut_info(clusters, variants):
   # Renumber variants so their indices are contiguous. They may not be

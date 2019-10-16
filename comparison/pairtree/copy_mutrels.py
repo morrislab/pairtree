@@ -16,7 +16,7 @@ def main():
       desired.append('clustrel_%s_%s' % (A, B))
 
   with open(args.src_results_fn, 'rb') as F:
-    src_results = np.load(F)
+    src_results = np.load(F, allow_pickle=True)
     dest_results = {K: src_results[K] for K in desired}
   np.savez_compressed(args.dest_results_fn, **dest_results)
 

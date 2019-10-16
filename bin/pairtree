@@ -39,7 +39,7 @@ def _parse_args():
     help='Proportion of samples to discard from beginning of each chain.')
   parser.add_argument('--thinned-frac', dest='thinned_frac', type=float, default=1,
     help='Proportion of non-burnin trees to write as output.')
-  parser.add_argument('--phi-fitter', dest='phi_fitter', choices=('graddesc', 'rprop', 'projection', 'proj_rprop'), default='projection')
+  parser.add_argument('--phi-fitter', dest='phi_fitter', choices=('graddesc', 'rprop', 'projection', 'proj_rprop', 'rprop_cached'), default='projection')
   parser.add_argument('--phi-iterations', dest='phi_iterations', type=int, default=10000,
     help='Maximum number of iterations of phi-fitting algorithm to run when using iterative phi-fitting algorithms (graddesc, rprop, or proj_rprop).')
   parser.add_argument('--only-build-tensor', dest='only_build_tensor', action='store_true',
@@ -154,7 +154,7 @@ def main():
         parallel
       )
 
-    results['struct'], results['count'], results['phi'], results['llh'], results['prob'] = tree_sampler.compute_posterior(adjm, phi, llh, False)
+    results['struct'], results['count'], results['phi'], results['llh'], results['prob'] = tree_sampler.compute_posterior(adjm, phi, llh)
     resultserializer.save(results, args.results_fn)
 
 if __name__ == '__main__':
