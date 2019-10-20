@@ -7,9 +7,21 @@ import evalutil
 
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
-import mutrel
-import util
+
+@njit
+def _find_parents(adj):
+  K = len(adj)
+  assert adj.shape == (K, K)
+  parents = np.full(K-1, np.nan)
+  for j in range(1, K):
+    for i in range(K):
+      if i == j:
+        continue
+      if adj[i,j]:
+        parents[j-1] = i
+        break
+  assert not np.any(np.isnan(parents))
+  return parents.astype(np.uint8)
 
 @njit
 def enum_trees(tau, phi, order, traversal):
@@ -19,7 +31,8 @@ def enum_trees(tau, phi, order, traversal):
   expected_colsum = np.ones(K)
   expected_colsum[0] = 0
 
-  first_partial = np.copy(tau)
+  tau_copy = np.copy(tau)
+  first_partial = tau_copy.astype(np.int8)
   np.fill_diagonal(first_partial, 0)
   first_childsum = np.zeros(phi.shape)
   partial_trees = [(1, first_partial, first_childsum)]
@@ -36,7 +49,8 @@ def enum_trees(tau, phi, order, traversal):
       assert np.all(0 <= childsum + epsilon) and np.all(childsum <= 1 + epsilon)
       assert np.all(childsum <= phi + epsilon)
       np.fill_diagonal(P, 1)
-      completed_trees.append(P)
+      struct = _find_parents(P)
+      completed_trees.append(struct)
       continue
 
     R = order[to_resolve]
@@ -65,7 +79,7 @@ def make_order(phi):
 @njit
 def make_tau(phi, order):
   K, S = phi.shape
-  tau = np.eye(K)
+  tau = np.eye(K, dtype=np.int8)
 
   for I in range(K):
     for J in range(I + 1, K):
@@ -139,8 +153,7 @@ def main():
   phi = simdata['phi']
   order = make_order(phi)
   tau = make_tau(phi, order)
-  adjms = enum_trees(tau, phi, order, 'dfs')
-  structs = [util.find_parents(A) for A in adjms]
+  structs = enum_trees(tau, phi, order, 'dfs')
   ensure_truth_found(simdata['structure'], structs)
   write_truth(
     structs,
