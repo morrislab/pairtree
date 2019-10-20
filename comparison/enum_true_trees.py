@@ -3,11 +3,6 @@ import pickle
 import numpy as np
 from numba import njit
 
-import evalutil
-
-import sys
-import os
-
 @njit
 def _find_parents(adj):
   K = len(adj)
@@ -24,7 +19,7 @@ def _find_parents(adj):
   return parents.astype(np.uint8)
 
 @njit
-def enum_trees(tau, phi, order, traversal):
+def enum_trees(tau, phi, order, traversal, store_trees=True):
   assert traversal == 'dfs' or traversal == 'bfs'
   epsilon = 1e-10
   K = len(tau)
@@ -37,6 +32,7 @@ def enum_trees(tau, phi, order, traversal):
   first_childsum = np.zeros(phi.shape)
   partial_trees = [(1, first_partial, first_childsum)]
   completed_trees = []
+  num_trees = 0
 
   while len(partial_trees) > 0:
     if traversal == 'dfs':
@@ -48,9 +44,12 @@ def enum_trees(tau, phi, order, traversal):
       assert np.all(expected_colsum == np.sum(P, axis=0))
       assert np.all(0 <= childsum + epsilon) and np.all(childsum <= 1 + epsilon)
       assert np.all(childsum <= phi + epsilon)
-      np.fill_diagonal(P, 1)
-      struct = _find_parents(P)
-      completed_trees.append(struct)
+      num_trees += 1
+      if num_trees % 100000 == 0:
+        print(num_trees)
+      if store_trees:
+        struct = _find_parents(P)
+        completed_trees.append(struct)
       continue
 
     R = order[to_resolve]
@@ -67,7 +66,7 @@ def enum_trees(tau, phi, order, traversal):
       P_prime[parent,R] = 1
       partial_trees.append((to_resolve + 1, P_prime, new_childsum))
 
-  return completed_trees
+  return (num_trees, completed_trees)
 
 @njit
 def make_order(phi):
@@ -76,6 +75,18 @@ def make_order(phi):
   assert order[0] == 0
   return order
 
+# TODO: propagate "definite parents" constraints through the tau graph to
+# reduce the number of edges. This is an-front optimization that would improve
+# performance.
+#
+# As the algorithm currently stands, if a high-phi node near the top of the
+# tree has only one possible parent, there will still be a bunch of spurious
+# edges between that parent and low-phi nodes near the bottom of the tree.
+# These will be elimianted through enumeration, but result in additional
+# iterations of the loop. I think the performance difference will be
+# inconsequential, though -- for each of those low-phi nodes, there will be at
+# most `K` invalid parents for it, so I think that I can upper-bound the number
+# of "bad" trees in that case at `K^2`, which is small enough to not matter.
 @njit
 def make_tau(phi, order):
   K, S = phi.shape
@@ -141,6 +152,7 @@ def main():
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--check-delta', action='store_true')
+  parser.add_argument('--only-count', action='store_true')
   parser.add_argument('sim_data_fn')
   parser.add_argument('results_fn')
   args = parser.parse_args()
@@ -153,15 +165,20 @@ def main():
   phi = simdata['phi']
   order = make_order(phi)
   tau = make_tau(phi, order)
-  structs = enum_trees(tau, phi, order, 'dfs')
-  ensure_truth_found(simdata['structure'], structs)
-  write_truth(
-    structs,
-    simdata['phi'],
-    simdata['clusters'],
-    simdata['vids_garbage'],
-    args.results_fn,
-  )
+
+  if args.only_count:
+    num_trees, _ = enum_trees(tau, phi, order, 'dfs', store_trees=False)
+    print(num_trees)
+  else:
+    num_trees, structs = enum_trees(tau, phi, order, 'dfs')
+    ensure_truth_found(simdata['structure'], structs)
+    write_truth(
+      structs,
+      simdata['phi'],
+      simdata['clusters'],
+      simdata['vids_garbage'],
+      args.results_fn,
+    )
 
 if __name__ == '__main__':
   main()
