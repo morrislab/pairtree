@@ -102,6 +102,5 @@ def main():
   conjoined = _process(args.truth_fns)
   plot(conjoined, args.plot_fn)
 
-
 if __name__ == '__main__':
   main()

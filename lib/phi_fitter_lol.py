@@ -10,7 +10,7 @@ import binom
 #   phi: Kx1, per-cluster phis
 #   mut_phi: Mx1, per-mutation phis
 
-def fit_etas(adj, superclusters, supervars, method, iterations, parallel, eta_init=None):
+def fit_etas(adj, superclusters, supervars, method, iterations, parallel, eta_init='mle'):
   # Supervar `i` is in cluster `i`. Cluster 0 is empty.
   assert len(supervars) == len(adj) - 1
   A = np.insert(np.eye(len(supervars)), 0, 0, axis=1)
@@ -30,7 +30,7 @@ def fit_etas(adj, superclusters, supervars, method, iterations, parallel, eta_in
     eta_init,
   )
 
-def _fit_etas(adj, A, ref_reads, var_reads, omega, method, iterations, parallel, eta_init=None):
+def _fit_etas(adj, A, ref_reads, var_reads, omega, method, iterations, parallel, eta_init):
   M, K = A.shape
   _, S = ref_reads.shape
   assert ref_reads.shape == var_reads.shape == omega.shape == (M, S)
@@ -40,7 +40,7 @@ def _fit_etas(adj, A, ref_reads, var_reads, omega, method, iterations, parallel,
   A = A.astype(np.float64)
   Z = Z.astype(np.float64)
 
-  if eta_init is None:
+  if isinstance(eta_init, str) and eta_init == 'mle':
     phi_implied = (var_reads / (ref_reads + var_reads)) / omega
     phi_implied = np.minimum(1, phi_implied)
     phi_implied = np.maximum(0, phi_implied)
@@ -48,9 +48,10 @@ def _fit_etas(adj, A, ref_reads, var_reads, omega, method, iterations, parallel,
     phi_implied = np.insert(phi_implied, 0, 1, axis=0)
     # Since phi = Z.eta, we have eta = (Z^-1)phi.
     eta = np.dot(np.linalg.inv(Z), phi_implied).T
-  elif str(eta_init) == 'dirichlet':
+  elif isinstance(eta_init, str) and eta_init == 'dirichlet':
     eta = np.random.dirichlet(alpha = K*[1e0], size = S)
   else:
+    assert isinstance(eta_init, np.ndarray)
     eta = np.copy(eta_init.T)
   assert eta.shape == (S, K)
 
@@ -82,6 +83,10 @@ def _calc_grad(var_reads, ref_reads, omega, A, Z, psi):
   eta = softmax(psi)   # Kx1
   phi = np.dot(Z, eta) # Kx1
 
+  delta = 1e-20
+  phi[binom.isclose(phi, 0)] += delta
+  phi[binom.isclose(phi, 1)] -= delta
+
   phi_muts = np.dot(A, phi) # Mx1
   dlogpx_dphi_muts = (var_reads / phi_muts) - (omega*ref_reads)/(1 - phi_muts*omega) # Mx1
   dlogpx_dphi = np.dot(A.T, dlogpx_dphi_muts) # Kx1
@@ -103,6 +108,8 @@ def _calc_grad(var_reads, ref_reads, omega, A, Z, psi):
   beta = np.dot(Z, deta_dpsi)        # KxK
   grad = np.dot(dlogpx_dphi.T, beta) # 1xK
   assert grad.shape == (K,)
+  assert not np.any(np.isnan(grad))
+  assert not np.any(np.isinf(grad))
   return grad
 
 @njit
@@ -114,6 +121,7 @@ def _rprop(var_reads, ref_reads, omega, A, Z, psi, iterations, convergence_thres
 
   for T in range(iterations):
     grad = _calc_grad(var_reads, ref_reads, omega, A, Z, psi)
+    assert not np.any(np.isnan(grad))
     #grad_num = _calc_grad_numerical(var_reads, ref_reads, omega, A, Z, psi)
     #print(grad, grad_num)
     if np.max(np.abs(grad)) < convergence_threshold:
