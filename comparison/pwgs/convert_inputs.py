@@ -4,7 +4,7 @@ import argparse
 import json
 import numpy as np
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
 import inputparser
 import clustermaker
 
