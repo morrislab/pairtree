@@ -62,9 +62,9 @@ def _fit_phis(adj, superclusters, supervars, method, iterations, parallel):
     import phi_fitter_lol
     import time
     fitters = {
-      'rprop_init_mle': lambda: phi_fitter_iterative.fit_etas(adj, superclusters, supervars, 'rprop', iterations, parallel, eta_init=None),
+      #'rprop_init_mle': lambda: phi_fitter_iterative.fit_etas(adj, superclusters, supervars, 'rprop', iterations, parallel, eta_init=None),
       'lol_init_mle': lambda: phi_fitter_lol.fit_etas(adj, superclusters, supervars, 'rprop', iterations, parallel, eta_init='mle'),
-      'lol_init_dirichlet': lambda: phi_fitter_lol.fit_etas(adj, superclusters, supervars, 'rprop', iterations, parallel, eta_init='dirichlet'),
+      #'lol_init_dirichlet': lambda: phi_fitter_lol.fit_etas(adj, superclusters, supervars, 'rprop', iterations, parallel, eta_init='dirichlet'),
       'projection': lambda: phi_fitter_projection.fit_etas(adj, superclusters, supervars),
     }
     fitters['lol_init_proj'] = lambda: phi_fitter_lol.fit_etas(adj, superclusters, supervars, 'rprop', iterations, parallel, eta_init=fitters['projection']())
@@ -94,9 +94,11 @@ def _fit_phis(adj, superclusters, supervars, method, iterations, parallel):
     last_eta[0] = np.copy(eta)
 
     names = sorted(etas.keys())
-    if False and not hasattr(_fit_phis, 'printed_header'):
+    if True and not hasattr(_fit_phis, 'printed_header'):
       print(*names, sep=',')
       _fit_phis.printed_header = True
+    if scores['lol_init_mle'][2] / scores['lol_init_proj'][2] < 0.9:
+      print('I WAS BORN, A UNICORN')
     print(
       *[scores[name][2] for name in names],
       np.nan,

@@ -3,6 +3,8 @@ from numba import njit, jit, prange
 import common
 import binom
 
+_EPS = 1e-30
+
 # Matrices: M mutations, K clusters, S samples
 #   adj: KxK, adjacency matrix -- adj[a,b]=1 iff a is parent of b (with 1 on diagonal)
 #   Z: KxK, Z[a,b]=1 iff cluster a is ancestral to cluster b (with 1 on diagonal)
@@ -47,18 +49,23 @@ def _fit_etas(adj, A, ref_reads, var_reads, omega, method, iterations, parallel,
     # Make first row 1 to account for normal root.
     phi_implied = np.insert(phi_implied, 0, 1, axis=0)
     # Since phi = Z.eta, we have eta = (Z^-1)phi.
-    eta = np.dot(np.linalg.inv(Z), phi_implied).T
+    eta = np.dot(np.linalg.inv(Z), phi_implied)
   elif isinstance(eta_init, str) and eta_init == 'dirichlet':
-    eta = np.random.dirichlet(alpha = K*[1e0], size = S)
+    eta = np.random.dirichlet(alpha = K*[1e0], size = S).T
   else:
     assert isinstance(eta_init, np.ndarray)
-    eta = np.copy(eta_init.T)
-  assert eta.shape == (S, K)
+    eta = np.copy(eta_init)
+
+  assert eta.shape == (K, S)
+  assert np.allclose(1, np.sum(eta, axis=0))
+  eta = np.maximum(_EPS, eta)
+  eta /= np.sum(eta, axis=0)
+  assert np.allclose(1, np.sum(eta, axis=0))
 
   # This could be parallelized. Maybe using numba.prange?
   for s in prange(S):
-    eta[s] = _fit_eta_S(
-      eta[s],
+    eta[:,s] = _fit_eta_S(
+      eta[:,s],
       var_reads[:,s],
       ref_reads[:,s],
       omega[:,s],
@@ -68,7 +75,7 @@ def _fit_etas(adj, A, ref_reads, var_reads, omega, method, iterations, parallel,
       iterations,
     )
 
-  return eta.T
+  return eta
 
 @njit
 def _tile_rows(vec, repeats):
@@ -107,6 +114,7 @@ def _calc_grad(var_reads, ref_reads, omega, A, Z, psi):
   # `i`)
   beta = np.dot(Z, deta_dpsi)        # KxK
   grad = np.dot(dlogpx_dphi.T, beta) # 1xK
+
   assert grad.shape == (K,)
   assert not np.any(np.isnan(grad))
   assert not np.any(np.isinf(grad))
@@ -159,7 +167,6 @@ def softmax(V):
 
 @njit
 def _fit_eta_S(eta_S, var_reads_S, ref_reads_S, omega_S, A, Z, method, iterations):
-  eta_S = np.maximum(common._EPSILON, eta_S)
   psi_S = np.log(eta_S)
 
   if method == 'rprop':
