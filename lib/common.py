@@ -1,7 +1,7 @@
 import numpy as np
 from collections import namedtuple
 
-_LOGEPSILON = -400
+_LOGEPSILON = -30
 _EPSILON    = np.exp(_LOGEPSILON)
 
 Variant = namedtuple('Variant', (
