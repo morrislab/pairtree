@@ -6,6 +6,8 @@ import subprocess
 import os
 import sys
 
+MIN_VARIANCE = 1e-8
+
 def _convert_adjm_to_adjlist(adjm):
   adjm = np.copy(adjm)
   assert np.all(np.diag(adjm) == 1)
@@ -29,33 +31,42 @@ def fit_etas(adj, superclusters, supervars):
   M, S = T.shape
 
   phi_hat = V / (omega * T)
-  var_phi_hat = V*(1 - V/T) / (T*omega)**2
-
+  phi_hat = np.maximum(0, phi_hat)
+  phi_hat = np.minimum(1, phi_hat)
   phi_hat = np.insert(phi_hat, 0, 1, axis=0)
-  var_phi_hat = np.maximum(1e-8, var_phi_hat)
-  prec_sqrt = np.sqrt(1 / var_phi_hat)
-  prec_sqrt = np.insert(prec_sqrt, 0, 1e3, axis=0)
-  assert prec_sqrt.shape == (M+1, S)
+
+  # Make Quaid happy with `V_hat` and `T_hat`. I don't really understand why
+  # we're doing this, but I believe that, when `V = 0` and `T` is relatively
+  # small, this will result in `var_phi_hat` being larger than it would
+  # otherwise be. Without using `V_hat` and `T_hat`, `var_phi_hat` would be
+  # zero here, and so would be bumped up to the floor of 1e-8 below.
+  V_hat = V + 1
+  T_hat = T + 2
+  var_phi_hat = V_hat*(1 - V_hat/T_hat) / (T_hat*omega)**2
+  var_phi_hat = np.insert(var_phi_hat, 0, MIN_VARIANCE, axis=0)
+  var_phi_hat = np.maximum(MIN_VARIANCE, var_phi_hat)
+  assert var_phi_hat.shape == (M+1, S)
 
   eta = np.zeros((M+1, S))
   for sidx in range(S):
-    eta[:,sidx] = _fit_eta_S(adj, phi_hat[:,sidx], prec_sqrt[:,sidx])
+    eta[:,sidx] = _fit_eta_S(adj, phi_hat[:,sidx], var_phi_hat[:,sidx])
   assert np.allclose(0, eta[eta < 0])
   eta[eta < 0] = 0
 
   return eta
 
-def _project_ppm(adjm, phi_hat, prec_sqrt, root):
-  assert phi_hat.ndim == prec_sqrt.ndim == 1
+def _project_ppm(adjm, phi_hat, var_phi_hat, root):
+  assert phi_hat.ndim == var_phi_hat.ndim == 1
   inner_flag = 0
   compute_eta = 1
   M = len(phi_hat)
   S = 1
   eta = np.empty(M, dtype=np.double)
   assert M >= 1
-  assert prec_sqrt.shape == (M,)
+  assert var_phi_hat.shape == (M,)
 
-  gamma_init = 1 / prec_sqrt**2 # This is now the variance.
+  # This is called `gamma_init` in the C code from B&J.
+  gamma_init = var_phi_hat
   phi_hat = phi_hat / gamma_init
 
   adjl = _convert_adjm_to_adjlist(adjm)
@@ -81,6 +92,13 @@ def _project_ppm(adjm, phi_hat, prec_sqrt, root):
   # );
   c_double_p = ctypes.POINTER(ctypes.c_double)
   c_short_p = ctypes.POINTER(ctypes.c_short)
+
+  # Ensure arrays are C-contiguous.
+  eta = np.require(eta, requirements='C')
+  phi_hat = np.require(phi_hat, requirements='C')
+  gamma_init = np.require(gamma_init, requirements='C')
+  deg = np.require(deg, requirements='C')
+  adjl_mat = np.require(adjl_mat, requirements='C')
 
   cost = _project_ppm.tree_cost_projection(
     inner_flag,
@@ -129,11 +147,11 @@ def _init_project_ppm():
   _project_ppm.tree_cost_projection = func
 _init_project_ppm()
 
-def _fit_eta_S_ctypes(adj, phi_hat, prec_sqrt):
-  assert phi_hat.ndim == prec_sqrt.ndim == 1
+def _fit_eta_S_ctypes(adj, phi_hat, var_phi_hat):
+  assert phi_hat.ndim == var_phi_hat.ndim == 1
   M = len(phi_hat)
   assert M >= 1
-  assert prec_sqrt.shape == (M,)
+  assert var_phi_hat.shape == (M,)
   root = 0
 
   # sim_K100_S100_T50_M1000_G100_run1 revealed a weird issue where a particular
@@ -149,7 +167,7 @@ def _fit_eta_S_ctypes(adj, phi_hat, prec_sqrt):
   # two additional attempts.
   max_attempts = 3
   for attempt in range(max_attempts):
-    eta = _project_ppm(adj, phi_hat, prec_sqrt, root)
+    eta = _project_ppm(adj, phi_hat, var_phi_hat, root)
     if np.any(np.isnan(eta)):
       print('eta contains NaN, retrying ...', file=sys.stderr)
       continue
@@ -189,10 +207,11 @@ def _prepare_subprocess_inputs(adjm, phi, prec_sqrt):
   joined = '\n'.join(calcphi_input)
   return joined
 
-def _fit_eta_S_subprocess(adj, phi_hat_S, prec_sqrt_S):
+def _fit_eta_S_subprocess(adj, phi_hat_S, var_phi_hat_S):
+  prec_sqrt_S = 1 / np.sqrt(var_phi_hat_S)
   calcphi_input = _prepare_subprocess_inputs(adj, phi_hat_S, prec_sqrt_S)
 
-  result = subprocess.run(['projectppm'], input=calcphi_input, capture_output=True, encoding='UTF-8')
+  result = subprocess.run([os.path.join(os.path.dirname(__file__), 'projectppm', 'bin', 'projectppm')], input=calcphi_input, capture_output=True, encoding='UTF-8')
   result.check_returncode()
   lines = result.stdout.strip().split('\n')
   assert len(lines) == 2
