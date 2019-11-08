@@ -7,9 +7,6 @@ INDIR=$PROTDIR/scratch/inputs/sims.pairtree.smallalpha
 JOBDIR=/tmp
 
 PARALLEL=40
-TREES_PER_CHAIN=1000
-PHI_ITERATIONS=10000
-FRACGARB=20
 
 function make_simulated_data {
   mkdir -p $INDIR
