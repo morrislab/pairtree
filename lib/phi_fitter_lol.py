@@ -3,7 +3,7 @@ from numba import njit, jit, prange
 import common
 import binom
 
-_EPS = 1e-30
+_EPS = 1e-10
 
 # Matrices: M mutations, K clusters, S samples
 #   adj: KxK, adjacency matrix -- adj[a,b]=1 iff a is parent of b (with 1 on diagonal)
