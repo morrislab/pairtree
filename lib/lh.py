@@ -6,6 +6,8 @@ import numpy as np
 import util
 import warnings
 import binom
+import lhmath_numba
+import lhmath_native
 
 def generate_logprob_phi(N):
   prob = {}
@@ -170,8 +172,8 @@ def calc_lh_mc_1D(V1, V2):
       else:
         logP = scipy.stats.binom.logpmf(V1.var_reads[sidx], V1.total_reads[sidx], V1.omega_v[sidx]*phi1)
 
-        lower = _make_lower(phi1, modelidx)
-        upper = _make_upper(phi1, modelidx)
+        lower = lhmath_native._make_lower(phi1, modelidx)
+        upper = lhmath_native._make_upper(phi1, modelidx)
         A = V2.var_reads[sidx] + 1
         B = V2.ref_reads[sidx] + 1
 
@@ -190,68 +192,12 @@ def calc_lh_mc_1D(V1, V2):
 
   return logprob_models
 
-def _make_lower(phi1, midx):
-  ret = {
-    Models.A_B: 0,
-    Models.B_A: phi1,
-    Models.diff_branches: 0,
-  }[midx]
-  return np.broadcast_to(ret, np.array(phi1).shape)
-
-def _make_upper(phi1, midx):
-  ret = {
-    Models.A_B: phi1,
-    Models.B_A: 1,
-    Models.diff_branches: 1 - phi1,
-  }[midx]
-  return np.broadcast_to(ret, np.array(phi1).shape)
-
-def binom_logpmf_scalar(X, N, P):
-  return binom.logpmf(
-    np.array([X]),
-    np.array([N]),
-    np.array([P]),
-  )[0]
-
-def _integral_separate_clusters(phi1, V1, V2, sidx, midx, logsub=0):
-  logP = binom_logpmf_scalar(
-    V1.var_reads[sidx],
-    V1.total_reads[sidx],
-    V1.omega_v[sidx]*phi1
-  )
-  lower = _make_lower(phi1, midx)
-  upper = _make_upper(phi1, midx)
-
-  A = V2.var_reads[sidx] + 1
-  B = V2.ref_reads[sidx] + 1
-  betainc_upper = scipy.special.betainc(A, B, V2.omega_v[sidx] * upper)
-  betainc_lower = scipy.special.betainc(A, B, V2.omega_v[sidx] * lower)
-  if np.isclose(betainc_upper, betainc_lower):
-    return 0
-  logP += np.log(betainc_upper - betainc_lower)
-  logP -= logsub
-
-  return np.exp(logP)
-
-def _integral_same_cluster(phi1, V1, V2, sidx, logsub=0):
-  binom_params = [(
-    V.var_reads[sidx],
-    V.total_reads[sidx],
-    V.omega_v[sidx]*phi1,
-  ) for V in (V1, V2)]
-  X, N, P = [np.array(A) for A in zip(*binom_params)]
-
-  B = binom.logpmf(X, N, P)
-  logP = B[0] + B[1]
-  logP -= logsub
-  return np.exp(logP)
-
 def quad(*args, **kwargs):
   with warnings.catch_warnings():
     warnings.simplefilter('ignore', category=scipy.integrate.IntegrationWarning)
     return scipy.integrate.quad(*args, **kwargs)
 
-def calc_lh_quad(V1, V2):
+def calc_lh_quad(V1, V2, use_numba=True):
   max_splits = 50
   S = len(V1.total_reads) # S
   logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
@@ -261,18 +207,42 @@ def calc_lh_quad(V1, V2):
     V1_phi_mle = np.minimum(1, V1_phi_mle)
     V1_phi_mle = np.maximum(0, V1_phi_mle)
 
+    if use_numba:
+      args = (
+        V1.var_reads[sidx],
+        V1.ref_reads[sidx],
+        V1.omega_v[sidx],
+        V2.var_reads[sidx],
+        V2.ref_reads[sidx],
+        V2.omega_v[sidx],
+      )
+
     for modelidx in (Models.cocluster, Models.A_B, Models.B_A, Models.diff_branches):
       if modelidx == Models.cocluster:
-        logmaxP = np.log(_integral_same_cluster(V1_phi_mle, V1, V2, sidx) + _EPSILON)
-        P, P_error = quad(_integral_same_cluster, 0, 1, args=(V1, V2, sidx, logmaxP), limit=max_splits)
+        if not use_numba:
+          logmaxP = np.log(lhmath_native.integral_same_cluster(V1_phi_mle, V1, V2, sidx, 0) + _EPSILON)
+          P, P_error = quad(lhmath_native.integral_same_cluster, 0, 1, args=(V1, V2, sidx, logmaxP), limit=max_splits)
+        else:
+          logmax_args = np.array((V1_phi_mle, *args, 0)).astype(np.float64)
+          logmaxP = np.log(lhmath_numba._integral_same_cluster(logmax_args) + _EPSILON)
+          P, P_error = quad(lhmath_numba.integral_same_cluster, 0, 1, args + (logmaxP,), limit=max_splits)
+
         P = np.maximum(_EPSILON, P)
         logP = np.log(P) + logmaxP
+
       else:
-        logmaxP = np.log(_integral_separate_clusters(V1_phi_mle, V1, V2, sidx, modelidx) + _EPSILON)
-        P, P_error = quad(_integral_separate_clusters, 0, 1, args=(V1, V2, sidx, modelidx, logmaxP), limit=max_splits)
+        if not use_numba:
+          logmaxP = np.log(lhmath_native.integral_separate_clusters(V1_phi_mle, V1, V2, sidx, modelidx, 0) + _EPSILON)
+          P, P_error = quad(lhmath_native.integral_separate_clusters, 0, 1, args=(V1, V2, sidx, modelidx, logmaxP), limit=max_splits)
+        else:
+          logmax_args = np.array((V1_phi_mle, *args, modelidx, 0)).astype(np.float64)
+          logmaxP = np.log(lhmath_numba._integral_separate_clusters(logmax_args) + _EPSILON)
+          P, P_error = quad(lhmath_numba.integral_separate_clusters, 0, 1, args + (modelidx, logmaxP), limit=max_splits)
+
         logdenorm = scipy.special.betaln(V2.var_reads[sidx] + 1, V2.ref_reads[sidx] + 1)
         P = np.maximum(_EPSILON, P)
         logP = np.log(P) + logmaxP + logdenorm + np.log(2) + util.log_N_choose_K(V2.total_reads[sidx], V2.var_reads[sidx]) - np.log(V2.omega_v[sidx])
+
       logprob_models[sidx,modelidx] = logP
   return logprob_models
 
@@ -321,6 +291,39 @@ def _filter_samples(V, samp_filter):
 calc_garbage = _calc_garbage_smart
 #calc_garbage = _calc_garbage_dumb
 
+def _compare_algorithms(V1, V2, S, good_samples):
+  import pairwise
+  import time
+  all_post = []
+  all_evidence = []
+  times = []
+  logprior = {'garbage': -np.inf, 'cocluster': -np.inf}
+  logprior = pairwise._complete_logprior(logprior)
+
+  for alg in (
+    lambda v1, v2: calc_lh_quad(v1, v2, True),
+    lambda v1, v2: calc_lh_quad(v1, v2, False),
+    #calc_lh_mc_2D,
+    calc_lh_mc_1D,
+    #calc_lh_grid,
+  ):
+    result = np.zeros((S, len(Models._all)))
+    time_start = time.perf_counter_ns()
+    result[good_samples] = alg(V1, V2)
+    time_end = time.perf_counter_ns()
+    result[good_samples,Models.garbage] = calc_garbage(V1, V2)
+    times.append((time_end - time_start)/1e6)
+    summed = np.sum(result, axis=0)
+
+    post = pairwise._calc_posterior(summed, logprior)
+    all_post.append(post)
+    all_evidence.append(summed)
+
+  print(np.array(times), times[1] / times[0], flush=True)
+  print(np.array(all_post), flush=True)
+  print(np.array(all_evidence), flush=True)
+  print()
+
 def calc_lh(V1, V2, _calc_lh=None):
   if _calc_lh is None:
     _calc_lh = calc_lh_quad
@@ -340,8 +343,10 @@ def calc_lh(V1, V2, _calc_lh=None):
   V1 = _filter_samples(V1, good_samples)
   V2 = _filter_samples(V2, good_samples)
 
+  _compare_algorithms(V1, V2, S, good_samples)
+
   evidence_per_sample[good_samples] = _calc_lh(V1, V2)
   evidence_per_sample[good_samples,Models.garbage] = calc_garbage(V1, V2)
-
   evidence = np.sum(evidence_per_sample, axis=0)
+
   return (evidence, evidence_per_sample)
