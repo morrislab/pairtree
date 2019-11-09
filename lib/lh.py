@@ -343,7 +343,7 @@ def calc_lh(V1, V2, _calc_lh=None):
   V1 = _filter_samples(V1, good_samples)
   V2 = _filter_samples(V2, good_samples)
 
-  _compare_algorithms(V1, V2, S, good_samples)
+  #_compare_algorithms(V1, V2, S, good_samples)
 
   evidence_per_sample[good_samples] = _calc_lh(V1, V2)
   evidence_per_sample[good_samples,Models.garbage] = calc_garbage(V1, V2)
