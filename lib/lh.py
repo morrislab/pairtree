@@ -135,7 +135,9 @@ def _calc_garbage_smart(V1, V2):
     for V in (V1, V2):
       A, B = V.var_reads[sidx] + 1, V.ref_reads[sidx] + 1
       logP.append(util.log_N_choose_K(V.total_reads[sidx], V.var_reads[sidx]))
-      logP.append(np.log(scipy.special.betainc(A, B, V.omega_v[sidx])))
+      # `betainc` (the beta distribution CDF) can sometimes return exactly
+      # zero, depending on the parameters.
+      logP.append(np.log(np.maximum(_EPSILON, scipy.special.betainc(A, B, V.omega_v[sidx]))))
       logP.append(scipy.special.betaln(A, B)) # Denormalization factor for beta
     evidence[sidx] = np.sum(logP)
 
