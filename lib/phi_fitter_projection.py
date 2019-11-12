@@ -50,10 +50,31 @@ def fit_etas(adj, superclusters, supervars):
   eta = np.zeros((M+1, S))
   for sidx in range(S):
     eta[:,sidx] = _fit_eta_S(adj, phi_hat[:,sidx], var_phi_hat[:,sidx])
+
+  assert not np.any(np.isnan(eta))
   assert np.allclose(0, eta[eta < 0])
   eta[eta < 0] = 0
-
   return eta
+
+def _fit_eta_S_nancheck(adj, phi_hat, var_phi_hat):
+  # sim_K100_S100_T50_M1000_G100_run1 revealed a weird issue where a particular
+  # call to _project_ppm() will return NaNs. This is reproducible insofar as
+  # running Pairtree again with the same seed ("1") will cause this failure at
+  # exactly the same point for exactly the same tree sample. In this instance,
+  # 101 of the 10,000 entries of the `eta` matrix will be NaN. However, calling
+  # _project_ppm() immediately after with the same inputs will work fine.  Out
+  # of 705 simulations, each of which sampled 3000 trees (meaning >2M trees
+  # sampled), this was the only case where I saw this failure.
+  #
+  # To work around this, if the first call to _project_ppm() returns NaNs, make
+  # two additional attempts.
+  max_attempts = 3
+  for attempt in range(max_attempts):
+    eta = _fit_eta_S_ctypes(adj, phi_hat, var_phi_hat)
+    if not np.any(np.isnan(eta)):
+      return eta
+    print('eta contains NaN, retrying ...', file=sys.stderr)
+  raise Exception('eta still contains NaN after %s attempt(s)' % max_attempts)
 
 def _project_ppm(adjm, phi_hat, var_phi_hat, root):
   assert phi_hat.ndim == var_phi_hat.ndim == 1
@@ -154,27 +175,7 @@ def _fit_eta_S_ctypes(adj, phi_hat, var_phi_hat):
   assert var_phi_hat.shape == (M,)
   root = 0
 
-  # sim_K100_S100_T50_M1000_G100_run1 revealed a weird issue where a particular
-  # call to _project_ppm() will return NaNs. This is reproducible insofar as
-  # running Pairtree again with the same seed ("1") will cause this failure at
-  # exactly the same point for exactly the same tree sample. In this instance,
-  # 101 of the 10,000 entries of the `eta` matrix will be NaN. However, calling
-  # _project_ppm() immediately after with the same inputs will work fine.  Out
-  # of 705 simulations, each of which sampled 3000 trees (meaning >2M trees
-  # sampled), this was the only case where I saw this failure.
-  #
-  # To work around this, if the first call to _project_ppm() returns NaNs, make
-  # two additional attempts.
-  max_attempts = 3
-  for attempt in range(max_attempts):
-    eta = _project_ppm(adj, phi_hat, var_phi_hat, root)
-    if np.any(np.isnan(eta)):
-      print('eta contains NaN, retrying ...', file=sys.stderr)
-      continue
-    else:
-      break
-  else:
-    raise Exception('eta still contains NaN after %s attempt(s)' % max_attempts)
+  eta = _project_ppm(adj, phi_hat, var_phi_hat, root)
   return eta
 
 def _prepare_subprocess_inputs(adjm, phi, prec_sqrt):
@@ -221,4 +222,4 @@ def _fit_eta_S_subprocess(adj, phi_hat_S, var_phi_hat_S):
 
   return eta_S
 
-_fit_eta_S = _fit_eta_S_ctypes
+_fit_eta_S = _fit_eta_S_nancheck
