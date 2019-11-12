@@ -615,11 +615,16 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin,
   if parallel > 0:
     import concurrent.futures
     import multiprocessing
+    import queue
+    import time
+    import sys
+
     manager = multiprocessing.Manager()
     # What is stored in progress_queue doesn't matter. The queue is just used
     # so that child processes can signal when they've sampled a tree, allowing
     # the main process to update the progress bar.
     progress_queue = manager.Queue()
+
     with progressbar(total=total, desc='Sampling trees', unit='tree', dynamic_ncols=True) as pbar:
       with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
         for C in range(nchains):
@@ -627,14 +632,54 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin,
           # seed the initial Pairtree invocation, yet nonetheless reproducible.
           jobs.append(ex.submit(_run_chain, data_logmutrel, supervars, superclusters, trees_per_chain, thinned_frac, phi_method, phi_iterations, seed + C + 1, progress_queue))
 
-        # Exactly `total` items will be added to the queue. Once we've
-        # retrieved that many items from the queue, we can assume that our
-        # child processes are finished sampling trees.
-        for _ in range(total):
-          # Block until there's something in the queue for us to retrieve,
-          # indicating a child process has sampled a tree.
-          progress_queue.get()
-          pbar.update()
+        while True:
+          finished = 0
+          last_check = time.perf_counter()
+
+          for J in jobs:
+            if J.done():
+              exception = J.exception(timeout=0.001)
+              if exception is not None:
+                # Ideally, if an exception occurs in a child process, we'd like
+                # to re-raise the exception from the parent process and cause
+                # the application to crash immediately. However,
+                # `concurrent.futures` will wait until all child processes
+                # terminate (either because they finished successfully or
+                # suffered an exception) to raise the exception from the parent
+                # process. If an exception occurs in the child process, it
+                # would normally be raised automatically when we call
+                # `J.result()` below; however, since we're in a loop, we must
+                # break out of the loop, which we can do so by explicitly
+                # re-raising the exception.
+                #
+                # Note that the `print()` call will happen immediately, so the
+                # user will be notified as soon as the error occurs. Actually
+                # raising the exception and crashing the application will not
+                # occur, however, until all child processes finish. When the
+                # `raise` happens below, the parent process will effectively
+                # freeze at that statement until all child processes finish,
+                # such that the progress bar stops updating. Ieally, we could
+                # terminate all child processes when we detect the exception,
+                # but we would have to do this manually by sending SIGTERM to
+                # the processes. It's evidently impossible to get the PIDs of
+                # the child processes without installing `psutil`, so we will
+                # just allow the application to wait until child processes
+                # finish before crashing.
+                print('Exception occurred in child process:', exception, file=sys.stderr)
+                raise exception
+              else:
+                finished += 1
+
+          if finished == nchains:
+            break
+          while time.perf_counter() - last_check < 5:
+            try:
+              # If there's something in the queue for us to retrieve, a child
+              # process has sampled a tree.
+              progress_queue.get(timeout=5)
+              pbar.update()
+            except queue.Empty:
+              pass
 
     results = [J.result() for J in jobs]
   else:
