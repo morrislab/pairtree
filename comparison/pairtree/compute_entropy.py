@@ -88,6 +88,9 @@ def compute_tree_jsd(structs1, probs1, structs2, probs2):
   kld_1 = compute_tree_kld(T_probs1, M)
   kld_2 = compute_tree_kld(T_probs2, M)
   jsd = 0.5*(kld_1 + kld_2)
+  if jsd > 1:
+    assert np.isclose(1, jsd)
+    jsd = 1
   # These bounds are guaranteed by JSD (when it's computed in bits).
   assert 0 <= jsd <= 1
   return jsd
