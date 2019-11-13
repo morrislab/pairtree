@@ -3,7 +3,7 @@ import os
 import numpy as np
 import argparse
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
 import clustermaker
 import inputparser
 
@@ -47,7 +47,7 @@ def main():
     matrices['alpha'][:] = 1
     matrices['beta'][:] = 2
 
-  C_max = 10
+  C_max = 15
   matrices['alpha'] = matrices['alpha'][:C_max,]
   matrices['beta']  = matrices['beta'][:C_max,]
 

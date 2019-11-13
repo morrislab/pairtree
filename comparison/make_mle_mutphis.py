@@ -30,8 +30,7 @@ def main():
 
   clusters = [[V] for V in vids]
   llh = 0
-  weight_trees_by = 'uniform'
-  mphi = mutphi.calc_mutphi([mle_phi], [llh], [clusters], weight_trees_by, args.ssm_fn)
+  mphi = mutphi.calc_mutphi([mle_phi], [llh], [clusters], args.ssm_fn)
   mutphi.write_mutphi(mphi, args.mutphi_fn)
 
 if __name__ == '__main__':

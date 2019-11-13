@@ -45,8 +45,6 @@ def enum_trees(tau, phi, order, traversal, store_trees=True):
       assert np.all(0 <= childsum + epsilon) and np.all(childsum <= 1 + epsilon)
       assert np.all(childsum <= phi + epsilon)
       num_trees += 1
-      if num_trees % 100000 == 0:
-        print(num_trees)
       if store_trees:
         struct = _find_parents(P)
         completed_trees.append(struct)
@@ -96,7 +94,14 @@ def make_tau(phi, order):
     for J in range(I + 1, K):
       I_prime = order[I]
       J_prime = order[J]
-      assert not np.all(phi[I_prime] == phi[J_prime])
+      # Because we can now have `eta = 0` for some nodes, phis will sometimes
+      # be identical across nodes. (This is particularly common with only one
+      # sample, since it only "gets one chance" to have a different phi.) This
+      # implies that there's no longer a meaningful ordering between those two
+      # nodes, which in turn means that we may not receover the true tree
+      # through enumeration. We may need to alter the simulations to have a
+      # tiny (non-zero) minimum `eta` so that this situation doesn't occur.
+      #assert not np.all(phi[I_prime] == phi[J_prime])
       if np.all(phi[I_prime] >= phi[J_prime]):
         tau[I_prime,J_prime] = 1
 
