@@ -76,11 +76,15 @@ function compute_phis {
     outd=$(dirname $structfn)
     resultsfn=$outd/$runid.results.npz
 
+    # `replace_llh.py` assumes that Pairtree will write trees (with computed
+    # phis) in the same order as the structures given in the `$structfn` file.
+    # We must disable posterior sorting to preserve this property.
     cmd="python3 $BASEDIR/bin/pairtree "
     cmd+="--seed 1 "
     cmd+="--phi-fitter projection "
     cmd+="--parallel 0 "
     cmd+="--params $structfn "
+    cmd+="--disable-posterior-sorting "
     cmd+="$PAIRTREE_INPUTS_DIR/$runid.ssm "
     cmd+="$resultsfn "
 
