@@ -3,7 +3,7 @@ set -euo pipefail
 
 PROTDIR=~/work/pairtree
 SIMDIR=~/work/pearsim
-INDIR=$PROTDIR/scratch/inputs/sims.pairtree.smallalpha
+INDIR=$PROTDIR/scratch/inputs/sims.smallalpha.pairtree
 JOBDIR=/tmp
 
 PARALLEL=40
@@ -18,7 +18,7 @@ function make_simulated_data {
   for T in 50 200 1000; do
   for M_per_cluster in 10 20 100; do
   for G_frac in 0; do
-  for run in $(seq 1 3); do
+  for run in $(seq 1 4); do
     M=$(echo "$K * $M_per_cluster" | bc)
     G=$(echo "(($G_frac * $M) + 0.5) / 1" | bc)
 

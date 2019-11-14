@@ -1,16 +1,17 @@
 #!/bin/bash
 command -v parallel > /dev/null || module load gnu-parallel
+PYTHON2=$HOME/.apps/miniconda2/bin/python2
 
 BASEDIR=~/work/pairtree
 JOBDIR=/tmp
 PWGS_PATH=~/.apps/phylowgs
 PARALLEL=40
-NUM_CHAINS=40
+NUM_CHAINS=1
 
-BATCH=sims.pwgs.supervars
-INDIR=$BASEDIR/scratch/inputs/sims.pwgs.supervars
+BATCH=sims.smallalpha.pwgs.supervars
+INDIR=$BASEDIR/scratch/inputs/$BATCH
 OUTBASE=$BASEDIR/scratch/results/$BATCH
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.smallalpha.pairtree
 
 #BATCH=steph.pwgs.supervars
 #BATCH=steph.pwgs.allvars
@@ -59,7 +60,7 @@ function run_pwgs {
         "mkdir -p $OUTDIR &&" \
         "cd $OUTDIR && " \
         "TIMEFORMAT='%R %U %S' && " \
-        "time (OMP_NUM_THREADS=1 python2 $PWGS_PATH/multievolve.py" \
+        "time (OMP_NUM_THREADS=1 $PYTHON2 $PWGS_PATH/multievolve.py" \
         "--num-chains $NUM_CHAINS" \
         "--ssms $INDIR/${runid}.ssm" \
         "--cnvs $INDIR/empty.cnv" \
@@ -98,7 +99,7 @@ function convert_outputs {
 
     cmd="cd $OUTDIR && export OMP_NUM_THREADS=1 "
 
-    cmd+="&& $HOME/.apps/anaconda2/bin/python2 $PWGS_PATH/write_results.py "
+    cmd+="&& $PYTHON2 $PWGS_PATH/write_results.py "
     cmd+="--include-multiprimary "
     cmd+="--keep-superclones "
     cmd+="$runid "
@@ -124,13 +125,14 @@ function convert_outputs {
 }
 
 function main {
-  #convert_inputs
+  convert_inputs
   #run_pwgs
+
   #convert_outputs true
   # Don't run `parallel` with `--halt 1`, as some jobs will fail --
   # `write_results.py` will exit with non-zero when burn-in hasn't finished.
   #convert_outputs false | grep -v -e K30_ -e K100_ | parallel -j80 --eta
-  convert_outputs false #| grep    -e K30_ -e K100_ | parallel -j10 --eta
+  #convert_outputs false #| grep    -e K30_ -e K100_ | parallel -j10 --eta
 }
 
 main

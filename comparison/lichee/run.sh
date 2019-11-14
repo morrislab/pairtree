@@ -6,8 +6,8 @@ SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 LICHEE_DIR=$HOME/.apps/lichee/LICHeE/release
 NUM_TREES=3000
 
-BATCH=sims.lichee
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+BATCH=sims.smallalpha.lichee
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.smallalpha.pairtree
 #BATCH=steph.xeno.lichee
 #PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 
@@ -36,8 +36,7 @@ function run_lichee {
   for snvfn in $INDIR/*.snv; do
     runid=$(basename $snvfn | cut -d. -f1)
     outd="$OUTBASE/$runid"
-
-    echo "(command -v java > /dev/null || module load java) && " \
+    echo \
       "mkdir -p $outd && cd $outd &&" \
       "TIMEFORMAT='%R %U %S'; time (java -jar $LICHEE_DIR/lichee.jar" \
       "-build" \
@@ -117,11 +116,11 @@ function compute_mutphis {
 }
 
 function main {
-  #convert_inputs
+  convert_inputs
   #run_lichee
-  convert_outputs | sort --random-sort | parallel -j8 --halt 1 --eta
-  compute_phis | parallel -j40 --halt 1 --eta
-  compute_mutphis | parallel -j80 --halt 1 --eta
+  #convert_outputs | sort --random-sort | parallel -j8 --halt 1 --eta
+  #compute_phis | parallel -j40 --halt 1 --eta
+  #compute_mutphis | parallel -j80 --halt 1 --eta
 }
 
 main

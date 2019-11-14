@@ -7,8 +7,8 @@ PARALLEL=40
 NUM_ITERS=10000
 PASTRI_DIR=$HOME/.apps/pastri
 
-BATCH=sims.pastri.informative
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
+BATCH=sims.smallalpha.pastri
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.smallalpha.pairtree
 #BATCH=steph.xeno.pastri.hbclusters
 #PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 
@@ -110,10 +110,10 @@ function convert_outputs {
 }
 
 function main {
-  #convert_inputs
+  convert_inputs
   #run_pastri
   #get_F_and_C
-  convert_outputs
+  #convert_outputs
 }
 
 main

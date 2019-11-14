@@ -75,5 +75,5 @@ def write_mutphi(mphi, mutphifn):
   np.savez_compressed(mutphifn, logprobs=mphi.logprobs, vids=mphi.vids, assays=mphi.assays)
 
 def load_mutphi(mutphifn):
-  results = np.load(mutphifn)
+  results = np.load(mutphifn, allow_pickle=True)
   return Mutphi(vids=results['vids'], assays=results['assays'], logprobs=results['logprobs'])
