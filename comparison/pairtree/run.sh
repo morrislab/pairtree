@@ -15,12 +15,12 @@ PHI_FITTER=projection
 THINNED_FRAC=1.0
 BURNIN=0.333333
 
-#BATCH=sims.pairtree
-#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.pairtree
-#PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.lol69
-BATCH=steph.pairtree.lol
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
-PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/$BATCH
+BATCH=sims.smallalpha.pairtree
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/$BATCH
+PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.lol1
+#BATCH=steph.pairtree.multichain
+#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+#PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/$BATCH
 
 source $SCRIPTDIR/util.sh
 
@@ -41,7 +41,7 @@ function run_pairtree {
       echo "#!/bin/bash"
       echo "#SBATCH --nodes=1"
       echo "#SBATCH --ntasks=$PARALLEL"
-      echo "#SBATCH --time=23:59:00"
+      echo "#SBATCH --time=1:59:00"
       echo "#SBATCH --job-name $runid"
       echo "#SBATCH --output=$JOBDIR/slurm_${runid}_%j.txt"
       echo "#SBATCH --mail-type=NONE"
@@ -68,8 +68,8 @@ function run_pairtree {
         "$resultsfn" \
         ">$runid.stdout" \
         "2>$runid.stderr) 2>$runid.time"
-    ) #> $jobfn
-    #sbatch $jobfn
+    ) > $jobfn
+    sbatch $jobfn
     rm $jobfn
   done
 }
@@ -109,9 +109,9 @@ function convert_outputs {
 }
 
 function main {
-  run_pairtree #| grep python3 | parallel -j80 --halt 1 --eta
-  #convert_outputs | grep python3 | grep mutphi | sort --random-sort | parallel -j80 --halt 1 --eta
-  #convert_outputs | grep python3 | grep mutrel | sort --random-sort | parallel -j5 --halt 1 --eta
+  #run_pairtree #| grep python3 | parallel -j80 --halt 1 --eta
+  convert_outputs | grep python3 | grep mutphi | sort --random-sort | parallel -j80 --halt 1 --eta
+  convert_outputs | grep python3 | grep mutrel | sort --random-sort | parallel -j5 --halt 1 --eta
 }
 
 main
