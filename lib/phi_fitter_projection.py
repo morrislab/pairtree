@@ -6,7 +6,7 @@ import subprocess
 import os
 import sys
 
-MIN_VARIANCE = 1e-8
+MIN_VARIANCE = 1e-4
 
 def _convert_adjm_to_adjlist(adjm):
   adjm = np.copy(adjm)
