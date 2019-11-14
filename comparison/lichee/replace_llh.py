@@ -17,7 +17,7 @@ def main():
   args = parser.parse_args()
 
   params = inputparser.load_params(args.params_fn)
-  pairtree_results = np.load(args.pairtree_results_fn)
+  pairtree_results = np.load(args.pairtree_results_fn, allow_pickle=True)
   pairtree_results = {K: pairtree_results[K] for K in pairtree_results}
 
   assert len(pairtree_results['struct']) == len(params['structures'])

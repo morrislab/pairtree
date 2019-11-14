@@ -45,9 +45,13 @@ def lpdist(A, B, p=1):
 def _fit_phis(adj, superclusters, supervars, method, iterations, parallel):
   # Calling `import` on each function call should be cheap, as Python caches a
   # reference to the module after the first load.
-  if method in ('graddesc', 'rprop'):
+  if method in ('graddesc_old', 'rprop_old'):
     import phi_fitter_iterative
-    eta = phi_fitter_iterative.fit_etas(adj, superclusters, supervars, method, iterations, parallel)
+    eta = phi_fitter_iterative.fit_etas(adj, superclusters, supervars, method[:-4], iterations, parallel)
+
+  elif method == 'rprop':
+    import phi_fitter_lol
+    eta = phi_fitter_lol.fit_etas(adj, superclusters, supervars, 'rprop', iterations, parallel, eta_init='mle')
 
   elif method == 'projection':
     import phi_fitter_projection
@@ -55,9 +59,9 @@ def _fit_phis(adj, superclusters, supervars, method, iterations, parallel):
 
   elif method == 'proj_rprop':
     import phi_fitter_projection
-    import phi_fitter_iterative
+    import phi_fitter_lol
     eta_proj = phi_fitter_projection.fit_etas(adj, superclusters, supervars)
-    eta = phi_fitter_iterative.fit_etas(adj, superclusters, supervars, 'rprop', iterations, parallel, eta_init=eta_proj)
+    eta = phi_fitter_lol.fit_etas(adj, superclusters, supervars, 'rprop', iterations, parallel, eta_init=eta_proj)
 
   elif method == 'debug':
     import phi_fitter_iterative
