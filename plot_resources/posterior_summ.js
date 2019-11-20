@@ -18,19 +18,4 @@ PosteriorSumm.prototype.plot = function(structs, container) {
     var root = 0;
     (new TreePlotter()).plot(root, struct.parents, struct.phi, struct.samples, '#' + struct_id);
   });
-
-  resize_svgs();
-}
-
-function resize_svgs() {
-  document.querySelectorAll('svg').forEach(function(svg) {
-    var box = svg.getBBox();
-    // Padding is necessary, as `getBBox` doesn't account for borders around
-    // nodes -- these would otherwise be clipped off.
-    var padding = 6;
-    var viewbox = [box.x - 0.5*padding, box.y - 0.5*padding, box.width + padding, box.height + padding];
-    svg.setAttribute('viewBox', viewbox.join(' '));
-    svg.setAttribute('width', viewbox[2]);
-    svg.setAttribute('height', viewbox[3]);
-  });
 }

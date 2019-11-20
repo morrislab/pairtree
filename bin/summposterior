@@ -37,14 +37,9 @@ def summarize(runid, results, params, supervars, threshold, html_out_fn):
     supervars,
     params['samples'],
   )
-  # This ensures that at least one tree will always be written.
-  structs = [_make_struct(0)]
 
-  for tidx in range(1, N):
-    if results['prob'][tidx] < threshold:
-      break
-    structs.append(_make_struct(tidx))
-
+  limit = 20
+  structs = [_make_struct(tidx) for tidx in range(min(N, limit))]
   json_trees = {
     'structs': structs,
   }

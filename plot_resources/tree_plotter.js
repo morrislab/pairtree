@@ -227,6 +227,7 @@ TreePlotter.prototype.plot = function(root, parents, phi, sampnames, container) 
   var right_sample = sampnames[0];
   var root = this._generate_tree_struct(parents, phi, root, sampnames, left_sample, right_sample);
   this._draw_tree(root, container, K, left_sample, right_sample);
+  resize_svg(container.selectAll('svg'));
 }
 
 function Util() {
@@ -512,5 +513,18 @@ VafMatrix.prototype._configure_filter = function(container) {
       targets = targets.filter((T) => { return T !== ''; });
       self._filter_rows(container, targets);
     }
+  });
+}
+
+function resize_svg(elems) {
+  elems.nodes().forEach(function(svg) {
+    var box = svg.getBBox();
+    // Padding is necessary, as `getBBox` doesn't account for borders around
+    // nodes -- these would otherwise be clipped off.
+    var padding = 6;
+    var viewbox = [box.x - 0.5*padding, box.y - 0.5*padding, box.width + padding, box.height + padding];
+    svg.setAttribute('viewBox', viewbox.join(' '));
+    svg.setAttribute('width', viewbox[2]);
+    svg.setAttribute('height', viewbox[3]);
   });
 }
