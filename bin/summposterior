@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+import numpy as np
+import argparse
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
+
+import common
+import resultserializer
+import clustermaker
+import inputparser
+
+import json
+import util
+import plotutil
+
+def write_header(runid, outf):
+  print('<meta charset="utf-8">', file=outf)
+  print('<script src="https://d3js.org/d3.v5.min.js"></script>', file=outf)
+  for jsfn in ('tree_plotter.js', 'posterior_summ.js'):
+    print('<script type="text/javascript">%s</script>' % plotutil.read_file(jsfn), file=outf)
+  print('<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">', file=outf)
+  print('<style type="text/css">%s</style>' % plotutil.read_file('tree.css'), file=outf)
+  if runid is not None:
+    print('<h1>%s</h1>' % runid, file=outf)
+
+def summarize(runid, results, params, supervars, threshold, html_out_fn):
+  N = len(results['prob'])
+  assert np.array_equal(np.argsort(-results['prob'], kind='stable'), np.arange(N))
+
+  _make_struct = lambda tidx: util.make_tree_struct(
+    results['struct'][tidx],
+    results['count'][tidx],
+    results['llh'][tidx],
+    results['prob'][tidx],
+    results['phi'][tidx],
+    supervars,
+    params['samples'],
+  )
+  # This ensures that at least one tree will always be written.
+  structs = [_make_struct(0)]
+
+  for tidx in range(1, N):
+    if results['prob'][tidx] < threshold:
+      break
+    structs.append(_make_struct(tidx))
+
+  json_trees = {
+    'structs': structs,
+  }
+
+  with open(html_out_fn, 'w') as outf:
+    write_header(runid, outf)
+    print("<script type=\"text/javascript\">var tree_json = '%s'; var results = JSON.parse(tree_json);</script>" % json.dumps(structs), file=outf)
+    print('<h2>Trees</h2>', file=outf)
+    print('<ul><li>Number of unique trees: %s</li></ul>' % N, file=outf)
+    print('<table id="trees" class="table table-striped"><thead><tr><th>Index</th><th>Posterior</th><th>nLgLh</th><th>Structure</th></tr></thead><tbody class="container"></tbody></table>', file=outf)
+    print(plotutil.js_on_load("(new PosteriorSumm()).plot(results, '#trees .container');"), file=outf)
+
+def main():
+  parser = argparse.ArgumentParser(
+    description='LOL HI THERE',
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter
+  )
+  parser.add_argument('--threshold', type=float, default=0.01)
+  parser.add_argument('--runid')
+  parser.add_argument('ssm_fn')
+  parser.add_argument('params_fn')
+  parser.add_argument('results_fn')
+  parser.add_argument('html_out_fn')
+  args = parser.parse_args()
+
+  results = resultserializer.load(args.results_fn)
+  variants = inputparser.load_ssms(args.ssm_fn)
+  params = inputparser.load_params(args.params_fn)
+  supervars = clustermaker.make_cluster_supervars(results['clusters'], variants)
+  supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
+
+  summarize(args.runid, results, params, supervars, args.threshold, args.html_out_fn)
+
+if __name__ == '__main__':
+  main()

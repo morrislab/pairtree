@@ -14,76 +14,56 @@ import vaf_plotter
 import relation_plotter
 import json
 import util
+import plotutil
 
-def read_file(fn):
-  basedir = os.path.join(os.path.dirname(__file__), '..', 'plot_resources')
-  with open(os.path.join(basedir, fn)) as F:
-    return F.read()
-
-def _make_tree_json(struct, count, llh, prob, phi, variants, sampnames):
-  phi_hat = _calc_phi_hat(variants)
-  tree = {
-    'phi': phi.tolist(),
-    'phi_hat': phi_hat.tolist(),
-    'llh': float(llh),
-    'prob': float(prob),
-    'count': int(count),
-    'parents': struct.tolist(),
-    'samples': sampnames,
-  }
-  return json.dumps(tree)
-
-def _write_tree_json(tree_json, jsonfn):
+def _write_tree_json(tree_struct, jsonfn):
   with open(jsonfn, 'w') as F:
-    print(tree_json, file=F)
+    print(json.dumps(tree_struct), file=F)
 
 def write_header(runid, outf):
   print('<meta charset="utf-8">', file=outf)
   print('<script src="https://d3js.org/d3.v5.min.js"></script>', file=outf)
-  print('<script type="text/javascript">%s</script>' % read_file('highlight_table_labels.js'), file=outf)
-  print('<script type="text/javascript">%s</script>' % read_file('tree_plotter.js'), file=outf)
+  for jsfn in ('highlight_table_labels.js', 'tree_plotter.js'):
+    print('<script type="text/javascript">%s</script>' % plotutil.read_file(jsfn), file=outf)
   print('<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">', file=outf)
-  print('<style type="text/css">%s</style>' % read_file('tree.css'), file=outf)
-  print('<style type="text/css">%s</style>' % read_file('matrix.css'), file=outf)
+  for cssfn in ('tree.css', 'matrix.css'):
+    print('<style type="text/css">%s</style>' % plotutil.read_file(cssfn), file=outf)
   print('<style type="text/css">.container { margin: 30px; } td, th, table { padding: 5px; margin: 0; border-collapse: collapse; font-weight: normal; } span { visibility: hidden; } td:hover > span { visibility: visible; } .highlighted { background-color: black !important; color: white; }</style>', file=outf)
   if runid is not None:
     print('<h1>%s</h1>' % runid, file=outf)
 
-def _js_on_load(js):
-  return '<script type="text/javascript">document.addEventListener("DOMContentLoaded", () => { %s });</script>' % js
-
-def _write_tree_html(runid, tree_json, plot_phi, plot_phi_hat, plot_phi_error, plot_phi_interleaved, outf):
+def _write_tree_html(runid, tree_struct, plot_phi, plot_phi_hat, plot_phi_error, plot_phi_interleaved, outf):
   write_header(runid, outf)
-  print("<script type=\"text/javascript\">var tree_json = '%s'; var results = JSON.parse(tree_json);</script>" % tree_json, file=outf)
+  print("<script type=\"text/javascript\">var tree_json = '%s'; var results = JSON.parse(tree_json);</script>" % json.dumps(tree_struct), file=outf)
 
   print('''
   <div id="trees" class="container"><h2>Tree</h2></div>
   %s
-  ''' % _js_on_load('''(new TreePlotter()).plot(0, results.parents, results.phi, results.llh, results.prob, results.samples, '#trees');'''), file=outf)
+  ''' % plotutil.js_on_load('''var container = '#trees'; d3.select(container).append('h3').text('nlglh=' + results.nlglh.toFixed(3) + ' prob=' + results.prob.toFixed(3)); (new TreePlotter()).plot(0, results.parents, results.phi,  results.samples, container);'''), file=outf)
 
   if plot_phi_interleaved:
     print('''
     <div id="phi_interleaved_matrix" class="container"><h2>Interleaved lineage frequencies</h2></div>
     %s
-    ''' % _js_on_load('''(new PhiInterleavedMatrix()).plot(results.phi, results.phi_hat, results.samples, '#phi_interleaved_matrix');'''), file=outf)
+    ''' % plotutil.js_on_load('''(new PhiInterleavedMatrix()).plot(results.phi, results.phi_hat, results.samples, '#phi_interleaved_matrix');'''), file=outf)
 
   if plot_phi:
     print('''
     <div id="phi_matrix" class="container"><h2>Tree-constrained lineage frequencies</h2></div>
     %s
-    ''' % _js_on_load('''(new PhiMatrix()).plot(results.phi, results.samples, '#phi_matrix');'''), file=outf)
+    ''' % plotutil.js_on_load('''(new PhiMatrix()).plot(results.phi, results.samples, '#phi_matrix');'''), file=outf)
 
   if plot_phi_hat:
     print('''
     <div id="phi_hat_matrix" class="container"><h2>Data-implied lineage frequencies</h2></div>
     %s
-    ''' % _js_on_load('''(new PhiMatrix().plot(results.phi_hat, results.samples, '#phi_hat_matrix'));'''), file=outf)
+    ''' % plotutil.js_on_load('''(new PhiMatrix().plot(results.phi_hat, results.samples, '#phi_hat_matrix'));'''), file=outf)
 
   if plot_phi_error:
     print('''
     <div id="phi_error_matrix" class="container"><h2>Lineage frequency error</h2></div>
     %s
-    ''' % _js_on_load('''(new PhiErrorMatrix()).plot(results.phi, results.phi_hat, results.samples, '#phi_error_matrix');'''), file=outf)
+    ''' % plotutil.js_on_load('''(new PhiErrorMatrix()).plot(results.phi, results.phi_hat, results.samples, '#phi_error_matrix');'''), file=outf)
 
 def write_cluster_stats(clusters, garbage, supervars, variants, outf):
   cluster_dev = []
@@ -104,20 +84,6 @@ def write_cluster_stats(clusters, garbage, supervars, variants, outf):
     rowhtml = ''.join(['<td>%s</td>' % (V if V is not None else '&mdash;') for V in row])
     print('<tr>%s</tr>' % rowhtml, file=outf)
   print('</tbody></table>', file=outf)
-
-def _extract_mat(variants, key):
-  mat = np.array([V[key] for V in variants])
-  return mat
-
-def _calc_phi_hat(variants):
-  V = _extract_mat(variants, 'var_reads')
-  T = _extract_mat(variants, 'total_reads')
-  omega = _extract_mat(variants, 'omega_v')
-  phi_hat = (V / T) / omega
-  phi_hat = np.minimum(1, phi_hat)
-  phi_hat = np.insert(phi_hat, 0, 1, axis=0)
-  assert np.all(phi_hat >= 0)
-  return phi_hat
 
 def main():
   parser = argparse.ArgumentParser(
@@ -152,7 +118,7 @@ def main():
   supervars = clustermaker.make_cluster_supervars(results['clusters'], variants)
   supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
 
-  tree_json = _make_tree_json(
+  tree_struct = util.make_tree_struct(
     results['struct'][tidx],
     results['count'][tidx],
     results['llh'][tidx],
@@ -162,12 +128,12 @@ def main():
     params['samples'],
   )
   if args.tree_json_fn is not None:
-    _write_tree_json(tree_json, args.tree_json_fn)
+    _write_tree_json(tree_struct, args.tree_json_fn)
 
   with open(args.html_out_fn, 'w') as outf:
     _write_tree_html(
       args.runid,
-      tree_json,
+      tree_struct,
       args.plot_phi,
       args.plot_phi_hat,
       args.plot_phi_error,

@@ -61,3 +61,33 @@ def convert_parents_to_adjmatrix(parents):
   adjm = np.eye(K)
   adjm[parents,np.arange(1, K)] = 1
   return adjm
+
+def _calc_phi_hat(variants):
+  _extract_mat = lambda key: np.array([var[key] for var in variants])
+
+  V = _extract_mat('var_reads')
+  T = _extract_mat('total_reads')
+  omega = _extract_mat('omega_v')
+  phi_hat = (V / T) / omega
+  phi_hat = np.minimum(1, phi_hat)
+  phi_hat = np.insert(phi_hat, 0, 1, axis=0)
+  assert np.all(phi_hat >= 0)
+  return phi_hat
+
+def calc_nlglh(llh, K, S):
+  return -llh / (np.log(2) * (K-1) * S)
+
+def make_tree_struct(struct, count, llh, prob, phi, variants, sampnames):
+  K, S = phi.shape
+  phi_hat = _calc_phi_hat(variants)
+  tree = {
+    'phi': phi.tolist(),
+    'phi_hat': phi_hat.tolist(),
+    'llh': float(llh),
+    'nlglh': float(calc_nlglh(llh, K, S)),
+    'prob': float(prob),
+    'count': int(count),
+    'parents': struct.tolist(),
+    'samples': sampnames,
+  }
+  return tree

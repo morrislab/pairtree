@@ -219,21 +219,9 @@ TreePlotter.prototype._generate_tree_struct = function(parents, phi, root_id, sa
   return root;
 }
 
-TreePlotter.prototype._calc_nlglh = function(llh, K, S) {
-  // Normalize LLH by casting into base 2 log (so we can think in bits), making
-  // positive, and normalizing to number of factors in LH (i.e., number of
-  // terms in LLH).
-  // (K - 1)xS: size of phi matrix used for scoring how well phis allowed by tree fit data VAFs
-  // K^2: size of cluster relation matrix
-  return -llh / Math.log(2) / ((K - 1)*S);
-}
-
-TreePlotter.prototype.plot = function(root, parents, phi, llh, prob, sampnames, container) {
+TreePlotter.prototype.plot = function(root, parents, phi, sampnames, container) {
   var K = phi.length;
-  var S = phi[0].length;
   container = d3.select(container).append('div');
-  var nlglh = this._calc_nlglh(llh, K, S);
-  container.append('h3').text('nlglh=' + nlglh.toFixed(3) + ' prob=' + prob.toFixed(3));
 
   var left_sample = sampnames[0];
   var right_sample = sampnames[0];
