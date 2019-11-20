@@ -11,7 +11,7 @@ PosteriorSumm.prototype.plot = function(structs, container) {
     var struct_id = 'structure_' + idx;
 
     row.append('td').text(idx);
-    row.append('td').text(struct.prob.toFixed(3));
+    row.append('td').text((100 * struct.prob).toFixed(1) + '%');
     row.append('td').text(struct.nlglh.toFixed(3));
     row.append('td').attr('id', struct_id);
 
