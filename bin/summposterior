@@ -24,7 +24,7 @@ def write_header(runid, outf):
   if runid is not None:
     print('<h1>%s</h1>' % runid, file=outf)
 
-def summarize(runid, results, params, supervars, threshold, html_out_fn):
+def summarize(runid, results, params, supervars, html_out_fn):
   N = len(results['prob'])
   assert np.array_equal(np.argsort(-results['prob'], kind='stable'), np.arange(N))
 
@@ -57,7 +57,6 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('--threshold', type=float, default=0.01)
   parser.add_argument('--runid')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
@@ -71,7 +70,7 @@ def main():
   supervars = clustermaker.make_cluster_supervars(results['clusters'], variants)
   supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
 
-  summarize(args.runid, results, params, supervars, args.threshold, args.html_out_fn)
+  summarize(args.runid, results, params, supervars, args.html_out_fn)
 
 if __name__ == '__main__':
   main()
