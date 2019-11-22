@@ -6,6 +6,8 @@ SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 PARALLEL=40
 NUM_ITERS=10000
 PASTRI_DIR=$HOME/.apps/pastri
+JOB_DIR=$HOME/jobs
+PYTHON2=$HOME/.apps/miniconda2/bin/python2
 
 BATCH=sims.smallalpha.pastri
 PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.smallalpha.pairtree
@@ -31,7 +33,6 @@ function convert_inputs {
 }
 
 function run_pastri {
-  source $HOME/.bash_host_specific
   for countsfn in $INDIR/*.counts; do
     runid=$(basename $countsfn | cut -d. -f1)
 
@@ -41,24 +42,35 @@ function run_pastri {
 
     [[ -f $OUTDIR/$runid.trees ]] && continue
 
-    (
-      # Must source ~/.bash_host_specific to get PATH set properly for
-      # Miniconda.
-      echo "cd $outpath && " \
-        "TIMEFORMAT='%R %U %S'; time (OMP_NUM_THREADS=1 " \
-        "python2 $PASTRI_DIR/src/RunPASTRI.py" \
-        "--output_prefix $runid" \
-        "--num_iters $NUM_ITERS" \
-        "$INDIR/${runid}.counts" \
-        "$INDIR/${runid}.proposal" \
-        ">$runid.stdout" \
-        "2>$runid.stderr) 2>$runid.time"
-    ) 
-  done #| parallel -j$PARALLEL --joblog $SCRATCH/tmp/$BATCH.log
+    cmd=""
+    cmd+="#!/bin/bash\n"
+    cmd+="#SBATCH --nodes=1\n"
+    cmd+="#SBATCH --ntasks=1\n"
+    cmd+="#SBATCH --mem=20GB\n"
+    cmd+="#SBATCH --time=23:59:00\n"
+    cmd+="#SBATCH --job-name pastri_$runid\n"
+    cmd+="#SBATCH --output=$JOB_DIR/slurm_pastri_${runid}_%j.txt\n"
+    cmd+="#SBATCH --partition=cpu\n"
+    cmd+="#SBATCH --mail-type=NONE\n"
+
+    cmd+="cd $outpath && "
+    cmd+="TIMEFORMAT='%R %U %S'; time (OMP_NUM_THREADS=1 "
+    cmd+="$PYTHON2 $PASTRI_DIR/src/RunPASTRI.py "
+    cmd+="--output_prefix $runid "
+    cmd+="--num_iters $NUM_ITERS "
+    cmd+="$INDIR/${runid}.counts "
+    cmd+="$INDIR/${runid}.proposal "
+    cmd+=">$runid.stdout "
+    cmd+="2>$runid.stderr) 2>$runid.time"
+
+    jobfn=$(mktemp)
+    echo -e $cmd > $jobfn
+    sbatch $jobfn
+    rm $jobfn
+  done
 }
 
 function get_F_and_C {
-  source $HOME/.bash_host_specific
   for treesfn in $OUTDIR/*/*.trees; do
     runid=$(basename $treesfn | cut -d. -f1)
     outpath=$(dirname $treesfn)
@@ -68,7 +80,7 @@ function get_F_and_C {
     valid_count=$(cat $treesfn | grep '^>' | grep -v -- '-inf$' | wc -l)
     for idx in $(seq $valid_count); do
       echo "cd $outpath && " \
-        "python2 $PASTRI_DIR/src/get_F_and_C.py" \
+        "$PYTHON2 $PASTRI_DIR/src/get_F_and_C.py" \
         "-i $idx" \
         "-o $outpath/$runid" \
         "$INDIR/${runid}.counts" \
@@ -110,8 +122,8 @@ function convert_outputs {
 }
 
 function main {
-  convert_inputs
-  #run_pastri
+  #convert_inputs
+  run_pastri
   #get_F_and_C
   #convert_outputs
 }

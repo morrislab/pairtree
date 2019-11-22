@@ -3,7 +3,10 @@ command -v java > /dev/null || module load java
 
 BASEDIR=~/work/pairtree
 SCRIPTDIR=$(dirname "$(readlink -f "$0")")
+JAVA=$HOME/.apps/jre8/bin/java
+JOB_DIR=$HOME/jobs
 LICHEE_DIR=$HOME/.apps/lichee/LICHeE/release
+
 NUM_TREES=3000
 
 BATCH=sims.smallalpha.lichee
@@ -36,19 +39,37 @@ function run_lichee {
   for snvfn in $INDIR/*.snv; do
     runid=$(basename $snvfn | cut -d. -f1)
     outd="$OUTBASE/$runid"
-    echo \
-      "mkdir -p $outd && cd $outd &&" \
-      "TIMEFORMAT='%R %U %S'; time (java -jar $LICHEE_DIR/lichee.jar" \
-      "-build" \
-      "-i $INDIR/$runid.snv" \
-      "-o $outd/$runid.trees" \
-      "-clustersFile $INDIR/$runid.cluster" \
-      "-maxVAFAbsent 0.005" \
-      "-minVAFPresent 0.005" \
-      "-n 0" \
-      "-s $NUM_TREES" \
-      ">  $outd/$runid.stdout" \
-      "2> $outd/$runid.stderr) 2>$outd/$runid.time"
+    outfn="$outd/$runid.trees"
+    [[ -f $outfn ]] && continue
+
+    cmd=""
+    cmd+="#!/bin/bash\n"
+    cmd+="#SBATCH --nodes=1\n"
+    cmd+="#SBATCH --ntasks=1\n"
+    cmd+="#SBATCH --mem=20GB\n"
+    cmd+="#SBATCH --time=23:59:00\n"
+    cmd+="#SBATCH --job-name lichee_$runid\n"
+    cmd+="#SBATCH --output=$JOB_DIR/slurm_lichee_${runid}_%j.txt\n"
+    cmd+="#SBATCH --partition=cpu\n"
+    cmd+="#SBATCH --mail-type=NONE\n"
+
+    cmd+="mkdir -p $outd && cd $outd && "
+    cmd+="TIMEFORMAT='%R %U %S'; time ($JAVA -jar $LICHEE_DIR/lichee.jar "
+    cmd+="-build "
+    cmd+="-i $INDIR/$runid.snv "
+    cmd+="-o $outfn "
+    cmd+="-clustersFile $INDIR/$runid.cluster "
+    cmd+="-maxVAFAbsent 0.005 "
+    cmd+="-minVAFPresent 0.005 "
+    cmd+="-n 0 "
+    cmd+="-s $NUM_TREES "
+    cmd+=">  $outd/$runid.stdout "
+    cmd+="2> $outd/$runid.stderr) 2>$outd/$runid.time"
+
+    jobfn=$(mktemp)
+    echo -e $cmd > $jobfn
+    sbatch $jobfn
+    rm $jobfn
   done
 }
 
@@ -120,8 +141,8 @@ function compute_mutphis {
 }
 
 function main {
-  convert_inputs
-  #run_lichee
+  #convert_inputs
+  run_lichee
   #convert_outputs | sort --random-sort | parallel -j8 --halt 1 --eta
   #compute_phis | parallel -j40 --halt 1 --eta
   #compute_mutphis | parallel -j80 --halt 1 --eta

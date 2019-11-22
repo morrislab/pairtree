@@ -3,12 +3,13 @@ export OMP_NUM_THREADS=1
 
 BASEDIR=~/work/pairtree
 SCRIPTDIR=$(dirname "$(readlink -f "$0")")
-CITUP_DIR=$HOME/.apps/anaconda2/bin
+CITUP_DIR=$HOME/.apps/miniconda2/bin
+JOB_DIR=$HOME/jobs
 
 #CITUP_MODE=iter
 CITUP_MODE=qip
 USE_SUPERVARS=false
-PARALLEL=40
+PARALLEL=1
 
 BATCH=sims.smallalpha.citup
 PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.smallalpha.pairtree
@@ -56,32 +57,50 @@ function run_citup {
   #for runid in SJBALL022610 SJBALL031 SJETV047 SJETV010nohypermut SJBALL022614 SJMLL026 SJBALL022611 SJERG009 SJETV010 SJETV043 SJBALL022613 SJMLL039 SJBALL022612 SJBALL036 SJBALL022609 SJBALL022610steph SJETV010stephR1 SJETV010stephR1R2 SJETV010stephR2; do
     runid=$(basename $snvfn | cut -d. -f1)
     snvfn=$INDIR/$runid.snv
+    outfn="$outdir/${runid}.results.hdf5"
+
     [[ -f $snvfn ]] || continue
-    is_big_K $runid && continue
+    is_big_K $runid || continue
+    [[ -f $outfn ]] && continue
 
     outdir="$OUTDIR/$runid"
     clusterfn="$INDIR/${runid}.cluster"
     let num_clusters=$(cat $clusterfn | sort | uniq | wc -l)+1
-    [[ -f $outdir/${runid}.results.hdf5 ]] && continue
 
-    cmd="mkdir -p $outdir && cd $outdir &&"
+    cmd=""
+    cmd+="#!/bin/bash\n"
+    cmd+="#SBATCH --nodes=1\n"
+    cmd+="#SBATCH --ntasks=$PARALLEL\n"
+    cmd+="#SBATCH --mem=20GB\n"
+    cmd+="#SBATCH --time=23:59:00\n"
+    cmd+="#SBATCH --job-name citup_$runid\n"
+    cmd+="#SBATCH --output=$JOB_DIR/slurm_citup_${runid}_%j.txt\n"
+    cmd+="#SBATCH --partition=cpu\n"
+    cmd+="#SBATCH --mail-type=NONE\n"
+
+    cmd+="mkdir -p $outdir && cd $outdir && "
+    cmd+="CITUPTMP=\$(mktemp -d --suffix .citup.$CITUP_MODE.$runid) "
     cmd+="TIMEFORMAT='%R %U %S'; time ("
-    cmd+="PATH=$HOME/.apps/anaconda2/bin:$PATH run_citup_${CITUP_MODE}.py " 
+    cmd+="PATH=$CITUP_DIR:$PATH run_citup_${CITUP_MODE}.py "
     cmd+="--submit local "
     cmd+="--maxjobs $PARALLEL "
-    cmd+="--tmpdir \$(mktemp -d --suffix .citup.$CITUP_MODE.$runid) "
+    cmd+="--tmpdir \$CITUPTMP "
     cmd+="--min_nodes $num_clusters "
     cmd+="--max_nodes $num_clusters "
     cmd+="$INDIR/${runid}.snv "
     if [[ "$CITUP_MODE" == "qip" ]]; then
       cmd+="$clusterfn "
     fi
-    cmd+="$outdir/${runid}.results.hdf5 "
+    cmd+="$outfn "
     cmd+=">$runid.stdout "
     cmd+="2>$runid.stderr "
     cmd+=") 2>$runid.time"
+    cmd+="; cp -a \$CITUPTMP/log/latest/pipeline.log $outdir/"
 
-    echo $cmd
+    jobfn=$(mktemp)
+    echo -e $cmd > $jobfn
+    sbatch $jobfn
+    rm $jobfn
   done
 }
 

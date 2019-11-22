@@ -1,9 +1,9 @@
 #!/bin/bash
-command -v parallel > /dev/null || module load gnu-parallel
+#command -v parallel > /dev/null || module load gnu-parallel
 PYTHON2=$HOME/.apps/miniconda2/bin/python2
 
 BASEDIR=~/work/pairtree
-JOBDIR=/tmp
+JOB_DIR=$HOME/jobs
 PWGS_PATH=~/.apps/phylowgs
 PARALLEL=40
 NUM_CHAINS=1
@@ -43,32 +43,31 @@ function run_pwgs {
     treefn=$OUTDIR/chains/trees.zip
     [[ -f $treefn ]] && continue
 
-    jobfn=$(mktemp)
-    (
-      echo "#!/bin/bash"
-      echo "#SBATCH --nodes=1"
-      echo "#SBATCH --ntasks=$PARALLEL"
-      echo "#SBATCH --time=23:59:00"
-      echo "#SBATCH --job-name $jobname"
-      echo "#SBATCH --output=$JOBDIR/slurm_${jobname}_%j.txt"
-      echo "#SBATCH --mail-type=NONE"
+    cmd=""
+    cmd+="#!/bin/bash\n"
+    cmd+="#SBATCH --nodes=1\n"
+    cmd+="#SBATCH --ntasks=1\n"
+    cmd+="#SBATCH --mem=20GB\n"
+    cmd+="#SBATCH --time=23:59:00\n"
+    cmd+="#SBATCH --job-name pwgs_$runid\n"
+    cmd+="#SBATCH --output=$JOB_DIR/slurm_pwgs_${runid}_%j.txt\n"
+    cmd+="#SBATCH --partition=cpu\n"
+    cmd+="#SBATCH --mail-type=NONE\n"
 
-      # Must source ~/.bash_host_specific to get PATH set properly for
-      # Miniconda.
-      echo "source $HOME/.bash_host_specific && " \
-        "module load gsl &&" \
-        "mkdir -p $OUTDIR &&" \
-        "cd $OUTDIR && " \
-        "TIMEFORMAT='%R %U %S' && " \
-        "time (OMP_NUM_THREADS=1 $PYTHON2 $PWGS_PATH/multievolve.py" \
-        "--num-chains $NUM_CHAINS" \
-        "--ssms $INDIR/${runid}.ssm" \
-        "--cnvs $INDIR/empty.cnv" \
-        "--params $INDIR/${runid}.params.json" \
-        ">$runid.stdout" \
-        "2>$runid.stderr) 2>$runid.time"
-    ) #> $jobfn
-    #sbatch $jobfn
+    cmd+="mkdir -p $OUTDIR && "
+    cmd+="cd $OUTDIR && "
+    cmd+="TIMEFORMAT='%R %U %S' && "
+    cmd+="time (LD_LIBRARY_PATH=$HOME/.apps/gsl/lib:$LD_LIBRARY_PATH OMP_NUM_THREADS=1 $PYTHON2 $PWGS_PATH/multievolve.py "
+    cmd+="--num-chains $NUM_CHAINS "
+    cmd+="--ssms $INDIR/${runid}.ssm "
+    cmd+="--cnvs $INDIR/empty.cnv "
+    cmd+="--params $INDIR/${runid}.params.json "
+    cmd+=">$runid.stdout "
+    cmd+="2>$runid.stderr) 2>$runid.time"
+
+    jobfn=$(mktemp)
+    echo -e $cmd > $jobfn
+    sbatch $jobfn
     rm $jobfn
   done
 }
@@ -125,8 +124,8 @@ function convert_outputs {
 }
 
 function main {
-  convert_inputs
-  #run_pwgs
+  #convert_inputs
+  run_pwgs
 
   #convert_outputs true
   # Don't run `parallel` with `--halt 1`, as some jobs will fail --
