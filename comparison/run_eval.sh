@@ -89,6 +89,7 @@ function make_results_paths {
     #  paths+="pairtree_clustrel=sims.pairtree.multichain/${runid}/${runid}.clustrel_${result_type}.npz "
     #fi
     paths+="pairtree_multi=${BATCH}.pairtree.multichain/${runid}/${runid}.trees_${result_type}.npz "
+    paths+="pairtree_rprop=${BATCH}.pairtree.rprop/${runid}/${runid}.trees_${result_type}.npz "
     #paths+="pairtree_quad=sims.pairtree.quadchain/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
     #paths+="pairtree_single_old=sims.pairtree.projection.singlechain.old_proposals/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
     #paths+="pairtree_multi_old=sims.pairtree.projection.multichain.old_proposals/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
@@ -249,7 +250,7 @@ function plot_individual {
   cmd+="--template plotly_white "
   cmd+="--score-type $ptype "
   cmd+="--plot-type $plot_type "
-  if [[ $BATCH == "sims" ]]; then
+  if [[ $BATCH =~ ^sims ]]; then
     cmd+="--S-threshold 10 "
   fi
   if [[ $ptype == "mutphi" || $ptype == "mutrel" ]]; then
@@ -262,10 +263,10 @@ function plot_individual {
   elif [[ $ptype =~ time$ ]]; then
     cmd+="--bandwidth 0.18 "
   fi
-  if [[ $ptype == "mutphi" && $BATCH == "sims" ]]; then
+  if [[ $ptype == "mutphi" && $BATCH =~ ^sims ]]; then
     cmd+="--baseline truth "
   fi
-  if [[ $ptype == "mutphi" && $BATCH == "steph" ]]; then
+  if [[ $ptype == "mutphi" && $BATCH == steph ]]; then
     cmd+="--baseline truth "
   fi
   if [[ $ptype =~ time$ ]]; then
