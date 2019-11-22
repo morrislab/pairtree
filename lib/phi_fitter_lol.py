@@ -86,6 +86,11 @@ def _tile_rows(vec, repeats):
 
 @njit
 def _calc_grad(var_reads, ref_reads, omega, A, Z, psi):
+  # Prevent overflow in `exp`. Cap `psi` at 300, since
+  # `np.log(np.finfo(np.float64).max) =~ 709`, and we take `exp(2*psi)` below.
+  # Thus, we need `psi < 709/2`.
+  psi = np.minimum(300, psi)
+
   M, K = A.shape
   eta = softmax(psi)   # Kx1
   phi = np.dot(Z, eta) # Kx1
