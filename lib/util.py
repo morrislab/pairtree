@@ -91,3 +91,8 @@ def make_tree_struct(struct, count, llh, prob, phi, variants, sampnames):
     'samples': sampnames,
   }
   return tree
+
+def lpdist(A, B, p=1):
+  dist = np.sum(np.abs(A - B)**p)**(1/p)
+  assert dist >= 0
+  return dist

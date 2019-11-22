@@ -1,5 +1,6 @@
 import common
 import numpy as np
+import util
 
 def fit_phis(adj, superclusters, supervars, method, iterations, parallel):
   if method == 'debug':
@@ -39,9 +40,6 @@ def _calc_llh(phi, V, N, omega_v, epsilon=1e-5):
   nlglh = np.sum(llh_per_sample) / S
   return (phi_llh, llh_per_sample, nlglh)
 
-def lpdist(A, B, p=1):
-  return np.sum(np.abs(A - B)**p)**(1/p)
-
 def _fit_phis(adj, superclusters, supervars, method, iterations, parallel):
   # Calling `import` on each function call should be cheap, as Python caches a
   # reference to the module after the first load.
@@ -71,7 +69,7 @@ def _fit_phis(adj, superclusters, supervars, method, iterations, parallel):
     fitters = {
       #'rprop_init_mle': lambda: phi_fitter_iterative.fit_etas(adj, superclusters, supervars, 'rprop', iterations, parallel, eta_init=None),
       'lol_init_mle': lambda: phi_fitter_lol.fit_etas(adj, superclusters, supervars, 'rprop', iterations, parallel, eta_init='mle'),
-      #'lol_init_dirichlet': lambda: phi_fitter_lol.fit_etas(adj, superclusters, supervars, 'rprop', iterations, parallel, eta_init='dirichlet'),
+      'lol_init_dirichlet': lambda: phi_fitter_lol.fit_etas(adj, superclusters, supervars, 'rprop', iterations, parallel, eta_init='dirichlet'),
       'projection': lambda: phi_fitter_projection.fit_etas(adj, superclusters, supervars),
     }
     #fitters['lol_init_proj'] = lambda: phi_fitter_lol.fit_etas(adj, superclusters, supervars, 'rprop', iterations, parallel, eta_init=fitters['projection']())
@@ -97,8 +95,8 @@ def _fit_phis(adj, superclusters, supervars, method, iterations, parallel):
       scores[name] = _calc_llh(phi, var_reads, total_reads, omega)
       times[name] = (time_end - time_start)/1e6
       zeros[name] = np.sum(phi == 0)
-      l1_dists[name] = lpdist(var_reads/(total_reads * omega), phi[1:], p=1)
-      l2_dists[name] = lpdist(var_reads/(total_reads * omega), phi[1:], p=2)
+      l1_dists[name] = util.lpdist(var_reads/(total_reads * omega), phi[1:], p=1)
+      l2_dists[name] = util.lpdist(var_reads/(total_reads * omega), phi[1:], p=2)
 
     eta = etas['lol_init_mle']
     last_eta[0] = np.copy(eta)
