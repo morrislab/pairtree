@@ -8,27 +8,32 @@ SCORESDIR=$BASEDIR/scratch/scores
 PARALLEL=80
 
 function para {
-  parallel -j$PARALLEL --halt 1
+  parallel -j$PARALLEL --halt 1 --eta
 }
 
 function make_sims_truth {
   mkdir -p $TRUTH_DIR
 
-  for datafn in $PAIRTREE_INPUTS_DIR/*.truth.pickle; do
-    runid=$(basename $datafn | cut -d. -f1)
+  for truthfn in $PAIRTREE_INPUTS_DIR/*.truth.pickle; do
+    runid=$(basename $truthfn | cut -d. -f1)
     truthdir=$TRUTH_DIR/$runid
+    mkdir -p $truthdir/$runid
 
-    cmd="mkdir -p $truthdir/$runid"
-
-    cmd+="&& OMP_NUM_THREADS=1 python3 $SCRIPTDIR/enum_true_trees.py "
+    cmd="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/enum_true_trees.py "
     cmd+="--check-delta "
-    cmd+="$datafn "
+    cmd+="$truthfn "
     cmd+="$truthdir/$runid.results.npz "
+    echo $cmd
 
-    cmd+="&& OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_truth_mutphi.py "
-    cmd+="$datafn "
+    cmd="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_truth_mutphi.py "
+    cmd+="$truthfn "
     cmd+="$PAIRTREE_INPUTS_DIR/$runid.ssm "
-    cmd+="$truthdir/$runid.trees_mutphi.npz"
+    cmd+="$truthdir/$runid.mutphi.npz"
+    echo $cmd
+
+    cmd="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_baseline_mutdist.py "
+    cmd+="$truthfn "
+    cmd+="$truthdir/$runid.phi.npz"
     echo $cmd
   done | parallel -j80 --halt 1 --eta
 
@@ -36,9 +41,12 @@ function make_sims_truth {
     runid=$(basename $resultsfn | cut -d. -f1)
     truthdir=$TRUTH_DIR/$runid
 
-    cmd="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/pairtree/make_mutrels.py "
-    cmd+="--trees-mutrel $truthdir/$runid.trees_mutrel.npz "
+    cmd="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/pairtree/convert_outputs.py "
     cmd+="$truthdir/$runid.results.npz "
+    cmd+="$truthdir/$runid.neutree.npz "
+    cmd+="&& OMP_NUM_THREADS=1 python3 $SCRIPTDIR/neutree/make_mutrels.py "
+    cmd+="$truthdir/$runid.neutree.npz "
+    cmd+="$truthdir/$runid.mutrel.npz "
     echo $cmd
   done | parallel -j10 --halt 1 --eta
 }
@@ -78,7 +86,7 @@ function make_results_paths {
     #  paths+="pairtree_tensor=${BATCH}.pairtree.onlytensor/${runid}/${runid}.pairtree_clustrel.mutrel.npz "
     #fi
   elif [[ $BATCH == sims.smallalpha ]]; then
-    paths+="truth=${TRUTH_DIR}/$runid/${runid}.trees_${result_type}.npz "
+    paths+="truth=${TRUTH_DIR}/$runid/${runid}.${result_type}.npz "
     #paths+="pwgs_supervars=sims.pwgs.supervars/$runid/$runid.pwgs_trees_single.$result_type.npz "
     #paths+="pastri=${BATCH}.pastri.informative/$runid/$runid.pastri_trees_llh.$result_type.npz "
     #for foo in $(seq 69 77); do
@@ -88,8 +96,8 @@ function make_results_paths {
     #if [[ $result_type == mutrel ]]; then
     #  paths+="pairtree_clustrel=sims.pairtree.multichain/${runid}/${runid}.clustrel_${result_type}.npz "
     #fi
-    paths+="pairtree_multi=${BATCH}.pairtree.multichain/${runid}/${runid}.trees_${result_type}.npz "
-    paths+="pairtree_rprop=${BATCH}.pairtree.rprop/${runid}/${runid}.trees_${result_type}.npz "
+    paths+="pairtree_multi=${BATCH}.pairtree.multichain/${runid}/${runid}.${result_type}.npz "
+    paths+="pairtree_rprop=${BATCH}.pairtree.rprop/${runid}/${runid}.${result_type}.npz "
     #paths+="pairtree_quad=sims.pairtree.quadchain/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
     #paths+="pairtree_single_old=sims.pairtree.projection.singlechain.old_proposals/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
     #paths+="pairtree_multi_old=sims.pairtree.projection.multichain.old_proposals/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
@@ -104,7 +112,7 @@ function eval_mutrels {
   cd $RESULTSDIR
   mkdir -p $SCORESDIR/$BATCH
 
-  for truthfn in $(ls $TRUTH_DIR/*/*.trees_mutrel.npz | sort --random-sort); do
+  for truthfn in $(ls $TRUTH_DIR/*/*.mutrel.npz | sort --random-sort); do
     runid=$(basename $truthfn | cut -d. -f1)
     mutrels=$(make_results_paths $runid mutrel)
 
@@ -127,7 +135,7 @@ function eval_mutphis {
   cd $RESULTSDIR
   mkdir -p $SCORESDIR/$BATCH
 
-  for mutphifn in $(ls $TRUTH_DIR/*/*.trees_mutphi.npz | sort --random-sort); do
+  for mutphifn in $(ls $TRUTH_DIR/*/*.mutphi.npz | sort --random-sort); do
     runid=$(basename $mutphifn | cut -d. -f1)
     mutphis=$(make_results_paths $runid mutphi)
 
@@ -136,6 +144,28 @@ function eval_mutphis {
       "--params $PAIRTREE_INPUTS_DIR/$runid.params.json" \
       "$mutphis " \
       "> $SCORESDIR/$BATCH/$runid.mutphi_score.txt"
+  done
+}
+
+function eval_mutdists {
+  cd $RESULTSDIR
+  mkdir -p $SCORESDIR/$BATCH
+
+  for phifn in $(ls $TRUTH_DIR/*/*.phi.npz | sort --random-sort); do
+    # We don't actually use `phifn`, but that's okay -- we just want a
+    # reference for what runs exist.
+    runid=$(basename $phifn | cut -d. -f1)
+    mutdists=$(make_results_paths $runid mutdist)
+
+    for P in 1 2; do
+      cmd="cd $RESULTSDIR && "
+      cmd+="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/eval_mutdists.py "
+      cmd+="-p $P "
+      cmd+="--params $PAIRTREE_INPUTS_DIR/$runid.params.json "
+      cmd+="$mutdists "
+      cmd+="> $SCORESDIR/$BATCH/$runid.mutdistl${P}_score.txt "
+      echo $cmd
+    done
   done
 }
 
@@ -148,6 +178,7 @@ function compile_scores {
     methods=$(head -n1 $(ls *.$suffix | head -n1))
     echo 'runid,'$methods
     for foo in *.$suffix; do
+      [[ $foo =~ K100_ ]] && continue
       if [[ $(head -n1 $foo) != $methods ]]; then
         echo "Methods in $foo ($(head -n1 $foo)) don't match expected $methods" >&2
         exit 1
@@ -278,10 +309,13 @@ function plot_individual {
 }
 
 function plot_results_sims {
+  (
+    eval_mutphis
+    eval_mutdists
+  ) | para
   eval_mutrels | parallel -j2 --halt 1 --eta
-  eval_mutphis | para
 
-  for type in mutrel mutphi; do
+  for type in mutrel mutphi mutdistl1 mutdistl2; do
     compile_scores $type
     partition_by_K $type
   done
@@ -289,8 +323,10 @@ function plot_results_sims {
   (
     basefn="$SCORESDIR/$BATCH"
     for ksize in smallK bigK; do
-      #plot_individual mutrel box $basefn.mutrel.$ksize.{txt,html}
+      plot_individual mutrel box $basefn.mutrel.$ksize.{txt,html}
       plot_individual mutphi box $basefn.mutphi.$ksize.{txt,html}
+      plot_individual mutdistl1 box $basefn.mutdistl1.$ksize.{txt,html}
+      plot_individual mutdistl2 box $basefn.mutdistl2.$ksize.{txt,html}
     done
   ) | para
 }

@@ -2,22 +2,24 @@
 set -euo pipefail
 command -v parallel > /dev/null || module load gnu-parallel
 
-PROTDIR=~/work/pairtree
-SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 BASEDIR=~/work/pairtree
+SCRIPTDIR=$(dirname "$(readlink -f "$0")")
+NEUTREEDIR=$BASEDIR/comparison/neutree
 JOBDIR=~/jobs
 
 PARALLEL=40
 TREE_CHAINS=$PARALLEL
 TREES_PER_CHAIN=3000
 PHI_ITERATIONS=10000
-PHI_FITTER=projection
+PHI_FITTER=rprop
 THINNED_FRAC=1.0
 BURNIN=0.333333
 
 BATCH=sims.smallalpha.pairtree
 PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/$BATCH
-PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.lol1
+TRUTH_DIR=$BASEDIR/scratch/results/sims.smallalpha.truth
+PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.multichain
+
 #BATCH=steph.pairtree.multichain
 #PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 #PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/$BATCH
@@ -32,8 +34,9 @@ function run_pairtree {
     runid=$(basename $ssmfn | cut -d. -f1)
     outdir="$PAIRTREE_RESULTS_DIR/$runid"
     resultsfn="$outdir/$runid.results.npz"
+    [[  $runid =~ K100_ ]] && continue
     #is_big_K $runid && continue
-    #is_run_complete $resultsfn && continue
+    is_run_complete $resultsfn && continue
     #[[ -f $resultsfn ]] || continue
 
     jobfn=$(mktemp)
@@ -41,7 +44,7 @@ function run_pairtree {
       echo "#!/bin/bash"
       echo "#SBATCH --nodes=1"
       echo "#SBATCH --ntasks=$PARALLEL"
-      echo "#SBATCH --time=1:59:00"
+      echo "#SBATCH --time=23:59:00"
       echo "#SBATCH --job-name $runid"
       echo "#SBATCH --output=$JOBDIR/slurm_${runid}_%j.txt"
       echo "#SBATCH --mail-type=NONE"
@@ -51,7 +54,7 @@ function run_pairtree {
       echo "mkdir -p $outdir && cd $outdir && " \
         "TIMEFORMAT='%R %U %S'; time (" \
         "OMP_NUM_THREADS=1 " \
-        "python3 $PROTDIR/bin/pairtree" \
+        "python3 $BASEDIR/bin/pairtree" \
         "--seed 1" \
         "--parallel $PARALLEL" \
         "--tree-chains $TREE_CHAINS" \
@@ -74,44 +77,78 @@ function run_pairtree {
   done
 }
 
-function convert_outputs {
+function create_neutree {
   for resultsfn in $PAIRTREE_RESULTS_DIR/*/*.results.npz; do
     outdir=$(dirname $resultsfn)
     runid=$(basename $resultsfn | cut -d. -f1)
+    basepath="${outdir}/${runid}"
     #is_big_K $runid || continue
     is_run_complete $resultsfn || continue
 
-    jobfn=$(mktemp)
     (
-        basepath="${outdir}/${runid}"
+      cmd="cd $outdir && "
+      cmd+="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/convert_outputs.py "
+      cmd+="$resultsfn "
+      cmd+="${basepath}.neutree.npz "
+      echo $cmd
+    )
+  done
+}
 
-        cmd="cd $outdir && "
-        cmd+="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_mutphis.py "
-        cmd+="$resultsfn "
-        cmd+="${PAIRTREE_INPUTS_DIR}/${runid}.ssm "
-        cmd+="${basepath}.trees_mutphi.npz "
-        cmd+=">${basepath}.mutphi_output_conversion.stdout "
-        cmd+="2>${basepath}.mutphi_output_conversion.stderr"
-        echo $cmd
+function create_mutrel_from_clustrel {
+  for resultsfn in $PAIRTREE_RESULTS_DIR/*/*.results.npz; do
+    outdir=$(dirname $resultsfn)
+    runid=$(basename $resultsfn | cut -d. -f1)
+    basepath="${outdir}/${runid}"
+    #is_big_K $runid || continue
+    is_run_complete $resultsfn || continue
 
-        cmd="cd $outdir && "
-        cmd+="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_mutrels.py "
-        cmd+="--trees-mutrel ${basepath}.trees_mutrel.npz "
-        cmd+="--clustrel-mutrel ${basepath}.clustrel_mutrel.npz "
-        cmd+="$resultsfn "
-        cmd+=">${basepath}.mutrel_output_conversion.stdout "
-        cmd+="2>${basepath}.mutrel_output_conversion.stderr"
-        echo $cmd
-    ) #> $jobfn
-    #sbatch $jobfn
-    rm $jobfn
+    (
+      cmd="cd $outdir && "
+      cmd+="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_mutrel_from_clustrel.py "
+      cmd+="$resultsfn "
+      cmd+="${basepath}.clustrel_mutrel.npz "
+      echo $cmd
+    )
+  done
+}
+
+function create_evals {
+  for neutreefn in $PAIRTREE_RESULTS_DIR/*/*.neutree.npz; do
+    outdir=$(dirname $neutreefn)
+    runid=$(basename $neutreefn | cut -d. -f1)
+    basepath="${outdir}/${runid}"
+
+    (
+      cmd="cd $outdir && "
+      cmd+="OMP_NUM_THREADS=1 python3 $NEUTREEDIR/make_mutphis.py "
+      cmd+="$neutreefn "
+      cmd+="${PAIRTREE_INPUTS_DIR}/${runid}.ssm "
+      cmd+="${basepath}.mutphi.npz "
+      echo $cmd
+
+      cmd="cd $outdir && "
+      cmd+="OMP_NUM_THREADS=1 python3 $NEUTREEDIR/make_mutdists.py "
+      cmd+="$neutreefn "
+      cmd+="${TRUTH_DIR}/${runid}/${runid}.phi.npz "
+      cmd+="${basepath}.mutdist.npz "
+      echo $cmd
+
+      cmd="cd $outdir && "
+      cmd+="OMP_NUM_THREADS=1 python3 $NEUTREEDIR/make_mutrels.py "
+      cmd+="$neutreefn "
+      cmd+="${basepath}.mutrel.npz "
+      echo $cmd
+    )
   done
 }
 
 function main {
   #run_pairtree #| grep python3 | parallel -j80 --halt 1 --eta
-  convert_outputs | grep python3 | grep mutphi | sort --random-sort | parallel -j80 --halt 1 --eta
-  convert_outputs | grep python3 | grep mutrel | sort --random-sort | parallel -j5 --halt 1 --eta
+  create_neutree | parallel -j80 --halt 1 --eta
+  create_mutrel_from_clustrel | sort --random-sort | parallel -j5 --halt 1 --eta
+  create_evals | grep -v mutrel | sort --random-sort | parallel -j80 --halt 1 --eta
+  create_evals | grep    mutrel | sort --random-sort | parallel -j5  --halt 1 --eta
 }
 
 main

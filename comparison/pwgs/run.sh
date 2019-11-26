@@ -125,13 +125,14 @@ function convert_outputs {
 
 function main {
   #convert_inputs
-  run_pwgs
+  #run_pwgs
 
   #convert_outputs true
+
   # Don't run `parallel` with `--halt 1`, as some jobs will fail --
   # `write_results.py` will exit with non-zero when burn-in hasn't finished.
-  #convert_outputs false | grep -v -e K30_ -e K100_ | parallel -j80 --eta
-  #convert_outputs false #| grep    -e K30_ -e K100_ | parallel -j10 --eta
+  convert_outputs false | grep -v -e K30_ -e K100_ | parallel -j80 --eta
+  convert_outputs false | grep    -e K30_ -e K100_ | parallel -j10 --eta
 }
 
 main

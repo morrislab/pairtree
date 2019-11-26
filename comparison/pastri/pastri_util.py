@@ -113,6 +113,8 @@ def convert_pastri_clusters(pastri_clusters, variant_clusters):
   return converted
 
 def convert_results(sampid, prelim_trees, variant_clusters, outdir):
+  # NB: PASTRI will assign mutations to the root ("normal") node. This of
+  # course means that it doesn't support polyclonal trees.
   _makefn = lambda tidx, ext: os.path.join(outdir, '%s.%s.%s' % (sampid, tidx, ext))
   llhs = []
   adjms = []

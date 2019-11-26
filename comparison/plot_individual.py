@@ -301,6 +301,12 @@ def make_score_ytitle(score_type, plot_fn):
     else:
       ytitle = 'Frequency reconstruction error'
     ytitle += '<br>(Δbits / mutation / tissue sample)'
+  elif score_type in ('mutdistl1', 'mutdistl2'):
+    ytitle = 'Mutation frequency distance '
+    if score_type.endswith('l1'):
+      ytitle += '(L1)'
+    else:
+      ytitle += '(L2)'
   elif score_type in ('cputime', 'walltime'):
     ytitle = 'Runtime (seconds)'
   else:
@@ -315,7 +321,7 @@ def main():
   parser.add_argument('--S-threshold', type=int)
   parser.add_argument('--template', default='seaborn')
   parser.add_argument('--max-y')
-  parser.add_argument('--score-type', required=True, choices=('mutrel', 'mutphi', 'cputime', 'walltime'))
+  parser.add_argument('--score-type', required=True, choices=('mutrel', 'mutphi', 'mutdistl1', 'mutdistl2', 'cputime', 'walltime'))
   parser.add_argument('--baseline')
   parser.add_argument('--bandwidth', type=float)
   parser.add_argument('--plot-type', choices=('box', 'violin'), default='box')

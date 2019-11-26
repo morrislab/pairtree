@@ -5,7 +5,6 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
 import inputparser
-import common
 import mutphi
 
 MISSING = -1
@@ -44,23 +43,20 @@ def score(logprobs):
 
 def compare(mutphis):
   names = list(mutphis.keys())
-  scores = {}
+  scores = {N: MISSING for N in names}
   present = [N for N in names if mutphis[N] is not None]
+  if len(present) == 0:
+    return (names, scores)
   first_present = present[0]
   vids = mutphis[first_present].vids
   assays = mutphis[first_present].assays
 
-  for name in names:
+  for name in present:
     mphi = mutphis[name]
-    if mphi is None:
-      scores[name] = MISSING
-      continue
     assert np.array_equal(mphi.vids, vids)
     assert np.array_equal(mphi.assays, assays)
     scores[name] = score(mphi.logprobs)
-
-  print(*names, sep=',')
-  print(*[scores[name] for name in names], sep=',')
+  return (names, scores)
 
 def check_incomplete(mutphis, clustered):
   names = list(mutphis.keys())
@@ -107,7 +103,10 @@ def main():
   mutphis = load_mutphis(args.mutphis)
   mutphis = remove_garbage(mutphis, params['garbage'])
   check_incomplete(mutphis, clustered)
-  compare(mutphis)
+
+  names, scores = compare(mutphis)
+  print(*names, sep=',')
+  print(*[scores[name] for name in names], sep=',')
 
 if __name__ == '__main__':
   main()

@@ -94,38 +94,34 @@ function get_F_and_C {
 
 function convert_outputs {
   source $HOME/.bash_host_specific
-  for tree_weights in llh uniform; do
-    for treesfn in $OUTDIR/*/*.trees; do
-      runid=$(basename $treesfn | cut -d. -f1)
-      outpath=$(dirname $treesfn)
-      echo "cd $outpath && " \
-        "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_mutrels.py" \
-        "--weight-trees-by $tree_weights" \
-        "$runid" \
-        "$PAIRTREE_INPUTS_DIR/$runid.params.json" \
-        "$treesfn" \
-        "${outpath}/${runid}.pastri_trees_${tree_weights}.mutrel.npz" #\
-        #"> $outpath/${runid}.mutrel_output_conversion.stdout" \
-        #"2>$outpath/${runid}.mutrel_output_conversion.stderr"
-      echo "cd $outpath && " \
-        "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_mutphis.py" \
-        "--weight-trees-by $tree_weights" \
-        "$runid" \
-        "${PAIRTREE_INPUTS_DIR}/${runid}.ssm" \
-        "${PAIRTREE_INPUTS_DIR}/${runid}.params.json" \
-        "$treesfn" \
-        "${outpath}/${runid}.pastri_trees_${tree_weights}.mutphi.npz" #\
-        #"> $outpath/${runid}.mutphi_output_conversion.stdout" \
-        #"2>$outpath/${runid}.mutphi_output_conversion.stderr"
-    done
-  done | parallel -j$PARALLEL
+  for treesfn in $OUTDIR/*/*.trees; do
+    runid=$(basename $treesfn | cut -d. -f1)
+    outpath=$(dirname $treesfn)
+    echo "cd $outpath && " \
+      "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_mutrels.py" \
+      "$runid" \
+      "$PAIRTREE_INPUTS_DIR/$runid.params.json" \
+      "$treesfn" \
+      "${outpath}/${runid}.pastri_trees.mutrel.npz" #\
+      #"> $outpath/${runid}.mutrel_output_conversion.stdout" \
+      #"2>$outpath/${runid}.mutrel_output_conversion.stderr"
+    echo "cd $outpath && " \
+      "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_mutphis.py" \
+      "$runid" \
+      "${PAIRTREE_INPUTS_DIR}/${runid}.ssm" \
+      "${PAIRTREE_INPUTS_DIR}/${runid}.params.json" \
+      "$treesfn" \
+      "${outpath}/${runid}.pastri_trees.mutphi.npz" #\
+      #"> $outpath/${runid}.mutphi_output_conversion.stdout" \
+      #"2>$outpath/${runid}.mutphi_output_conversion.stderr"
+  done | parallel -j$PARALLEL --halt 1 --eta
 }
 
 function main {
   #convert_inputs
-  run_pastri
+  #run_pastri
   #get_F_and_C
-  #convert_outputs
+  convert_outputs
 }
 
 main

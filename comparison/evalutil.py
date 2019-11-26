@@ -49,74 +49,25 @@ def save_sorted_mutrel(mrel, mrelfn):
   mutrel.check_posterior_sanity(mrel.rels)
   np.savez_compressed(mrelfn, rels=mrel.rels, vids=mrel.vids)
 
-def distinguish_unique_trees(adjms, phis, llhs, clusterings):
-  unique = {}
-
-  for adjm, phi, llh, clustering in zip(adjms, phis, llhs, clusterings):
-    hashable_clustering = tuple((frozenset(C) for C in clustering))
-    H = hash((
-      adjm.tobytes(),
-      phi.tobytes(),
-      llh,
-      hashable_clustering,
-    ))
-
-    if H in unique:
-      unique[H]['count'] += 1
-    else:
-      unique[H] = {
-        'adjm': adjm,
-        'phi': phi,
-        'llh': llh,
-        'clustering': clustering,
-        'count': 1,
-      }
-
-  unique = list(unique.values())
-  unzipped = {key: [U[key] for U in unique] for key in unique[0].keys()}
-  return (
-    unzipped['adjm'],
-    unzipped['phi'],
-    unzipped['llh'],
-    unzipped['clustering'],
-    unzipped['count'],
-  )
-
-def make_mutrel_from_trees_and_unique_clusterings(adjms, llhs, clusterings):
+def make_mutrel_from_trees_and_unique_clusterings(structs, llhs, clusterings, garbage):
   '''
   Relative to `make_mutrel_from_trees_and_single_clustering`, this function is
-  slower and more memory intensive, but also more flexible. It differs in three
+  slower and more memory intensive, but also more flexible. It differs in two
   respects:
 
   1. It doesn't assume that the user has already computed counts for all unique
-  samples -- i.e., it allows duplicate samples and performs the counting
-  itself.
+  samples -- i.e., it allows duplicate samples.
 
   2. It allows unique clusterings for every sample.
-
-  3. It works on parent vectors rather than adjacency matrices.
   '''
-  assert len(adjms) == len(llhs) == len(clusterings)
-  phis = len(adjms) * [np.array([])]
-  adjms, _, llhs, clusterings, counts = distinguish_unique_trees(adjms, phis, llhs, clusterings)
-
-  # Oftentimes, we will have many samples of the same adjacency matrix paired
-  # with the same clustering. This will produce the same mutrel. As computing
-  # the mutrel from adjm + clustering is expensive, we want to avoid repeating
-  # this unnecessarily. Instead, we just modify the associated weight of the
-  # the pairing to reflect this.
-  #
-  # Observe that if we have `C` copies of the LLH `W`, we obtain
-  # equivalent post-softmax linear-space weights under either of the following
-  # two methods:
-  #
-  # 1. (naive) Represent the associated samples `C` separate times in the softmax
-  # 2. (smart) Set `W' = W + log(C)`, as `exp(W') = Cexp(W)`
-  weights = util.softmax(llhs + np.log(counts))
-
+  assert len(structs) == len(llhs) == len(clusterings)
+  weights = util.softmax(llhs)
   vids = None
-  for adjm, clustering, weight in zip(adjms, clusterings, weights):
+
+  for struct, clustering, weight, garb in zip(structs, clusterings, weights, garbage):
+    adjm = util.convert_parents_to_adjmatrix(struct)
     mrel = make_mutrel_from_cluster_adj(adjm, clustering)
+    mrel = add_garbage(mrel, garb)
     if vids is None:
       vids = mrel.vids
       soft_mutrel = np.zeros(mrel.rels.shape)
@@ -130,7 +81,19 @@ def make_mutrel_from_trees_and_unique_clusterings(adjms, llhs, clusterings):
     rels = soft_mutrel,
   )
 
-def make_mutrel_from_trees_and_single_clustering(structs, llhs, counts, clustering):
+def make_mutrel_from_trees_and_single_clustering(structs, llhs, counts, clustering, garb):
+  # Oftentimes, we will have many samples of the same adjacency matrix paired
+  # with the same clustering. This will produce the same mutrel. As computing
+  # the mutrel from adjm + clustering is expensive, we want to avoid repeating
+  # this unnecessarily. Instead, we just modify the associated weight of the
+  # the pairing to reflect this.
+  #
+  # Observe that if we have `C` copies of the LLH `W`, we obtain
+  # equivalent post-softmax linear-space weights under either of the following
+  # two methods:
+  #
+  # 1. (naive) Represent the associated samples `C` separate times in the softmax
+  # 2. (smart) Set `W' = W + log(C)`, as `exp(W') = Cexp(W)`
   weights = util.softmax(llhs + np.log(counts))
   vids = None
 
@@ -148,6 +111,7 @@ def make_mutrel_from_trees_and_single_clustering(structs, llhs, counts, clusteri
   soft_clustrel = fix_rounding_errors(soft_clustrel)
   clustrel = mutrel.Mutrel(rels=soft_clustrel, vids=vids)
   mrel = make_mutrel_from_clustrel(clustrel, clustering)
+  mrel = add_garbage(mrel, garb)
   return mrel
 
 def make_membership_mat(clusters):
@@ -177,8 +141,8 @@ def make_mutrel_from_cluster_adj(cluster_adj, clusters):
   an `MxMx5` binary mutation relation tensor
   '''
   clustrel = make_clustrel_from_cluster_adj(cluster_adj)
-  mutrel = make_mutrel_from_clustrel(clustrel, clusters)
-  return mutrel
+  mrel = make_mutrel_from_clustrel(clustrel, clusters)
+  return mrel
 
 def make_clustrel_from_cluster_adj(cluster_adj):
   '''
@@ -209,21 +173,25 @@ def make_clustrel_from_cluster_adj(cluster_adj):
   clustrel[already_filled == 0, Models.diff_branches] = 1
 
   assert np.array_equal(np.ones((K,K)), np.sum(clustrel, axis=2))
-  vids = ['S%s' % idx for idx in range(K - 1)]
-  clustrel = mutrel.Mutrel(vids=vids, rels=clustrel[1:,1:])
+  vids = ['S%s' % idx for idx in range(K)]
+  clustrel = mutrel.Mutrel(vids=vids, rels=clustrel)
   mutrel.check_posterior_sanity(clustrel.rels)
   return clustrel
 
 def make_mutrel_from_clustrel(clustrel, clusters, check_sanity=True):
   mutrel.check_posterior_sanity(clustrel.rels)
   assert len(clusters[0]) == 0
-  vids, membership = make_membership_mat(clusters[1:])
-  # K: number of non-empty clusters
-  M, K = membership.shape
-
+  K = len(clusters)
   num_models = len(Models._all)
-  mrel = np.zeros((M, M, num_models))
   assert clustrel.rels.shape == (K, K, num_models)
+
+  vids, membership = make_membership_mat(clusters)
+  # K: number of non-empty clusters
+  M = len(membership)
+  assert len(vids) == M
+  assert membership.shape == (M, K)
+
+  mrel = np.zeros((M, M, num_models))
 
   for modelidx in range(num_models):
     mut_vs_cluster = np.dot(membership, clustrel.rels[:,:,modelidx]) # MxK

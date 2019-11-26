@@ -112,7 +112,6 @@ function convert_outputs {
 
     cmd="cd $outdir && "
     cmd+="python3 $SCRIPTDIR/convert_outputs.py "
-    cmd+="--weight-trees-by llh "
     if [[ "$USE_SUPERVARS" == "true" ]]; then
       cmd+="--use-supervars "
     fi
@@ -127,13 +126,13 @@ function convert_outputs {
     cmd+="$PAIRTREE_INPUTS_DIR/$runid.params.json "
 
     echo $cmd
-  done
+  done | parallel -j40 --halt 1 --eta
 }
 
 function main {
   #convert_inputs
-  run_citup
-  #convert_outputs
+  #run_citup
+  convert_outputs
 }
 
 main

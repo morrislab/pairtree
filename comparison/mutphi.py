@@ -27,12 +27,8 @@ def _calc_logprob(mphi, vids, variants, epsilon=1e-5):
   assert np.all(log_px <= 0)
   return log_px
 
-def calc_mutphi(cluster_phis, llhs, clusterings, ssmsfn, counts=None):
+def calc_mutphi(cluster_phis, llhs, clusterings, ssmsfn, counts):
   assert len(cluster_phis) == len(llhs) == len(clusterings)
-  if counts is None:
-    adjms = len(cluster_phis)*[np.array([])]
-    _, cluster_phis, llhs, clusterings, counts = evalutil.distinguish_unique_trees(adjms, cluster_phis, llhs, clusterings)
-
   variants = inputparser.load_ssms(ssmsfn)
   weights = util.softmax(llhs + np.log(counts))
 
