@@ -6,21 +6,9 @@ import json
 import numpy as np
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import common
 import inputparser
-import evalutil
 import util
-
-def write_mutrels(structs, scores, clusters, lichee_garbage, true_garbage, mutrel_fn):
-  assert len(structs) == len(scores)
-  clusters = [[]] + list(clusters)
-  counts = np.ones(len(structs))
-
-  mrel = evalutil.make_mutrel_from_trees_and_single_clustering(structs, scores, counts, clusters)
-  mrel = evalutil.add_garbage(mrel, lichee_garbage)
-  mrel = evalutil.add_garbage(mrel, true_garbage)
-  evalutil.save_sorted_mutrel(mrel, mutrel_fn)
 
 def _parse_node(line, snv_indices):
   tokens = line.split('\t')
@@ -147,7 +135,6 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('--mutrel', dest='mutrel_fn')
   parser.add_argument('--structures', dest='struct_fn')
   parser.add_argument('lichee_snv_fn')
   parser.add_argument('trees_fn')
@@ -162,8 +149,6 @@ def main():
   true_garbage = params['garbage']
   lichee_garbage = find_garbage(clusters, true_clusters)
 
-  if args.mutrel_fn is not None:
-    write_mutrels(structs, scores, clusters, lichee_garbage, true_garbage, args.mutrel_fn)
   if args.struct_fn is not None:
     write_params(
       clusters,

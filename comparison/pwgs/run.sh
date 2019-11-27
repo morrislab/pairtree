@@ -94,8 +94,6 @@ function convert_outputs {
       [[ $(unzip -l $treefn | grep tree_ | wc -l) > 0 ]] || continue
     fi
 
-    [[ -f $OUTDIR/${results_base}.mutrel.npz && -f $OUTDIR/${results_base}.mutphi.npz ]] && continue
-
     cmd="cd $OUTDIR && export OMP_NUM_THREADS=1 "
 
     cmd+="&& $PYTHON2 $PWGS_PATH/write_results.py "
@@ -104,20 +102,14 @@ function convert_outputs {
     cmd+="$runid "
     cmd+="$treefn "
     cmd+="$OUTDIR/$json_base.{summ.json.gz,muts.json.gz,mutass.zip} "
-    cmd+=">  $OUTDIR/$runid.results.stdout "
-    cmd+="2> $OUTDIR/$runid.results.stderr "
 
-    cmd+="&& OMP_NUM_THREADS=1 python3 $BASEDIR/comparison/pwgs/make_mutrel_and_mutphi.py "
+    cmd+="&& OMP_NUM_THREADS=1 python3 $BASEDIR/comparison/pwgs/convert_outputs.py "
     if [[ $OUTDIR =~ supervars ]]; then
       cmd+="--use-supervars "
     fi
-    cmd+="--trees-mutrel $OUTDIR/${results_base}.mutrel.npz "
-    cmd+="--phi $OUTDIR/${results_base}.mutphi.npz "
-    cmd+="--pairtree-params $PAIRTREE_INPUTS_DIR/$runid.params.json "
-    cmd+="--pairtree-ssms $PAIRTREE_INPUTS_DIR/$runid.ssm "
     cmd+="$OUTDIR/$json_base.{summ.json.gz,muts.json.gz,mutass.zip} "
-    cmd+=">>  $OUTDIR/$runid.results.stdout "
-    cmd+="2>> $OUTDIR/$runid.results.stderr"
+    cmd+="$PAIRTREE_INPUTS_DIR/$runid.params.json "
+    cmd+="$OUTDIR/$runid.neutree.pickle "
 
     echo $cmd
   done
@@ -128,11 +120,9 @@ function main {
   #run_pwgs
 
   #convert_outputs true
-
   # Don't run `parallel` with `--halt 1`, as some jobs will fail --
   # `write_results.py` will exit with non-zero when burn-in hasn't finished.
-  convert_outputs false | grep -v -e K30_ -e K100_ | parallel -j80 --eta
-  convert_outputs false | grep    -e K30_ -e K100_ | parallel -j10 --eta
+  convert_outputs false | parallel -j80 --eta
 }
 
 main

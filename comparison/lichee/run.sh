@@ -80,7 +80,6 @@ function convert_outputs {
     outd=$(dirname $treesfn)
 
     cmd="python3 $SCRIPTDIR/convert_outputs.py "
-    cmd+="--mutrel $outd/$runid.mutrel.npz "
     cmd+="--structures $outd/$runid.params.json "
     cmd+="$INDIR/$runid.snv "
     cmd+="$outd/$runid.trees "
@@ -117,35 +116,28 @@ function compute_phis {
   done
 }
 
-function compute_mutphis {
-  cd $OUTBASE
-
+function create_neutree {
   for resultsfn in $OUTBASE/*/*.results.npz; do
+    outdir=$(dirname $resultsfn)
     runid=$(basename $resultsfn | cut -d. -f1)
-    outd=$(dirname $resultsfn)
-    ssmfn=${PAIRTREE_INPUTS_DIR}/${runid}.ssm 
-    mutphifn=$outd/$runid.mutphi.npz
+    basepath="${outdir}/${runid}"
 
-    cmd="python3 $BASEDIR/comparison/pairtree/make_mutphis.py "
-    cmd+="$resultsfn "
-    cmd+="$ssmfn "
-    cmd+="$mutphifn "
-
-    cmd+="&& python3 $BASEDIR/comparison/impute_missing_mutphis.py "
-    cmd+="$ssmfn "
-    cmd+="$PAIRTREE_INPUTS_DIR/${runid}.params.json "
-    cmd+="$mutphifn "
-
-    echo $cmd
+    (
+      cmd="cd $outdir && "
+      cmd+="OMP_NUM_THREADS=1 python3 $BASEDIR/comparison/pairtree/convert_outputs.py "
+      cmd+="$resultsfn "
+      cmd+="${PAIRTREE_INPUTS_DIR}/${runid}.params.json "
+      cmd+="${basepath}.neutree.pickle "
+      echo $cmd
+    )
   done
 }
-
 function main {
   #convert_inputs
-  run_lichee
-  #convert_outputs | sort --random-sort | parallel -j8 --halt 1 --eta
-  #compute_phis | parallel -j40 --halt 1 --eta
-  #compute_mutphis | parallel -j80 --halt 1 --eta
+  #run_lichee
+  convert_outputs | sort --random-sort | parallel -j8 --halt 1 --eta
+  compute_phis | parallel -j40 --halt 1 --eta
+  create_neutree | parallel -j80 --halt 1 --eta
 }
 
 main

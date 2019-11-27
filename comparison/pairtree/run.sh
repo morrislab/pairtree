@@ -4,7 +4,6 @@ command -v parallel > /dev/null || module load gnu-parallel
 
 BASEDIR=~/work/pairtree
 SCRIPTDIR=$(dirname "$(readlink -f "$0")")
-NEUTREEDIR=$BASEDIR/comparison/neutree
 JOBDIR=~/jobs
 
 PARALLEL=40
@@ -18,7 +17,7 @@ BURNIN=0.333333
 BATCH=sims.smallalpha.pairtree
 PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/$BATCH
 TRUTH_DIR=$BASEDIR/scratch/results/sims.smallalpha.truth
-PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.multichain
+PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.rprop
 
 #BATCH=steph.pairtree.multichain
 #PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
@@ -89,7 +88,8 @@ function create_neutree {
       cmd="cd $outdir && "
       cmd+="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/convert_outputs.py "
       cmd+="$resultsfn "
-      cmd+="${basepath}.neutree.npz "
+      cmd+="${PAIRTREE_INPUTS_DIR}/${runid}.params.json "
+      cmd+="${basepath}.neutree.pickle "
       echo $cmd
     )
   done
@@ -113,42 +113,10 @@ function create_mutrel_from_clustrel {
   done
 }
 
-function create_evals {
-  for neutreefn in $PAIRTREE_RESULTS_DIR/*/*.neutree.npz; do
-    outdir=$(dirname $neutreefn)
-    runid=$(basename $neutreefn | cut -d. -f1)
-    basepath="${outdir}/${runid}"
-
-    (
-      cmd="cd $outdir && "
-      cmd+="OMP_NUM_THREADS=1 python3 $NEUTREEDIR/make_mutphis.py "
-      cmd+="$neutreefn "
-      cmd+="${PAIRTREE_INPUTS_DIR}/${runid}.ssm "
-      cmd+="${basepath}.mutphi.npz "
-      echo $cmd
-
-      cmd="cd $outdir && "
-      cmd+="OMP_NUM_THREADS=1 python3 $NEUTREEDIR/make_mutdists.py "
-      cmd+="$neutreefn "
-      cmd+="${TRUTH_DIR}/${runid}/${runid}.phi.npz "
-      cmd+="${basepath}.mutdist.npz "
-      echo $cmd
-
-      cmd="cd $outdir && "
-      cmd+="OMP_NUM_THREADS=1 python3 $NEUTREEDIR/make_mutrels.py "
-      cmd+="$neutreefn "
-      cmd+="${basepath}.mutrel.npz "
-      echo $cmd
-    )
-  done
-}
-
 function main {
   #run_pairtree #| grep python3 | parallel -j80 --halt 1 --eta
   create_neutree | parallel -j80 --halt 1 --eta
   create_mutrel_from_clustrel | sort --random-sort | parallel -j5 --halt 1 --eta
-  create_evals | grep -v mutrel | sort --random-sort | parallel -j80 --halt 1 --eta
-  create_evals | grep    mutrel | sort --random-sort | parallel -j5  --halt 1 --eta
 }
 
 main

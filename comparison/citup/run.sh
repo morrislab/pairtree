@@ -118,12 +118,10 @@ function convert_outputs {
     if [[ "$CITUP_MODE" == "qip" ]]; then
       cmd+="--citup-clusters $INDIR/$runid.cluster "
     fi
-    cmd+="--mutrel $outdir/$runid.mutrel.npz "
-    cmd+="--mutphi $outdir/$runid.mutphi.npz "
     cmd+="$resultfn "
     cmd+="$INDIR/$runid.vid "
-    cmd+="$PAIRTREE_INPUTS_DIR/$runid.ssm "
     cmd+="$PAIRTREE_INPUTS_DIR/$runid.params.json "
+    cmd+="$outdir/$runid.neutree.pickle "
 
     echo $cmd
   done | parallel -j40 --halt 1 --eta

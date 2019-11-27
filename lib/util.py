@@ -62,6 +62,11 @@ def convert_parents_to_adjmatrix(parents):
   adjm[parents,np.arange(1, K)] = 1
   return adjm
 
+def convert_adjmatrix_to_parents(adj):
+  adj = np.copy(adj)
+  np.fill_diagonal(adj, 0)
+  return np.argmax(adj[:,1:], axis=0)
+
 def _calc_phi_hat(variants):
   _extract_mat = lambda key: np.array([var[key] for var in variants])
 

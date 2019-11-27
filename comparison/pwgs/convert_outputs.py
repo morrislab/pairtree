@@ -14,6 +14,8 @@ import mutrel
 import inputparser
 import evalutil
 import mutphi
+import util
+import neutree
 
 def replace_supervar_with_variants(clusters, mutass):
   expanded = {}
@@ -27,7 +29,7 @@ def extract_phi(pops):
   phi = [pops[C]['cellular_prevalence'] for C in sorted(pops.keys())]
   return np.array(phi)
 
-def convert_results(results, base_clusters, use_supervars):
+def convert_results(results, base_clusters, garbage, use_supervars):
   tidxs = sorted(results.tree_summary.keys())
   llhs = np.array([results.tree_summary[tidx]['llh'] for tidx in tidxs])
   adjms = []
@@ -48,47 +50,48 @@ def convert_results(results, base_clusters, use_supervars):
     phis.append(phi)
     clusterings.append(pwgs_clusters)
 
-  return (adjms, llhs, phis, clusterings)
+  structs = [util.convert_adjmatrix_to_parents(A) for A in adjms]
+  counts = np.ones(len(structs))
+  ntree = neutree.Neutree(
+    structs = structs,
+    phis = phis,
+    counts = counts,
+    logscores = llhs,
+    clusterings = clusterings,
+    garbage = [[] for idx in range(len(structs))],
+  )
+  return ntree
 
 def main():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('--trees-mutrel')
   parser.add_argument('--use-supervars', action='store_true')
-  parser.add_argument('--phi', dest='mutphifn')
   # This takes Pairtree rather than PWGS inputs, which seems a little weird,
   # but it's okay -- the PWGS inputs are the supervariants, but we need to know
   # which variants correspond to each cluster in the original Pairtree inputs.
-  parser.add_argument('--pairtree-params', dest='pairtree_params_fn')
-  parser.add_argument('--pairtree-ssms', dest='pairtree_ssm_fn')
   parser.add_argument('tree_summary',
     help='JSON-formatted tree summaries')
   parser.add_argument('mutation_list',
     help='JSON-formatted list of mutations')
   parser.add_argument('mutation_assignment',
     help='JSON-formatted list of SSMs and CNVs assigned to each subclone')
+  parser.add_argument('pairtree_params_fn')
+  parser.add_argument('neutree_fn')
   args = parser.parse_args()
 
   results = ResultLoader(args.tree_summary, args.mutation_list, args.mutation_assignment)
   if args.use_supervars:
     params = inputparser.load_params(args.pairtree_params_fn)
     base_clusters = params['clusters']
+    garbage = params['garbage']
   else:
     base_clusters = None
+    garbage = []
 
-  adjms, llhs, phis, clusterings = convert_results(results, base_clusters, args.use_supervars)
-
-  if args.trees_mutrel is not None:
-    mrel = evalutil.make_mutrel_from_trees_and_unique_clusterings(adjms, llhs, clusterings)
-    if args.use_supervars:
-      mrel = evalutil.add_garbage(mrel, params['garbage'])
-    evalutil.save_sorted_mutrel(mrel, args.trees_mutrel)
-
-  if args.mutphifn is not None:
-    mphi = mutphi.calc_mutphi(phis, llhs, clusterings, args.pairtree_ssm_fn)
-    mutphi.write_mutphi(mphi, args.mutphifn)
+  ntree = convert_results(results, base_clusters, garbage, args.use_supervars)
+  neutree.save(ntree, args.neutree_fn)
 
 if __name__ == '__main__':
   main()

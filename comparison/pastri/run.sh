@@ -8,6 +8,7 @@ NUM_ITERS=10000
 PASTRI_DIR=$HOME/.apps/pastri
 JOB_DIR=$HOME/jobs
 PYTHON2=$HOME/.apps/miniconda2/bin/python2
+PYTHON3=$HOME/.apps/miniconda3/bin/python3
 
 BATCH=sims.smallalpha.pastri
 PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.smallalpha.pairtree
@@ -18,13 +19,12 @@ INDIR=$BASEDIR/scratch/inputs/$BATCH
 OUTDIR=$BASEDIR/scratch/results/$BATCH
 
 function convert_inputs {
-  source $HOME/.bash_host_specific
   mkdir -p $INDIR
 
   for ssmfn in $PAIRTREE_INPUTS_DIR/*.ssm; do
     sampid=$(basename $ssmfn | cut -d. -f1)
       #"--uniform-proposal" \
-    echo "python3 $SCRIPTDIR/convert_inputs.py " \
+    echo "$PYTHON3 $SCRIPTDIR/convert_inputs.py " \
       "$PAIRTREE_INPUTS_DIR/$sampid.ssm" \
       "$PAIRTREE_INPUTS_DIR/$sampid.params.json" \
       "$INDIR/$sampid.counts" \
@@ -93,27 +93,15 @@ function get_F_and_C {
 }
 
 function convert_outputs {
-  source $HOME/.bash_host_specific
   for treesfn in $OUTDIR/*/*.trees; do
     runid=$(basename $treesfn | cut -d. -f1)
     outpath=$(dirname $treesfn)
     echo "cd $outpath && " \
-      "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_mutrels.py" \
+      "OMP_NUM_THREADS=1 $PYTHON3 $SCRIPTDIR/convert_outputs.py" \
       "$runid" \
       "$PAIRTREE_INPUTS_DIR/$runid.params.json" \
       "$treesfn" \
-      "${outpath}/${runid}.pastri_trees.mutrel.npz" #\
-      #"> $outpath/${runid}.mutrel_output_conversion.stdout" \
-      #"2>$outpath/${runid}.mutrel_output_conversion.stderr"
-    echo "cd $outpath && " \
-      "OMP_NUM_THREADS=1 python3 $SCRIPTDIR/make_mutphis.py" \
-      "$runid" \
-      "${PAIRTREE_INPUTS_DIR}/${runid}.ssm" \
-      "${PAIRTREE_INPUTS_DIR}/${runid}.params.json" \
-      "$treesfn" \
-      "${outpath}/${runid}.pastri_trees.mutphi.npz" #\
-      #"> $outpath/${runid}.mutphi_output_conversion.stdout" \
-      #"2>$outpath/${runid}.mutphi_output_conversion.stderr"
+      "${outpath}/${runid}.neutree.pickle"
   done | parallel -j$PARALLEL --halt 1 --eta
 }
 

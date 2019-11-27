@@ -9,8 +9,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import common
 import inputparser
-import evalutil
-import mutphi
+import neutree
+import util
 
 def replace_supervar_with_variants(clusters, mutass):
   expanded = {}
@@ -155,44 +155,41 @@ def load_results(resultfn, vidfn, citup_clusters_fn, clusters, use_supervars):
   _check_results(results)
   return results
 
-def write_mutrels(results, garbage, mutrel_fn):
+def write_neutree(results, neutree_fn):
   adjms = [R['adjm'] for R in results]
+  structs = [util.convert_adjmatrix_to_parents(A) for A in adjms]
   llhs = [R['llh'] for R in results]
   clusterings = [R['clusters'] for R in results]
-  mrel = evalutil.make_mutrel_from_trees_and_unique_clusterings(adjms, llhs, clusterings)
-  mrel = evalutil.add_garbage(mrel, garbage)
-  evalutil.save_sorted_mutrel(mrel, mutrel_fn)
-
-def write_mutphis(results, ssm_fn, mutphi_fn):
-  llhs = [R['llh'] for R in results]
-  cluster_phis = [R['phi'] for R in results]
-  clusterings = [R['clusters'] for R in results]
-  mphi = mutphi.calc_mutphi(cluster_phis, llhs, clusterings, ssm_fn)
-  mutphi.write_mutphi(mphi, mutphi_fn)
+  phis = [R['phi'] for R in results]
+  N = len(structs)
+  counts = np.ones(N)
+  ntree = neutree.Neutree(
+    structs = structs,
+    phis = phis,
+    counts = counts,
+    logscores = llhs,
+    clusterings = clusterings,
+    garbage = [[] for idx in range(N)],
+  )
+  neutree.save(ntree, neutree_fn)
 
 def main():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('--mutrel', dest='mutrel_fn')
-  parser.add_argument('--mutphi', dest='mutphi_fn')
   parser.add_argument('--use-supervars', action='store_true')
   parser.add_argument('--citup-clusters')
   parser.add_argument('citup_result_fn')
   parser.add_argument('citup_vid_fn')
-  parser.add_argument('pairtree_ssm_fn')
   parser.add_argument('pairtree_params_fn')
+  parser.add_argument('neutree_fn')
   args = parser.parse_args()
 
   params = inputparser.load_params(args.pairtree_params_fn)
   clusters = params['clusters']
   results = load_results(args.citup_result_fn, args.citup_vid_fn, args.citup_clusters, clusters, args.use_supervars)
-
-  if args.mutrel_fn is not None:
-    write_mutrels(results, params['garbage'], args.mutrel_fn)
-  if args.mutphi_fn is not None:
-    write_mutphis(results, args.pairtree_ssm_fn, args.mutphi_fn)
+  write_neutree(results, args.neutree_fn)
 
 if __name__ == '__main__':
   main()
