@@ -52,3 +52,8 @@ Replace adjacency matrices with parent vectors throughout code
 Remove "--use-subset"
 Figure out why creating mutrels for Pairtere takes so much memory
 In reporting nlglh, should I subtract off nlglh of the MLE phis?
+
+Returning in Dec. 2019:
+  Don't impute for Lichee any longer
+  Check results of runs on Vector cluster -- K=100 for rprop, and for projection with 30k trees per chain
+  Make figures comparing Pairtree to each method, looking only on datasets where the other method succeeded

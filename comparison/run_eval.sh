@@ -258,7 +258,7 @@ function partition_by_K {
   done
 }
 
-function plot_individual {
+function plot_all_methods {
   ptype=$1
   plot_type=$2
   infn=$3
@@ -272,12 +272,12 @@ function plot_individual {
     continue
   fi
 
-  cmd="python3 $SCRIPTDIR/plot_individual.py "
+  cmd="python3 $SCRIPTDIR/plotter/plot_all_methods.py "
   cmd+="--template plotly_white "
   cmd+="--score-type $ptype "
   cmd+="--plot-type $plot_type "
   if [[ $BATCH =~ ^sims ]]; then
-    cmd+="--S-threshold 10 "
+    cmd+="--S-threshold 3 "
   fi
   if [[ $ptype == "mutphi" || $ptype == "mutrel" ]]; then
     cmd+="--hide-method mle_unconstrained "
@@ -303,6 +303,22 @@ function plot_individual {
   echo $cmd
 }
 
+function plot_single_method {
+  method=$1
+  score_type=$2
+  infn=$3
+  outfn=$4
+
+  cmd="python3 $SCRIPTDIR/plotter/plot_single_method.py "
+  cmd+="--template plotly_white "
+  cmd+="--score-type $score_type "
+  if [[ $score_type == mutphi ]]; then
+    cmd+="--baseline truth "
+  fi
+  cmd+="$infn $method $outfn"
+  echo $cmd
+}
+
 function plot_results_sims {
   (
     eval_mutphis
@@ -318,10 +334,13 @@ function plot_results_sims {
   (
     basefn="$SCORESDIR/$BATCH"
     for ksize in smallK bigK; do
-      plot_individual mutrel box $basefn.mutrel.$ksize.{txt,html}
-      plot_individual mutphi box $basefn.mutphi.$ksize.{txt,html}
-      plot_individual mutdistl1 box $basefn.mutdistl1.$ksize.{txt,html}
-      plot_individual mutdistl2 box $basefn.mutdistl2.$ksize.{txt,html}
+      plot_all_methods mutrel box $basefn.mutrel.$ksize.{txt,html}
+      plot_all_methods mutphi box $basefn.mutphi.$ksize.{txt,html}
+      plot_all_methods mutdistl1 box $basefn.mutdistl1.$ksize.{txt,html}
+      plot_all_methods mutdistl2 box $basefn.mutdistl2.$ksize.{txt,html}
+    done
+    for score_type in mutphi mutrel mutdistl1 mutdistl2; do
+      plot_single_method pairtree_multi $score_type ${basefn}.${score_type}.txt ${basefn}.pairtree.${score_type}.html
     done
   ) | para
 }
@@ -334,8 +353,8 @@ function plot_results_steph {
   compile_scores mutphi
   (
     basefn="$SCORESDIR/$BATCH"
-    plot_individual mutrel box $basefn.mutrel.{txt,html}
-    plot_individual mutphi box $basefn.mutphi.{txt,html}
+    plot_all_methods mutrel box $basefn.mutrel.{txt,html}
+    plot_all_methods mutphi box $basefn.mutphi.{txt,html}
   ) | para
 }
 
@@ -350,15 +369,15 @@ function remove_missing {
 }
 
 function plot_runtime {
-  #eval_runtime | para
-  #compile_runtime
-  #remove_missing
-  #partition_by_K cputime
-  #partition_by_K walltime
+  eval_runtime | para
+  compile_runtime
+  remove_missing
+  partition_by_K cputime
+  partition_by_K walltime
   for ksize in bigK smallK; do
     for ttype in cputime walltime; do
       basefn="$SCORESDIR/$BATCH.$ttype.$ksize"
-      plot_individual $ttype violin $basefn.{txt,html}
+      plot_all_methods $ttype violin $basefn.{txt,html}
     done
   done | para
 }

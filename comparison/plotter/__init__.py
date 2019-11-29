@@ -1,13 +1,12 @@
+import numpy as np
 import pandas as pd
-import argparse
 import plotly
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 from collections import defaultdict
-import re
-import numpy as np
 import sys
 import os
+import re
 
 MISSING = -1
 HAPPY_METHOD_NAMES = [
@@ -145,14 +144,17 @@ def make_pie_fig(methods, complete, total, name=None):
     pie_fig.update_layout(title_text=name)
   return pie_fig
 
-def _make_points(vals):
-  methods = sort_methods(vals.keys())
-  points = [(HAPPY_METHOD_NAMES.get(M, M), R) for M in methods for R in vals[M]]
+def make_points_for_methods(scores):
+  methods = sort_methods(scores.keys())
+  points = [(HAPPY_METHOD_NAMES.get(M, M), R) for M in methods for R in scores[M]]
   X, Y = zip(*points)
   return (X, Y)
 
-def make_violin_trace(vals, side='both', group=None, name=None, bandwidth=None, colour=None):
-  X, Y = _make_points(vals)
+def make_points_for_single_method(results, method, X_key):
+  points = [(row[X_key], row[method]) for idx, row in results.iterrows() if row[method] != MISSING]
+  return points
+
+def make_violin_trace(X, Y, side='both', group=None, name=None, bandwidth=None, colour=None):
   trace = {
     'type': 'violin',
     'x': X,
@@ -182,8 +184,7 @@ def make_violin_trace(vals, side='both', group=None, name=None, bandwidth=None, 
 
   return trace
 
-def make_box_trace(vals, group=None, name=None, colour=None):
-  X, Y = _make_points(vals)
+def make_box_trace(X, Y, group=None, name=None, colour=None):
   trace = {
     'type': 'box',
     'x': X,
@@ -288,6 +289,20 @@ def partition_by_threshold(parted, threshold):
   }
   return threshed
 
+def munge(results, methods, baseline, score_type, plot_type):
+  if baseline is not None:
+    assert baseline in results
+    for M in methods:
+      present = results[M] != MISSING
+      results.loc[present,M] -= results.loc[present,baseline]
+
+  if score_type == 'mutrel':
+    for M in methods:
+      present = results[M] != MISSING
+      results.loc[present,M] *= 100
+    if plot_type == 'violin':
+      set_missing_to(results, methods, 1)
+
 def make_score_ytitle(score_type, plot_fn):
   if score_type == 'mutrel':
     if 'steph' in plot_fn:
@@ -313,116 +328,3 @@ def make_score_ytitle(score_type, plot_fn):
     raise Exception('Unknown score type %s' % score_type)
   return ytitle
 
-def main():
-  parser = argparse.ArgumentParser(
-    description='LOL HI THERE',
-    formatter_class=argparse.ArgumentDefaultsHelpFormatter
-  )
-  parser.add_argument('--S-threshold', type=int)
-  parser.add_argument('--template', default='seaborn')
-  parser.add_argument('--max-y')
-  parser.add_argument('--score-type', required=True, choices=('mutrel', 'mutphi', 'mutdistl1', 'mutdistl2', 'cputime', 'walltime'))
-  parser.add_argument('--baseline')
-  parser.add_argument('--bandwidth', type=float)
-  parser.add_argument('--plot-type', choices=('box', 'violin'), default='box')
-  parser.add_argument('--log-y-axis', action='store_true')
-  parser.add_argument('--hide-method', nargs='+')
-  parser.add_argument('results_fn')
-  parser.add_argument('plot_fn')
-  args = parser.parse_args()
-
-  results, methods = load_results(args.results_fn)
-  if args.hide_method is not None:
-    methods = [M for M in methods if M not in args.hide_method]
-
-  if args.baseline is not None:
-    assert args.baseline in results
-    for M in methods:
-      present = results[M] != MISSING
-      results.loc[present,M] -= results.loc[present,args.baseline]
-
-  if args.score_type == 'mutrel':
-    for M in methods:
-      present = results[M] != MISSING
-      results.loc[present,M] *= 100
-    if args.plot_type == 'violin':
-      set_missing_to(results, methods, 1)
-
-  sides = {
-    'lte': 'negative',
-    'gt': 'positive',
-  }
-  names = {
-    'lte': '1, 3, or 10 tissue samples',
-    'gt': '30 or 100 tissue samples',
-  }
-  colours = {
-    'lte':'rgb(55,126,184)',
-    'gt': 'rgb(152,78,163)',
-  }
-
-  score_traces = []
-  completion_bar_traces = []
-  completion_pie_figs = []
-
-  if args.S_threshold is not None:
-    results = augment(results, 'S')
-    parted_by_S = partition(results, methods, key='S')
-    parted_by_thresh = partition_by_threshold(parted_by_S, args.S_threshold)
-    for group in parted_by_thresh.keys():
-      vals = parted_by_thresh[group]
-      methods = [M for M in vals.keys()]
-      scores = {M: vals[M]['scores'] for M in methods}
-      complete = {M: vals[M]['complete'] for M in methods}
-      total = {M: vals[M]['total'] for M in methods}
-
-      if args.plot_type == 'box':
-        score_trace = make_box_trace(scores, group=group, name=names[group], colour=colours[group])
-      elif args.plot_type == 'violin':
-        score_trace = make_violin_trace(scores, side=sides[group], group=group, name=names[group], bandwidth=args.bandwidth, colour=colours[group])
-      else:
-        raise Exception('Unknown plot type %s' % args.plot_type)
-
-      score_traces.append(score_trace)
-      completion_bar_traces.append(make_bar_trace(methods, complete, total, name=names[group]))
-      completion_pie_figs.append(make_pie_fig(methods, complete, total, name=names[group]))
-  else:
-    scores = {M: np.array(results[M]) for M in methods}
-    total = {M: len(scores[M]) for M in methods}
-    complete = {M: np.sum(scores[M] != MISSING) for M in methods}
-    if args.plot_type == 'box':
-      score_trace = make_box_trace(scores, colour=colours['lte'])
-    elif args.plot_type == 'violin':
-      score_trace = make_violin_trace(scores, side='both', bandwidth=args.bandwidth)
-    score_traces.append(score_trace)
-    completion_bar_traces.append(make_bar_trace(methods, complete, total))
-    completion_pie_figs.append(make_pie_fig(methods, complete, total))
-
-  figs = [
-    make_fig(
-      score_traces,
-      args.template,
-      make_score_ytitle(args.score_type, args.plot_fn),
-      args.max_y,
-      log_y_axis = args.log_y_axis,
-      layout_options = {
-        'boxmode': 'group',
-        'violinmode': 'overlay',
-        'violingap': 0.0,
-        'violingroupgap': 0.0,
-      },
-    ),
-
-    make_fig(
-      completion_bar_traces,
-      args.template,
-      'Proportion of failed runs',
-      max_y = None,
-      layout_options = {'barmode': 'group'},
-    ),
-  ]
-  figs += completion_pie_figs
-  write_figs(figs, args.plot_fn)
-
-if __name__ == '__main__':
-  main()
