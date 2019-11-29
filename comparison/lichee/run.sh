@@ -126,7 +126,7 @@ function create_neutree {
       cmd="cd $outdir && "
       cmd+="OMP_NUM_THREADS=1 python3 $BASEDIR/comparison/pairtree/convert_outputs.py "
       cmd+="$resultsfn "
-      cmd+="${PAIRTREE_INPUTS_DIR}/${runid}.params.json "
+      cmd+="${outdir}/${runid}.params.json "
       cmd+="${basepath}.neutree.pickle "
       echo $cmd
     )

@@ -18,7 +18,7 @@ def convert(results, garbage):
     counts = results['count'],
     logscores = results['llh'],
     clusterings = [clusters for idx in range(N)],
-    garbage = [garbage for idx in range(N)],
+    garbage = garbage,
   )
   return ntree
 

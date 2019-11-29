@@ -8,6 +8,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
 import neutree
 import pastri_util
 import util
+import inputparser
 
 def convert(sampid, params_fn, trees_fn, neutree_fn):
   adjms, llhs, phis, clusterings = pastri_util.load_results(sampid, params_fn, trees_fn)
@@ -15,13 +16,14 @@ def convert(sampid, params_fn, trees_fn, neutree_fn):
     return
   structs = [util.convert_adjmatrix_to_parents(A) for A in adjms]
   N = len(structs)
+  params = inputparser.load_params(params_fn)
   ntree = neutree.Neutree(
     structs = structs,
     phis = phis,
     counts = np.ones(N),
     logscores = llhs,
     clusterings = clusterings,
-    garbage = [[] for idx in range(N)],
+    garbage = params['garbage'],
   )
   neutree.save(ntree, neutree_fn)
 

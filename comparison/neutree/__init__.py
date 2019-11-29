@@ -8,8 +8,8 @@ def save(ntree, outfn):
   # `phis`, `structs`, and `clusterings` can be NumPy arrays (if all of same
   # dimension) or lists of lists/arrays (if different dimensions).
   N = len(ntree.structs)
-  for K in ('structs', 'phis', 'counts', 'logscores', 'clusterings', 'garbage'):
-    assert len(getattr(ntree, K)) == N
+  for K in ('structs', 'phis', 'counts', 'logscores', 'clusterings'):
+    assert len(getattr(ntree, K)) == N, '%s has length %s instead of %s' % (K, len(getattr(ntree, K)), N)
 
   # Ensure these values are definitely NumPy arrays.
   arr_vals = {K: np.array(getattr(ntree, K)) for K in ('counts', 'logscores')}

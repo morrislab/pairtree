@@ -58,7 +58,7 @@ def convert_results(results, base_clusters, garbage, use_supervars):
     counts = counts,
     logscores = llhs,
     clusterings = clusterings,
-    garbage = [[] for idx in range(len(structs))],
+    garbage = garbage,
   )
   return ntree
 

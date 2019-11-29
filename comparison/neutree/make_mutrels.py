@@ -8,14 +8,13 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
 import evalutil
 import neutree
 
-def are_same_clusterings(clusterings, garbage):
+def are_same_clusterings(clusterings):
   # Tuple conversion probably isn't necessary, but it makes everything
   # hashable, so it's probably a good idea.
   _convert_to_tuples = lambda C: tuple([tuple(cluster) for cluster in C])
   first_C = _convert_to_tuples(clusterings[0])
-  first_G = tuple(garbage[0])
-  for C, G in zip(clusterings[1:], garbage[1:]):
-    if _convert_to_tuples(C) != first_C or tuple(G) != first_G:
+  for C in clusterings[1:]:
+    if _convert_to_tuples(C) != first_C:
       return False
   return True
 
@@ -30,12 +29,12 @@ def main():
 
   ntree = neutree.load(args.neutree_fn)
   clusterings = ntree.clusterings
-  garbage = ntree.garbage
 
-  if are_same_clusterings(clusterings, garbage):
-    mrel = evalutil.make_mutrel_from_trees_and_single_clustering(ntree.structs, ntree.logscores, ntree.counts, clusterings[0], garbage[0])
+  if are_same_clusterings(clusterings):
+    mrel = evalutil.make_mutrel_from_trees_and_single_clustering(ntree.structs, ntree.logscores, ntree.counts, clusterings[0])
   else:
-    mrel = evalutil.make_mutrel_from_trees_and_unique_clusterings(ntree.structs, ntree.logscores, clusterings, garbage)
+    mrel = evalutil.make_mutrel_from_trees_and_unique_clusterings(ntree.structs, ntree.logscores, clusterings)
+  mrel = evalutil.add_garbage(mrel, ntree.garbage)
   evalutil.save_sorted_mutrel(mrel, args.mutrel_fn)
 
 if __name__ == '__main__':

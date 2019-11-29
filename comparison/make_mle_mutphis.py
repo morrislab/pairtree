@@ -2,6 +2,7 @@ import argparse
 import numpy as np
 
 import mutphi
+import mutstat
 
 import os
 import sys
@@ -29,9 +30,10 @@ def main():
   mle_phi = np.minimum(1, mle_phi)
 
   clusters = [[V] for V in vids]
-  llh = 0
-  mphi = mutphi.calc_mutphi([mle_phi], [llh], [clusters], args.ssm_fn, [1])
-  mutphi.write_mutphi(mphi, args.mutphi_fn)
+  llhs = [0]
+  counts = [1]
+  mphi = mutphi.calc_mutphi([mle_phi], llhs, [clusters], args.ssm_fn, counts)
+  mutstat.write(mphi, args.mutphi_fn)
 
 if __name__ == '__main__':
   main()

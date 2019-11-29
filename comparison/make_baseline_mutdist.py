@@ -3,6 +3,7 @@ import numpy as np
 import pickle
 
 import evalutil
+import mutstat
 
 def main():
   parser = argparse.ArgumentParser(
@@ -19,7 +20,8 @@ def main():
   clusters = [[]] + simdata['clusters']
   vids, membership = evalutil.make_membership_mat(clusters)
   mphi = np.dot(membership, simdata['phi'])
-  np.savez_compressed(args.baseline_mutdist_fn, phi=mphi, vids=vids, assays=simdata['sampnames'])
+  baseline = mutstat.Mutstat(stats=mphi, vids=vids, assays=simdata['sampnames'])
+  mutstat.write(baseline, args.baseline_mutdist_fn)
 
 if __name__ == '__main__':
   main()

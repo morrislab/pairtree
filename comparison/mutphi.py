@@ -9,8 +9,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import inputparser
 import common
 import util
-
-Mutphi = namedtuple('Mutphi', ('vids', 'assays', 'logprobs'))
+import mutstat
 
 def _calc_logprob(mphi, vids, variants, epsilon=1e-5):
   def _extract_arr(K):
@@ -59,17 +58,7 @@ def calc_mutphi(cluster_phis, llhs, clusterings, ssmsfn, counts):
 
     # TODO: should I be doing something like logsumexp?
     weighted = weight * _calc_logprob(mphi, vids, variants)
-    assert not np.any(np.isnan(weighted))
+    assert not np.any(np.isnan(weighted)) and not np.any(np.isinf(weighted))
     logprobs += weighted
 
-  return Mutphi(vids=vids, assays=assays, logprobs=logprobs)
-
-def write_mutphi(mphi, mutphifn):
-  # calc_mutphi should have created `mutphi` with sorted vids, but double-check
-  # this is true.
-  assert list(mphi.vids) == common.sort_vids(mphi.vids)
-  np.savez_compressed(mutphifn, logprobs=mphi.logprobs, vids=mphi.vids, assays=mphi.assays)
-
-def load_mutphi(mutphifn):
-  results = np.load(mutphifn, allow_pickle=True)
-  return Mutphi(vids=results['vids'], assays=results['assays'], logprobs=results['logprobs'])
+  return mutstat.Mutstat(vids=vids, assays=assays, stats=logprobs)

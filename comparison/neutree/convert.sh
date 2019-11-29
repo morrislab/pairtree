@@ -7,7 +7,7 @@ RESULTSDIR=$BASEDIR/scratch/results
 PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.smallalpha.pairtree
 TRUTH_DIR=$RESULTSDIR/sims.smallalpha.truth
 NEUTREEDIR=$BASEDIR/comparison/neutree
-PARALLEL=40
+PARALLEL=80
 
 function create_evals {
   results=$1
@@ -22,6 +22,9 @@ function create_evals {
     (
       cmd="cd $outdir && "
       cmd+="OMP_NUM_THREADS=1 python3 $NEUTREEDIR/make_mutphis.py "
+      if [[ $results =~ lichee ]]; then
+        cmd+="--impute-garbage "
+      fi
       cmd+="$neutreefn "
       cmd+="${PAIRTREE_INPUTS_DIR}/${runid}.ssm "
       cmd+="${basepath}.mutphi.npz "
@@ -29,6 +32,9 @@ function create_evals {
 
       cmd="cd $outdir && "
       cmd+="OMP_NUM_THREADS=1 python3 $NEUTREEDIR/make_mutdists.py "
+      if [[ $results =~ lichee ]]; then
+        cmd+="--impute-garbage "
+      fi
       cmd+="$neutreefn "
       cmd+="${TRUTH_DIR}/${runid}/${runid}.phi.npz "
       cmd+="${basepath}.mutdist.npz "
@@ -56,9 +62,10 @@ function main {
     create_evals $result
   done)
 
-  echo "$cmds" | grep mutphi                   | sort --random-sort | parallel -j$PARALLEL --halt 1 --eta
-  echo "$cmds" | grep mutdist | grep -v lichee | sort --random-sort | parallel -j$PARALLEL --halt 1 --eta
-  echo "$cmds" | grep mutphi                   | sort --random-sort | parallel -j5         --halt 1 --eta
+  echo "$cmds" | grep mutphi | sort --random-sort | parallel -j$PARALLEL --halt 1 --eta
+  echo "$cmds" | grep mutdist | sort --random-sort | parallel -j$PARALLEL --halt 1 --eta
+  echo "$cmds" | grep mutrel | grep -v -e K30_ -e K100_ | sort --random-sort | parallel -j$PARALLEL --halt 1 --eta
+  echo "$cmds" | grep mutrel | grep    -e K30_ -e K100_ | sort --random-sort | parallel -j10 --halt 1 --eta
 }
 
 main

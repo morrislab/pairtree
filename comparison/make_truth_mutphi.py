@@ -6,6 +6,7 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import mutphi
+import mutstat
 
 def main():
   parser = argparse.ArgumentParser(
@@ -30,7 +31,7 @@ def main():
     args.ssm_fn,
     counts,
   )
-  mutphi.write_mutphi(mphi, args.mutphi_fn)
+  mutstat.write(mphi, args.mutphi_fn)
 
 if __name__ == '__main__':
   main()

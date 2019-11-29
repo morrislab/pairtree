@@ -43,6 +43,7 @@ function make_sims_truth {
 
     cmd="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/pairtree/convert_outputs.py "
     cmd+="$truthdir/$runid.results.npz "
+    cmd+="$PAIRTREE_INPUTS_DIR/$runid.params.json "
     cmd+="$truthdir/$runid.neutree.npz "
     cmd+="&& OMP_NUM_THREADS=1 python3 $SCRIPTDIR/neutree/make_mutrels.py "
     cmd+="$truthdir/$runid.neutree.npz "
@@ -56,7 +57,6 @@ function make_mle_mutphis {
 
   for ssmfn in $PAIRTREE_INPUTS_DIR/*.ssm; do
     runid=$(basename $ssmfn | cut -d. -f1)
-    #[[ $runid =~ K30 || $runid =~ K100 ]] || continue
 
     echo "python3 $SCRIPTDIR/make_mle_mutphis.py" \
       "$ssmfn" \
@@ -86,23 +86,19 @@ function make_results_paths {
     #  paths+="pairtree_tensor=${BATCH}.pairtree.onlytensor/${runid}/${runid}.pairtree_clustrel.mutrel.npz "
     #fi
   elif [[ $BATCH == sims.smallalpha ]]; then
-    paths+="truth=${TRUTH_DIR}/$runid/${runid}.${result_type}.npz "
-    #paths+="pwgs_supervars=sims.pwgs.supervars/$runid/$runid.pwgs_trees_single.$result_type.npz "
-    #paths+="pastri=${BATCH}.pastri.informative/$runid/$runid.pastri_trees_llh.$result_type.npz "
-    #for foo in $(seq 69 77); do
-    #  paths+="pairtree_lol${foo}=sims.pairtree.lol${foo}/${runid}/${runid}.trees_${result_type}.npz "
-    #done
+    if [[ $result_type == mutphi || $result_type == mutrel ]]; then
+      paths+="truth=${TRUTH_DIR}/$runid/${runid}.${result_type}.npz "
+    fi
+    paths+="pwgs_supervars=${BATCH}.pwgs.supervars/$runid/$runid.$result_type.npz "
+    paths+="pastri=${BATCH}.pastri/$runid/$runid.$result_type.npz "
     #paths+="pairtree_single=sims.pairtree.singlechain/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
-    #if [[ $result_type == mutrel ]]; then
-    #  paths+="pairtree_clustrel=sims.pairtree.multichain/${runid}/${runid}.clustrel_${result_type}.npz "
-    #fi
+    if [[ $result_type == mutrel ]]; then
+      paths+="pairtree_clustrel=${BATCH}.pairtree.multichain/${runid}/${runid}.clustrel_mutrel.npz "
+    fi
     paths+="pairtree_multi=${BATCH}.pairtree.multichain/${runid}/${runid}.${result_type}.npz "
     paths+="pairtree_rprop=${BATCH}.pairtree.rprop/${runid}/${runid}.${result_type}.npz "
-    #paths+="pairtree_quad=sims.pairtree.quadchain/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
-    #paths+="pairtree_single_old=sims.pairtree.projection.singlechain.old_proposals/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
-    #paths+="pairtree_multi_old=sims.pairtree.projection.multichain.old_proposals/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
-    #paths+="lichee=sims.lichee/$runid/$runid.$result_type.npz "
-    #paths+="citup=sims.citup.rawvars.qip/$runid/$runid.$result_type.npz "
+    paths+="lichee=${BATCH}.lichee/$runid/$runid.$result_type.npz "
+    paths+="citup=${BATCH}.citup.rawvars.qip/$runid/$runid.$result_type.npz "
   fi
 
   echo $paths
@@ -178,7 +174,6 @@ function compile_scores {
     methods=$(head -n1 $(ls *.$suffix | head -n1))
     echo 'runid,'$methods
     for foo in *.$suffix; do
-      [[ $foo =~ K100_ ]] && continue
       if [[ $(head -n1 $foo) != $methods ]]; then
         echo "Methods in $foo ($(head -n1 $foo)) don't match expected $methods" >&2
         exit 1

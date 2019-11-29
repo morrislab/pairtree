@@ -49,7 +49,7 @@ def save_sorted_mutrel(mrel, mrelfn):
   mutrel.check_posterior_sanity(mrel.rels)
   np.savez_compressed(mrelfn, rels=mrel.rels, vids=mrel.vids)
 
-def make_mutrel_from_trees_and_unique_clusterings(structs, llhs, clusterings, garbage):
+def make_mutrel_from_trees_and_unique_clusterings(structs, llhs, clusterings):
   '''
   Relative to `make_mutrel_from_trees_and_single_clustering`, this function is
   slower and more memory intensive, but also more flexible. It differs in two
@@ -64,10 +64,9 @@ def make_mutrel_from_trees_and_unique_clusterings(structs, llhs, clusterings, ga
   weights = util.softmax(llhs)
   vids = None
 
-  for struct, clustering, weight, garb in zip(structs, clusterings, weights, garbage):
+  for struct, clustering, weight in zip(structs, clusterings, weights):
     adjm = util.convert_parents_to_adjmatrix(struct)
     mrel = make_mutrel_from_cluster_adj(adjm, clustering)
-    mrel = add_garbage(mrel, garb)
     if vids is None:
       vids = mrel.vids
       soft_mutrel = np.zeros(mrel.rels.shape)
@@ -81,7 +80,7 @@ def make_mutrel_from_trees_and_unique_clusterings(structs, llhs, clusterings, ga
     rels = soft_mutrel,
   )
 
-def make_mutrel_from_trees_and_single_clustering(structs, llhs, counts, clustering, garb):
+def make_mutrel_from_trees_and_single_clustering(structs, llhs, counts, clustering):
   # Oftentimes, we will have many samples of the same adjacency matrix paired
   # with the same clustering. This will produce the same mutrel. As computing
   # the mutrel from adjm + clustering is expensive, we want to avoid repeating
@@ -111,7 +110,6 @@ def make_mutrel_from_trees_and_single_clustering(structs, llhs, counts, clusteri
   soft_clustrel = fix_rounding_errors(soft_clustrel)
   clustrel = mutrel.Mutrel(rels=soft_clustrel, vids=vids)
   mrel = make_mutrel_from_clustrel(clustrel, clustering)
-  mrel = add_garbage(mrel, garb)
   return mrel
 
 def make_membership_mat(clusters):
@@ -180,7 +178,6 @@ def make_clustrel_from_cluster_adj(cluster_adj):
 
 def make_mutrel_from_clustrel(clustrel, clusters, check_sanity=True):
   mutrel.check_posterior_sanity(clustrel.rels)
-  assert len(clusters[0]) == 0
   K = len(clusters)
   num_models = len(Models._all)
   assert clustrel.rels.shape == (K, K, num_models)

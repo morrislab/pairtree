@@ -155,7 +155,7 @@ def load_results(resultfn, vidfn, citup_clusters_fn, clusters, use_supervars):
   _check_results(results)
   return results
 
-def write_neutree(results, neutree_fn):
+def write_neutree(results, garbage, neutree_fn):
   adjms = [R['adjm'] for R in results]
   structs = [util.convert_adjmatrix_to_parents(A) for A in adjms]
   llhs = [R['llh'] for R in results]
@@ -169,7 +169,7 @@ def write_neutree(results, neutree_fn):
     counts = counts,
     logscores = llhs,
     clusterings = clusterings,
-    garbage = [[] for idx in range(N)],
+    garbage = garbage,
   )
   neutree.save(ntree, neutree_fn)
 
@@ -187,9 +187,8 @@ def main():
   args = parser.parse_args()
 
   params = inputparser.load_params(args.pairtree_params_fn)
-  clusters = params['clusters']
-  results = load_results(args.citup_result_fn, args.citup_vid_fn, args.citup_clusters, clusters, args.use_supervars)
-  write_neutree(results, args.neutree_fn)
+  results = load_results(args.citup_result_fn, args.citup_vid_fn, args.citup_clusters, params['clusters'], args.use_supervars)
+  write_neutree(results, params['garbage'], args.neutree_fn)
 
 if __name__ == '__main__':
   main()
