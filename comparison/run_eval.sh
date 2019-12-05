@@ -319,6 +319,22 @@ function plot_single_method {
   echo $cmd
 }
 
+function plot_single_vs_others {
+  single_method=$1
+  score_type=$2
+  infn=$3
+  outfn=$4
+
+  cmd="python3 $SCRIPTDIR/plotter/plot_single_vs_others.py "
+  cmd+="--template plotly_white "
+  cmd+="--score-type $score_type "
+  if [[ $score_type == mutphi ]]; then
+    cmd+="--baseline truth "
+  fi
+  cmd+="$infn $method $outfn"
+  echo $cmd
+}
+
 function plot_results_sims {
   (
     eval_mutphis
@@ -340,7 +356,10 @@ function plot_results_sims {
       plot_all_methods mutdistl2 box $basefn.mutdistl2.$ksize.{txt,html}
     done
     for score_type in mutphi mutrel mutdistl1 mutdistl2; do
-      plot_single_method pairtree_multi $score_type ${basefn}.${score_type}.txt ${basefn}.pairtree.${score_type}.html
+      for method in pairtree_multi lichee; do
+        plot_single_method    $method $score_type ${basefn}.${score_type}.txt ${basefn}.${method}.${score_type}.html
+        plot_single_vs_others $method $score_type ${basefn}.${score_type}.txt ${basefn}.${method}_vs_others.${score_type}.html
+      done
     done
   ) | para
 }

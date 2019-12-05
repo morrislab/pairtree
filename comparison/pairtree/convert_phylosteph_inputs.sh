@@ -4,7 +4,7 @@ module load gnu-parallel
 
 SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 BASEDIR=~/work/pairtree
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.patient.withgarb.pairtree
 HANDBUILTDIR=~/work/steph/data/handbuilt_trees
 PHYLOSTEPH_INPUTS_DIR=~/work/steph/data/inputs/steph.xenos.nocns
 PARALLEL=40
@@ -20,7 +20,7 @@ function convert_phylosteph_inputs {
       "--handbuilt $HANDBUILTDIR/$runid.json" \
       "$PHYLOSTEPH_INPUTS_DIR/$runid.{sampled.ssm,params.json}" \
       "$PAIRTREE_INPUTS_DIR/$runid.{ssm,params.json}"
-  done | parallel -j$PARALLEL --halt 1
+  done #| parallel -j$PARALLEL --halt 1
 }
 
 function main {

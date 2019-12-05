@@ -1,27 +1,33 @@
 import argparse
 import numpy as np
+import plotly.graph_objs as go
+
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import plotter
 from plotter import MISSING
-import pandas as pd
+import plotly
 
-def make_traces(results, method):
-  S_vals = sorted(pd.unique(results['S']))
+def make_boxes(results, methods, single):
+  assert single in methods
+  others = plotter.sort_methods(set(methods) - set((single,)))
+
   traces = []
-
-  for S in S_vals:
-    points = [(row['K'], row[method]) for idx, row in results.iterrows() \
-      if row[method] != MISSING and row['S'] == S]
+  for M in others:
+    points = [row[M] - row[single] for idx, row in results.iterrows() \
+      if MISSING not in (row[single], row[M])]
     if len(points) == 0:
       continue
-    points = sorted(points, key = lambda V: V[0])
-    X, Y = zip(*points)
-    X = ['%s subclones' % K for K in X]
-    trace = plotter.make_box_trace(X, Y, group=str(S), name='%s samples' % S)
-    traces.append(trace)
+    traces.append(go.Box(
+      y = points,
+      name = '%s (%s runs)' % (plotter.HAPPY_METHOD_NAMES.get(M, M), len(points)),
+      boxpoints = 'all',
+      jitter = 0.3,
+      pointpos = 1.8,
+    ))
 
+  assert len(traces) > 0
   return traces
 
 def main():
@@ -34,30 +40,25 @@ def main():
   parser.add_argument('--score-type', required=True, choices=('mutrel', 'mutphi', 'mutdistl1', 'mutdistl2'))
   parser.add_argument('--baseline')
   parser.add_argument('results_fn')
-  parser.add_argument('method')
+  parser.add_argument('single_method')
   parser.add_argument('plot_fn')
   args = parser.parse_args()
 
   results, methods = plotter.load_results(args.results_fn)
   plot_type = 'box'
   plotter.munge(results, methods, args.baseline, args.score_type, plot_type)
-
   for key in ('K', 'S'):
     results = plotter.augment(results, key)
-  traces = make_traces(results, args.method)
 
+  boxes = make_boxes(results, methods, args.single_method)
   figs = [
     plotter.make_fig(
-      traces,
+      boxes,
       args.template,
       plotter.make_score_ytitle(args.score_type, args.plot_fn),
       args.max_y,
       log_y_axis = False,
       layout_options = {
-        'boxmode': 'group',
-        'violinmode': 'overlay',
-        'violingap': 0.0,
-        'violingroupgap': 0.0,
       },
     ),
   ]
