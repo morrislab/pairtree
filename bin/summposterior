@@ -49,7 +49,7 @@ def summarize(runid, results, params, supervars, html_out_fn):
     print("<script type=\"text/javascript\">var tree_json = '%s'; var results = JSON.parse(tree_json);</script>" % json.dumps(structs), file=outf)
     print('<h2>Trees</h2>', file=outf)
     print('<ul><li>Number of unique trees: %s</li></ul>' % N, file=outf)
-    print('<table id="trees" class="table table-striped"><thead><tr><th>Index</th><th>Posterior</th><th>nLgLh</th><th>Structure</th></tr></thead><tbody class="container"></tbody></table>', file=outf)
+    print('<table id="trees" class="table table-striped"><thead><tr><th>Index</th><th>Posterior</th><th>nLgLh</th><th>Count</th><th>Structure</th></tr></thead><tbody class="container"></tbody></table>', file=outf)
     print(plotutil.js_on_load("(new PosteriorSumm()).plot(results, '#trees .container');"), file=outf)
 
 def main():
