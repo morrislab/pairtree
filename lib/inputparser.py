@@ -26,8 +26,6 @@ def load_ssms(ssmfn, max_ssms=None):
 
       variant['ref_reads'] = variant['total_reads'] - variant['var_reads']
       variant['vaf'] = variant['var_reads'] / variant['total_reads']
-      variant['chrom'], variant['pos'] = variant['name'].split('_')
-      variant['pos'] = int(variant['pos'])
 
       assert variant['id'] not in variants
       variants[variant['id']] = variant

@@ -7,4 +7,3 @@ def read_file(fn):
 
 def js_on_load(js):
   return '<script type="text/javascript">document.addEventListener("DOMContentLoaded", () => { %s });</script>' % js
-

@@ -52,11 +52,8 @@ def make_phi_pseudovars(phi):
   M, S = phi.shape
   omega_v = 0.5 * np.ones(S)
   V = [{
-    'gene': None,
     'id': 'P%s' % cidx,
     'name': 'P%s' % cidx,
-    'chrom': None,
-    'pos': None,
     'cluster': cidx,
     'vaf': omega_v * row,
     'omega_v': omega_v,
@@ -87,7 +84,7 @@ def print_vaftable_header(sampnames, show_cluster_members, outf):
   print('</div>', file=outf)
   print('<br><br><br>', file=outf)
   print('<table class="matrix"><thead><tr>', file=outf)
-  header = ['Gene', 'ID', 'Chrom', 'Locus', 'Cluster']
+  header = ['ID', 'Name', 'Cluster']
   header += munge_samp_names(sampnames)
   print(''.join(['<th>%s</th>' % H for H in header]), file=outf)
   print('</tr></thead><tbody>', file=outf)
@@ -103,12 +100,11 @@ def print_vaftable_row(V, cls, bgcolour, should_correct_vaf, outf, visible=True)
   else:
     vaf = V['vaf']
 
-  #V['chrom'] = V['pos'] = None
   if V['cluster'] is not None:
     # Increment cluster number to correct off-by-one error relative to tree nodes.
     V['cluster'] += 1
 
-  td = ['<td class="%s">%s</td>' % (K, V[K] if K in V and V[K] is not None else '&mdash;') for K in ('gene', 'id', 'chrom', 'pos', 'cluster')]
+  td = ['<td class="%s">%s</td>' % (K, V[K] if K in V and V[K] is not None else '&mdash;') for K in ('id', 'name', 'cluster')]
   td += ['<td style="background-color: %s"><span>%s</span></td>' % (make_colour(v), make_vaf_label(v)) for v in vaf]
   print('<tr class="%s" style="background-color: %s%s">%s</tr>' % (
     cls,
