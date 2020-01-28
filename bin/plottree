@@ -32,8 +32,7 @@ def write_header(runid, outf):
   if runid is not None:
     print('<h1>%s</h1>' % runid, file=outf)
 
-def _write_tree_html(runid, tree_struct, plot_phi, plot_phi_hat, plot_phi_error, plot_phi_interleaved, outf):
-  write_header(runid, outf)
+def _write_tree_html(tree_struct, plot_phi, plot_phi_hat, plot_phi_error, plot_phi_interleaved, outf):
   print("<script type=\"text/javascript\">var tree_json = '%s'; var results = JSON.parse(tree_json);</script>" % json.dumps(tree_struct), file=outf)
 
   print('''
@@ -90,7 +89,8 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('--tree-index', type=int)
+  parser.add_argument('--tree-index', type=int, default=0)
+  parser.add_argument('--plot-tree', action='store_true')
   parser.add_argument('--plot-pairwise-separate', action='store_true')
   parser.add_argument('--plot-pairwise-mle', action='store_true')
   parser.add_argument('--plot-vaf-matrix', action='store_true')
@@ -108,38 +108,36 @@ def main():
   args = parser.parse_args()
 
   results = resultserializer.load(args.results_fn)
-  if args.tree_index is not None:
-    tidx = args.tree_index
-  else:
-    tidx = 0
-
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.params_fn)
   supervars = clustermaker.make_cluster_supervars(results['clusters'], variants)
   supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
-
-  tree_struct = util.make_tree_struct(
-    results['struct'][tidx],
-    results['count'][tidx],
-    results['llh'][tidx],
-    results['prob'][tidx],
-    results['phi'][tidx],
-    supervars,
-    params['samples'],
-  )
-  if args.tree_json_fn is not None:
-    _write_tree_json(tree_struct, args.tree_json_fn)
+  tidx = args.tree_index
 
   with open(args.html_out_fn, 'w') as outf:
-    _write_tree_html(
-      args.runid,
-      tree_struct,
-      args.plot_phi,
-      args.plot_phi_hat,
-      args.plot_phi_error,
-      args.plot_phi_interleaved,
-      outf,
-    )
+    write_header(args.runid, outf)
+
+    if args.plot_tree:
+      tree_struct = util.make_tree_struct(
+        results['struct'][tidx],
+        results['count'][tidx],
+        results['llh'][tidx],
+        results['prob'][tidx],
+        results['phi'][tidx],
+        supervars,
+        params['samples'],
+      )
+      _write_tree_html(
+        tree_struct,
+        args.plot_phi,
+        args.plot_phi_hat,
+        args.plot_phi_error,
+        args.plot_phi_interleaved,
+        outf,
+      )
+      if args.tree_json_fn is not None:
+        _write_tree_json(tree_struct, args.tree_json_fn)
+
     if args.plot_vaf_matrix:
       vaf_plotter.plot_vaf_matrix(
         results['clusters'],
@@ -151,6 +149,7 @@ def main():
         should_correct_vaf=True,
         outf=outf,
       )
+
     if args.plot_pairwise_mle:
       relation_plotter.plot_ml_relations(results['clustrel_posterior'], outf)
     if args.plot_pairwise_separate:
