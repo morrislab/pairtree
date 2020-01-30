@@ -7,6 +7,7 @@ import common
 import itertools
 import random
 import string
+import scipy.stats
 
 def make_random_id(K=8):
   return ''.join(random.choices(string.ascii_letters, k=K))
@@ -57,6 +58,9 @@ def make_phi_pseudovars(phi):
     'cluster': cidx,
     'vaf': omega_v * row,
     'omega_v': omega_v,
+    'var_reads': np.full_like(omega_v, np.nan),
+    'ref_reads': np.full_like(omega_v, np.nan),
+    'total_reads': np.full_like(omega_v, np.nan),
   } for cidx, row in enumerate(phi[1:])]
   return V
 
@@ -94,18 +98,16 @@ def print_vaftable_header(sampnames, show_cluster_members, outf):
 def print_vaftable_row(V, cls, bgcolour, should_correct_vaf, outf, visible=True):
   # Duplicate variant so we don't modify it.
   V = dict(V)
-
   if should_correct_vaf:
-    vaf = V['vaf'] / V['omega_v']
-  else:
-    vaf = V['vaf']
+    # Don't change underlying Numpy array by avoiding `/=`.
+    V['vaf'] = V['vaf'] / V['omega_v']
 
   if V['cluster'] is not None:
     # Increment cluster number to correct off-by-one error relative to tree nodes.
     V['cluster'] += 1
 
   td = ['<td class="%s">%s</td>' % (K, V[K] if K in V and V[K] is not None else '&mdash;') for K in ('id', 'name', 'cluster')]
-  td += ['<td style="background-color: %s"><span>%s</span></td>' % (make_colour(v), make_vaf_label(v)) for v in vaf]
+  td += ['<td style="background-color: %s"><span>%s</span></td>' % (make_colour(V['vaf'][idx]), make_cell_label(V, idx)) for idx in range(len(V['vaf']))]
   print('<tr class="%s" style="background-color: %s%s">%s</tr>' % (
     cls,
     bgcolour,
@@ -177,8 +179,24 @@ def make_colour(vaf):
   val = int(255*(1 - float(vaf)))
   return 'rgb(255, %s, %s)' % (2*(val,))
 
-def make_vaf_label(vaf):
-  return '%.2f' % float(vaf)
+def make_cell_label(V, idx):
+  # Comptue the 95% credible interval for `phi_hat`, using a Beta(0.5, 0.5)
+  # noninformative prior.
+  phi_hat_alpha = 0.5 + V['var_reads'][idx]
+  phi_hat_beta = max(0.5, 0.5 + V['omega_v'][idx]*V['total_reads'][idx] - V['var_reads'][idx])
+  phi_hat_ci_range = 0.95
+  phi_hat_ci = [scipy.stats.beta.ppf(point, phi_hat_alpha, phi_hat_beta) for point in (
+    0.5 - phi_hat_ci_range/2,
+    0.5 + phi_hat_ci_range/2
+  )]
+
+  return '%.2f (%s/%s)<br>[%.2f, %.2f]' % (
+    V['vaf'][idx],
+    V['var_reads'][idx],
+    V['total_reads'][idx],
+    phi_hat_ci[0],
+    phi_hat_ci[1],
+  )
 
 def assign_colours(num_colours):
   colours = {None: '#fff'}
