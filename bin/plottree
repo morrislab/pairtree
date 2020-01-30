@@ -16,6 +16,43 @@ import json
 import util
 import plotutil
 
+def _calc_eta(struct, phi):
+  K, M = phi.shape
+  assert len(struct) == K - 1
+  adj = util.convert_parents_to_adjmatrix(struct)
+  Z = common.make_ancestral_from_adj(adj)
+  Z_inv = np.linalg.inv(Z)
+  eta = np.dot(Z_inv, phi)
+  return eta
+
+def _plot_eta(struct, phi, sampnames, outf):
+  # Avoid Plotly dependency unless user wants this plot.
+  import plotly.graph_objs as go
+  import plotly.io as pio
+
+  eta = _calc_eta(struct, phi)
+  traces = [go.Bar(
+    name = 'Pop. %s' % cidx,
+    x = sampnames,
+    y = row,
+    text = ['Population %s: %.0f%%' % (cidx, 100*E) for E in row],
+    hoverinfo = 'x+text',
+    width = 0.9,
+  ) for cidx, row in enumerate(eta)]
+  layout = go.Layout(
+    barmode = 'stack',
+    bargap = 0.1,
+    template = 'seaborn',
+    xaxis = {'title': 'Sample'},
+    yaxis = {
+      'title': 'Population frequency',
+      'tickformat': ',.0%',
+    },
+  )
+  fig = go.Figure(data=traces, layout=layout)
+  plot_html = pio.to_html(fig, include_plotlyjs='cdn')
+  print('<h2>Population frequencies</h2>%s' % plot_html, file=outf)
+
 def _write_tree_json(tree_struct, jsonfn):
   with open(jsonfn, 'w') as F:
     print(json.dumps(tree_struct), file=F)
@@ -40,12 +77,6 @@ def _write_tree_html(tree_struct, plot_phi, plot_phi_hat, plot_phi_error, plot_p
   %s
   ''' % plotutil.js_on_load('''var container = '#trees'; d3.select(container).append('h3').text('nlglh=' + results.nlglh.toFixed(3) + ' prob=' + results.prob.toFixed(3)); (new TreePlotter()).plot(0, results.parents, results.phi,  results.samples, container);'''), file=outf)
 
-  if plot_phi_interleaved:
-    print('''
-    <div id="phi_interleaved_matrix" class="container"><h2>Interleaved lineage frequencies</h2></div>
-    %s
-    ''' % plotutil.js_on_load('''(new PhiInterleavedMatrix()).plot(results.phi, results.phi_hat, results.samples, '#phi_interleaved_matrix');'''), file=outf)
-
   if plot_phi:
     print('''
     <div id="phi_matrix" class="container"><h2>Tree-constrained lineage frequencies</h2></div>
@@ -63,6 +94,12 @@ def _write_tree_html(tree_struct, plot_phi, plot_phi_hat, plot_phi_error, plot_p
     <div id="phi_error_matrix" class="container"><h2>Lineage frequency error</h2></div>
     %s
     ''' % plotutil.js_on_load('''(new PhiErrorMatrix()).plot(results.phi, results.phi_hat, results.samples, '#phi_error_matrix');'''), file=outf)
+
+  if plot_phi_interleaved:
+    print('''
+    <div id="phi_interleaved_matrix" class="container"><h2>Interleaved lineage frequencies</h2></div>
+    %s
+    ''' % plotutil.js_on_load('''(new PhiInterleavedMatrix()).plot(results.phi, results.phi_hat, results.samples, '#phi_interleaved_matrix');'''), file=outf)
 
 def write_cluster_stats(clusters, garbage, supervars, variants, outf):
   cluster_dev = []
@@ -99,6 +136,7 @@ def main():
   parser.add_argument('--plot-phi-error', action='store_true')
   parser.add_argument('--plot-phi-interleaved', action='store_true')
   parser.add_argument('--plot-cluster-stats', action='store_true')
+  parser.add_argument('--plot-eta', action='store_true')
   parser.add_argument('--runid')
   parser.add_argument('--tree-json', dest='tree_json_fn', help='Additional external file in which to store JSON, which is already stored statically in the HTML file')
   parser.add_argument('ssm_fn')
@@ -137,6 +175,9 @@ def main():
       )
       if args.tree_json_fn is not None:
         _write_tree_json(tree_struct, args.tree_json_fn)
+
+    if args.plot_eta:
+      _plot_eta(results['struct'][tidx], results['phi'][tidx], params['samples'], outf)
 
     if args.plot_vaf_matrix:
       vaf_plotter.plot_vaf_matrix(

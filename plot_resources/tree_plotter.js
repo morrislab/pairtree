@@ -377,7 +377,7 @@ MatrixBar.prototype.plot = function(mat, row_labels, row_colours, col_labels, co
   var cell_size = 50;
   var row_label_width = this._calc_label_width(row_labels);
   var col_label_height = this._calc_label_width(col_labels);
-  var font_size = '24px';
+  var font_size = '16px';
   var label_padding = 10;
 
   if(row_labels.length !== num_rows) {
