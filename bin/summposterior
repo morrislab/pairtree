@@ -52,12 +52,50 @@ def summarize(runid, results, params, supervars, html_out_fn):
     print('<table id="trees" class="table table-striped"><thead><tr><th>Index</th><th>Posterior</th><th>nLgLh</th><th>Count</th><th>Structure</th></tr></thead><tbody class="container"></tbody></table>', file=outf)
     print(plotutil.js_on_load("(new PosteriorSumm()).plot(results, '#trees .container');"), file=outf)
 
+def _make_congraph(results):
+  adjms = np.array([util.convert_parents_to_adjmatrix(struct) for struct in results['struct']])
+  weights = results['prob']
+  assert len(weights) == len(adjms)
+  assert np.isclose(1, np.sum(weights))
+  graph = np.sum(weights[:,np.newaxis,np.newaxis] * adjms, axis=0)
+  np.fill_diagonal(graph, 0)
+
+  parent_sum = np.sum(graph, axis=0)
+  assert parent_sum[0] == 0 and np.allclose(1, parent_sum[1:])
+  assert np.all(0 <= graph) and np.all(graph <= 1)
+  return graph
+
+def _render_congraph(congraph, threshold=0.05):
+  root = 0
+  stack = [root]
+  maxwt = 5
+
+  visited = set()
+  G = 'digraph {\n'
+
+  while len(stack) > 0:
+    node = stack.pop()
+    if node in visited:
+      continue
+    visited.add(node)
+    children = np.flatnonzero(congraph[node] >= threshold).tolist()
+    for child in children:
+      G += '%s -> %s [penwidth=%s]\n' % (
+        node,
+        child,
+        maxwt * congraph[node,child]
+      )
+    stack += children
+  G += '}'
+  return G
+
 def main():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--runid')
+  parser.add_argument('--dot', dest='dot_fn')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
   parser.add_argument('results_fn')
@@ -71,6 +109,11 @@ def main():
   supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
 
   summarize(args.runid, results, params, supervars, args.html_out_fn)
+  if args.dot_fn is not None:
+    congraph = _make_congraph(results)
+    congraph_dot = _render_congraph(congraph)
+    with open(args.dot_fn, 'w') as F:
+      print(congraph_dot, file=F)
 
 if __name__ == '__main__':
   main()
