@@ -17,14 +17,16 @@ import plotutil
 def write_header(runid, outf):
   print('<meta charset="utf-8">', file=outf)
   print('<script src="https://d3js.org/d3.v5.min.js"></script>', file=outf)
-  for jsfn in ('tree_plotter.js', 'posterior_summ.js'):
+  print('<script src="https://d3js.org/d3-force.v2.min.js"></script>', file=outf)
+  print('<script src="posterior_summ.js"></script>', file=outf)
+  for jsfn in ('tree_plotter.js',):#, 'posterior_summ.js'):
     print('<script type="text/javascript">%s</script>' % plotutil.read_file(jsfn), file=outf)
   print('<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">', file=outf)
   print('<style type="text/css">%s</style>' % plotutil.read_file('tree.css'), file=outf)
   if runid is not None:
     print('<h1>%s</h1>' % runid, file=outf)
 
-def summarize(runid, results, params, supervars, html_out_fn):
+def summarize(results, params, supervars, outf):
   N = len(results['prob'])
   assert np.array_equal(np.argsort(-results['prob'], kind='stable'), np.arange(N))
 
@@ -44,13 +46,11 @@ def summarize(runid, results, params, supervars, html_out_fn):
     'structs': structs,
   }
 
-  with open(html_out_fn, 'w') as outf:
-    write_header(runid, outf)
-    print("<script type=\"text/javascript\">var tree_json = '%s'; var results = JSON.parse(tree_json);</script>" % json.dumps(structs), file=outf)
-    print('<h2>Trees</h2>', file=outf)
-    print('<ul><li>Number of unique trees: %s</li></ul>' % N, file=outf)
-    print('<table id="trees" class="table table-striped"><thead><tr><th>Index</th><th>Posterior</th><th>nLgLh</th><th>Count</th><th>Structure</th></tr></thead><tbody class="container"></tbody></table>', file=outf)
-    print(plotutil.js_on_load("(new PosteriorSumm()).plot(results, '#trees .container');"), file=outf)
+  print("<script type=\"text/javascript\">var tree_json = '%s'; var results = JSON.parse(tree_json);</script>" % json.dumps(structs), file=outf)
+  print('<h2>Trees</h2>', file=outf)
+  print('<ul><li>Number of unique trees: %s</li></ul>' % N, file=outf)
+  print('<table id="trees" class="table table-striped"><thead><tr><th>Index</th><th>Posterior</th><th>nLgLh</th><th>Count</th><th>Structure</th></tr></thead><tbody class="container"></tbody></table>', file=outf)
+  print(plotutil.js_on_load("(new PosteriorSumm()).plot(results, '#trees .container');"), file=outf)
 
 def _make_congraph(results):
   adjms = np.array([util.convert_parents_to_adjmatrix(struct) for struct in results['struct']])
@@ -65,29 +65,15 @@ def _make_congraph(results):
   assert np.all(0 <= graph) and np.all(graph <= 1)
   return graph
 
-def _render_congraph(congraph, threshold=0.05):
-  root = 0
-  stack = [root]
-  maxwt = 5
-
-  visited = set()
-  G = 'digraph {\n'
-
-  while len(stack) > 0:
-    node = stack.pop()
-    if node in visited:
-      continue
-    visited.add(node)
-    children = np.flatnonzero(congraph[node] >= threshold).tolist()
-    for child in children:
-      G += '%s -> %s [penwidth=%s]\n' % (
-        node,
-        child,
-        maxwt * congraph[node,child]
-      )
-    stack += children
-  G += '}'
-  return G
+def _plot_congraph(congraph, outf):
+  print('''
+  <div id="congraph"></div>
+  <script type="text/javascript">
+  var congraph_json = '%s';
+  var congraph = JSON.parse(congraph_json);
+  (new CongraphPlotter()).plot(congraph, '#congraph');
+  </script>
+  ''' % json.dumps(congraph.tolist()), file=outf)
 
 def main():
   parser = argparse.ArgumentParser(
@@ -95,7 +81,7 @@ def main():
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--runid')
-  parser.add_argument('--dot', dest='dot_fn')
+  parser.add_argument('--plot-congraph', action='store_true')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
   parser.add_argument('results_fn')
@@ -108,12 +94,13 @@ def main():
   supervars = clustermaker.make_cluster_supervars(results['clusters'], variants)
   supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
 
-  summarize(args.runid, results, params, supervars, args.html_out_fn)
-  if args.dot_fn is not None:
-    congraph = _make_congraph(results)
-    congraph_dot = _render_congraph(congraph)
-    with open(args.dot_fn, 'w') as F:
-      print(congraph_dot, file=F)
+  with open(args.html_out_fn, 'w') as outf:
+    write_header(args.runid, outf)
+    if args.plot_congraph:
+      congraph = _make_congraph(results)
+      _plot_congraph(congraph, outf)
+    summarize(results, params, supervars, outf)
+
 
 if __name__ == '__main__':
   main()
