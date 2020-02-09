@@ -34,6 +34,11 @@ def write_header(runid, outf):
     'https://cdn.jsdelivr.net/npm/cose-base@1.0.1/cose-base.min.js',
     'https://cdn.jsdelivr.net/npm/cytoscape-fcose@1.2.0/cytoscape-fcose.min.js',
 
+    # We need these just to display edge weight over edges on hover. Bleh.
+    'https://unpkg.com/popper.js@1',
+    'https://unpkg.com/tippy.js@5',
+    'https://cdn.jsdelivr.net/npm/cytoscape-popper@1.0.6/cytoscape-popper.min.js',
+
     'posterior_summ.js',
   ):
     print('<script type="text/javascript" src="%s"></script>' % jsurl, file=outf)
@@ -90,7 +95,7 @@ def _plot_congraph(congraph, outf):
   <h2>Consensus graph</h2>
   <form>
     <div class="form-group">
-      <label for="threshold_chooser">Edge threshold (<span id="congraph_threshold"></span>)</label>
+      <label for="threshold_chooser">Edge threshold: <span id="congraph_threshold"></span></label>
       <input type="range" id="threshold_chooser" class="form-control-range">
     </div>
   </form>

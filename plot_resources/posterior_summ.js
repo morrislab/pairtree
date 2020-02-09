@@ -25,12 +25,17 @@ function CongraphPlotter() {
 }
 
 CongraphPlotter.prototype.plot = function(cgraph, container, threshold_display) {
+  const self = this;
   const min_threshold = 0.01;
   const good_threshold = this._find_threshold(cgraph);
 
   var [nodes, edges] = this._make_graph(cgraph, min_threshold);
   this._draw(nodes, edges, container);
-  this._config_threshold_chooser('#threshold_chooser', '#congraph_threshold', min_threshold, good_threshold);
+
+  this._cy.ready(() => {
+    self._config_edge_weight_display();
+    self._config_threshold_chooser('#threshold_chooser', '#congraph_threshold', min_threshold, good_threshold);
+  });
 }
 
 CongraphPlotter.prototype._find_threshold = function(cgraph) {
@@ -81,23 +86,47 @@ CongraphPlotter.prototype._config_threshold_chooser = function(chooser, label_el
   const all_edges = this._cy.edges();
 
   let _update_thresh = function(new_thresh) {
-    d3.select(label_elem).text(new_thresh);
+    d3.select(label_elem).text(Math.round(100*new_thresh) + '%');
     all_edges.restore();
     all_edges.filter('[weight <= ' + new_thresh + ']').remove();
     self._run_layout();
   };
-  const rounded_thresh = Math.round(100*good_thresh)/100;
-  _update_thresh(rounded_thresh);
+  _update_thresh(good_thresh);
 
   d3.select(chooser)
     .attr('min', min_thresh)
     .attr('max', 1.0)
     .attr('step', 0.01)
-    .attr('value', rounded_thresh)
+    .attr('value', good_thresh)
     .on('change', function(d) {
       const threshold = this.value;
       _update_thresh(threshold);
     });
+}
+
+CongraphPlotter.prototype._config_edge_weight_display = function() {
+  // See https://stackoverflow.com/a/54556015
+  // and https://cytoscape.org/cytoscape.js-popper/demo-tippy.html
+  this._cy.edges().forEach(function(edge) {
+    var ref = edge.popperRef();
+    const dummy = document.createElement('div');
+
+    edge.tip = tippy(dummy, {
+      onCreate: function(inst) {
+        inst.popperInstance.reference = ref;
+      },
+      lazy: false,
+      trigger: 'manual',
+      content: () => {
+        const content = document.createElement('div');
+        content.innerHTML = Math.round(100*edge.data().weight) + '%';
+        return content;
+      },
+    });
+  });
+
+  this._cy.edges().bind('mouseover', (evt) => evt.target.tip.show());
+  this._cy.edges().bind('mouseout',  (evt) => evt.target.tip.hide());
 }
 
 CongraphPlotter.prototype._draw = function(nodes, edges, container) {
@@ -117,13 +146,12 @@ CongraphPlotter.prototype._draw = function(nodes, edges, container) {
       selector: 'edge',
       style: {
         'width': 'data(thickness)',
-        'opacity': 'data(weight)',
+        'opacity': 'data(opacity)',
         'line-color': '#000',
         'target-arrow-color': '#000',
         'target-arrow-shape': 'triangle',
         // Necessary to allow arrowheads
         'curve-style': 'bezier',
-        //'label': 'data(label)',
       },
     }],
   });
@@ -137,6 +165,9 @@ CongraphPlotter.prototype._draw = function(nodes, edges, container) {
   edges.forEach(edge => {
     const maxwt = 8;
     const minwt = 0.5;
+    const max_opacity = 1.0;
+    const min_opacity = 0.1;
+
     self._cy.add({
       group: 'edges',
       data: {
@@ -145,7 +176,7 @@ CongraphPlotter.prototype._draw = function(nodes, edges, container) {
         target: edge.target,
         weight: edge.weight,
         thickness: edge.weight*(maxwt - minwt) + minwt,
-        label: edge.weight.toFixed(2),
+        opacity: edge.weight*(max_opacity - min_opacity) + min_opacity,
       },
     });
   });
