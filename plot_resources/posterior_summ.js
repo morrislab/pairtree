@@ -25,10 +25,12 @@ function CongraphPlotter() {
 }
 
 CongraphPlotter.prototype.plot = function(cgraph, container, threshold_display) {
-  var threshold = this._find_threshold(cgraph);
-  d3.select(threshold_display).text(threshold.toFixed(2));
-  var [nodes, edges] = this._make_graph(cgraph, threshold);
+  const min_threshold = 0.01;
+  const good_threshold = this._find_threshold(cgraph);
+
+  var [nodes, edges] = this._make_graph(cgraph, min_threshold);
   this._draw(nodes, edges, container);
+  this._config_threshold_chooser('#threshold_chooser', '#congraph_threshold', min_threshold, good_threshold);
 }
 
 CongraphPlotter.prototype._find_threshold = function(cgraph) {
@@ -74,8 +76,33 @@ CongraphPlotter.prototype._make_graph = function(cgraph, threshold=0.2) {
   return [nodes, edges];
 }
 
+CongraphPlotter.prototype._config_threshold_chooser = function(chooser, label_elem, min_thresh, good_thresh) {
+  let self = this;
+  const all_edges = this._cy.edges();
+
+  let _update_thresh = function(new_thresh) {
+    d3.select(label_elem).text(new_thresh);
+    all_edges.restore();
+    all_edges.filter('[weight <= ' + new_thresh + ']').remove();
+    self._run_layout();
+  };
+  const rounded_thresh = Math.round(100*good_thresh)/100;
+  _update_thresh(rounded_thresh);
+
+  d3.select(chooser)
+    .attr('min', min_thresh)
+    .attr('max', 1.0)
+    .attr('step', 0.01)
+    .attr('value', rounded_thresh)
+    .on('change', function(d) {
+      const threshold = this.value;
+      _update_thresh(threshold);
+    });
+}
+
 CongraphPlotter.prototype._draw = function(nodes, edges, container) {
-  var cy = cytoscape({
+  let self = this;
+  this._cy = cytoscape({
     container: document.querySelector(container),
     userZoomingEnabled: false,
     style: [{
@@ -102,7 +129,7 @@ CongraphPlotter.prototype._draw = function(nodes, edges, container) {
   });
 
   nodes.forEach(node => {
-    cy.add({
+    self._cy.add({
       group: 'nodes',
       data: { id: node.id },
     });
@@ -110,7 +137,7 @@ CongraphPlotter.prototype._draw = function(nodes, edges, container) {
   edges.forEach(edge => {
     const maxwt = 8;
     const minwt = 0.5;
-    cy.add({
+    self._cy.add({
       group: 'edges',
       data: {
         id: edge.source + '_' + edge.target,
@@ -123,5 +150,9 @@ CongraphPlotter.prototype._draw = function(nodes, edges, container) {
     });
   });
 
-  cy.layout({name: 'fcose'}).run();
+  this._run_layout();
+}
+
+CongraphPlotter.prototype._run_layout = function() {
+  this._cy.layout({name: 'fcose'}).run();
 }

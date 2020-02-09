@@ -87,7 +87,13 @@ def _make_congraph(results):
 def _plot_congraph(congraph, outf):
   print('''
 
-  <h2>Consensus graph (threshold=<span id="congraph_threshold"></span>)
+  <h2>Consensus graph</h2>
+  <form>
+    <div class="form-group">
+      <label for="threshold_chooser">Edge threshold (<span id="congraph_threshold"></span>)</label>
+      <input type="range" id="threshold_chooser" class="form-control-range">
+    </div>
+  </form>
   <div id="congraph"></div>
   <style type="text/css">
   #congraph { width: 100%%; height: 400px; }
