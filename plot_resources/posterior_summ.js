@@ -9,6 +9,7 @@ PosteriorSumm.prototype.plot = function(structs, container) {
   structs.forEach(function(struct, idx) {
     var row = d3.select(container).append('tr');
     var struct_id = 'structure_' + idx;
+    var tree_container = '#' + struct_id;
 
     row.append('td').text(idx);
     row.append('td').text((100 * struct.prob).toFixed(1) + '%');
@@ -17,22 +18,46 @@ PosteriorSumm.prototype.plot = function(structs, container) {
     row.append('td').attr('id', struct_id);
 
     var root = 0;
-    (new TreePlotter()).plot(root, struct.parents, struct.phi, struct.samples, '#' + struct_id);
+    (new TreePlotter()).plot(root, struct.parents, struct.phi, struct.samples, tree_container);
+    // Resize tree to fit in table.
+    d3.select(tree_container)
+      .select('svg')
+      .attr('width', '100%')
+      .attr('height', 'auto');
   });
 }
 
 function CongraphPlotter() {
+  this._layout_options = {
+    klay: {
+      name: 'klay',
+      animate: true,
+      klay: {
+        direction: 'RIGHT',
+      },
+    },
+
+    fcose: {
+      name: 'fcose',
+    },
+  };
+
+  this._default_layout = this._layout = 'klay';
 }
 
 CongraphPlotter.prototype.plot = function(cgraph, container, threshold_display) {
   const self = this;
   const min_threshold = 0.01;
   const good_threshold = this._find_threshold(cgraph);
+  if(good_threshold < min_threshold) {
+    throw "good_threshold < min_threshold, implying some parts of the graph will always be disconnected";
+  }
 
   var [nodes, edges] = this._make_graph(cgraph, min_threshold);
   this._draw(nodes, edges, container);
 
   this._cy.ready(() => {
+    self._config_layout_chooser('#layout_chooser');
     self._config_edge_weight_display();
     self._config_threshold_chooser('#threshold_chooser', '#congraph_threshold', min_threshold, good_threshold);
   });
@@ -88,7 +113,8 @@ CongraphPlotter.prototype._config_threshold_chooser = function(chooser, label_el
   let _update_thresh = function(new_thresh) {
     d3.select(label_elem).text(Math.round(100*new_thresh) + '%');
     all_edges.restore();
-    all_edges.filter('[weight <= ' + new_thresh + ']').remove();
+    const bad = all_edges.filter(E => E.data().weight < new_thresh);
+    bad.remove();
     self._run_layout();
   };
   _update_thresh(good_thresh);
@@ -102,6 +128,24 @@ CongraphPlotter.prototype._config_threshold_chooser = function(chooser, label_el
       const threshold = this.value;
       _update_thresh(threshold);
     });
+}
+
+CongraphPlotter.prototype._config_layout_chooser = function(chooser) {
+  var self = this;
+
+  chooser = d3.select(chooser);
+  for(const layout of Object.keys(this._layout_options).sort()) {
+    const option = chooser.insert('option').text(layout);
+    if(layout == this._default_layout) {
+      option.attr('selected', 'selected');
+    }
+  }
+
+  chooser.on('change', function(d) {
+    const new_layout = this.value;
+    self._layout = new_layout;
+    self._run_layout();
+  });
 }
 
 CongraphPlotter.prototype._config_edge_weight_display = function() {
@@ -185,5 +229,5 @@ CongraphPlotter.prototype._draw = function(nodes, edges, container) {
 }
 
 CongraphPlotter.prototype._run_layout = function() {
-  this._cy.layout({name: 'fcose'}).run();
+  this._cy.layout(this._layout_options[this._layout]).run();
 }

@@ -15,14 +15,14 @@ import util
 import plotutil
 
 def write_header(runid, outf):
-  print('<meta charset="utf-8">', file=outf)
+  print('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Posterior summary</title>', file=outf)
   for jsurl in (
     'https://d3js.org/d3.v5.min.js',
     #'https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.14.0/cytoscape.min.js',
 
-    #'https://cdn.jsdelivr.net/npm/klayjs@0.4.1/klay.min.js',
-    #'https://cdn.jsdelivr.net/npm/cytoscape-klay@3.1.3/cytoscape-klay.min.js',
+    'https://cdn.jsdelivr.net/npm/klayjs@0.4.1/klay.min.js',
+    'https://cdn.jsdelivr.net/npm/cytoscape-klay@3.1.3/cytoscape-klay.min.js',
 
     #'https://cdn.jsdelivr.net/npm/cytoscape-euler@1.2.2/cytoscape-euler.min.js',
 
@@ -44,6 +44,7 @@ def write_header(runid, outf):
     print('<script type="text/javascript">%s</script>' % plotutil.read_file(jsfn), file=outf)
   print('<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">', file=outf)
   print('<style type="text/css">%s</style>' % plotutil.read_file('tree.css'), file=outf)
+  print('</head><body><main role="main" class="container">', file=outf)
   if runid is not None:
     print('<h1>%s</h1>' % runid, file=outf)
 
@@ -92,21 +93,34 @@ def _plot_congraph(congraph, outf):
 
   <h2>Consensus graph</h2>
   <form>
-    <div class="form-group">
-      <label for="threshold_chooser">Edge threshold: <span id="congraph_threshold"></span></label>
-      <input type="range" id="threshold_chooser" class="form-control-range">
+    <div class="row">
+      <div class=" col">
+        <label for="threshold_chooser">Edge threshold: <span id="congraph_threshold"></span></label>
+        <input type="range" id="threshold_chooser" class="form-control-range">
+      </div>
+
+      <div class=" col">
+        <label for="layout_chooser">Layout</label>
+        <select class="form-control" id="layout_chooser">
+        </select>
+      </div>
     </div>
   </form>
-  <div id="congraph"></div>
+
   <style type="text/css">
   #congraph { width: 100%%; height: 400px; }
   </style>
+  <div id="congraph" class="row"></div>
+
   <script type="text/javascript">
   var congraph_json = '%s';
   var congraph = JSON.parse(congraph_json);
   </script>
   ''' % json.dumps(congraph.tolist()), file=outf)
   print(plotutil.js_on_load("(new CongraphPlotter()).plot(congraph, '#congraph', '#congraph_threshold');"), file=outf)
+
+def write_footer(outf):
+  print('</main></body></html>', file=outf)
 
 def main():
   parser = argparse.ArgumentParser(
@@ -133,7 +147,7 @@ def main():
       congraph = _make_congraph(results)
       _plot_congraph(congraph, outf)
     summarize(results, params, supervars, outf)
-
+    write_footer(outf)
 
 if __name__ == '__main__':
   main()
