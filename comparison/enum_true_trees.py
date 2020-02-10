@@ -19,7 +19,7 @@ def _find_parents(adj):
   return parents.astype(np.uint8)
 
 @njit
-def enum_trees(tau, phi, order, traversal, store_trees=True):
+def enum_trees(tau, phi, order, traversal, store_trees=True, print_progress=False):
   assert traversal == 'dfs' or traversal == 'bfs'
   epsilon = 1e-10
   K = len(tau)
@@ -32,7 +32,15 @@ def enum_trees(tau, phi, order, traversal, store_trees=True):
   first_childsum = np.zeros(phi.shape)
   partial_trees = [(1, first_partial, first_childsum)]
   completed_trees = []
-  num_trees = 0
+  # Explicitly make this a Numpy int. If I left this as a native Python int,
+  # Numba would automatically have converted it to a Numpy type to allow a
+  # fixed-length encoding using machine-native datatypes. If integer overflow
+  # occurs, it will automatically convert to a float:
+  # https://numba.pydata.org/numba-doc/dev/proposals/integer-typing.html. To
+  # avoid converting to a float (and losing precision), we make this an
+  # explicit int, then check for overflow in the loop.
+  num_trees = np.uint64(0)
+  max_count = np.iinfo(np.uint64).max
 
   while len(partial_trees) > 0:
     if traversal == 'dfs':
@@ -44,7 +52,19 @@ def enum_trees(tau, phi, order, traversal, store_trees=True):
       assert np.all(expected_colsum == np.sum(P, axis=0))
       assert np.all(0 <= childsum + epsilon) and np.all(childsum <= 1 + epsilon)
       assert np.all(childsum <= phi + epsilon)
-      num_trees += 1
+      # Ensure we won't overflow.
+      assert num_trees < max_count
+      # Adding a Python int to `num_trees`, which is a Numpy uint64, results in
+      # `num_trees` becoming a float. This is because the Numpy casting rules
+      # say that a Python int can be negative, since it's inherently signed, so
+      # the result must be a sufficiently general type to accommodate this. To
+      # avoid this behaviour, explicitly add a Numpy unsigned integer. (Adding
+      # a Numpy signed integer would result in a float again for the same
+      # reason.)
+      num_trees += np.uint8(1)
+      # Print every hundred million trees.
+      if print_progress and num_trees % int(1e8) == 0:
+        print('partial', num_trees)
       if store_trees:
         struct = _find_parents(P)
         completed_trees.append(struct)
