@@ -38,11 +38,9 @@ def write_header(runid, outf):
     'https://unpkg.com/popper.js@1',
     'https://unpkg.com/tippy.js@5',
     'https://cdn.jsdelivr.net/npm/cytoscape-popper@1.0.6/cytoscape-popper.min.js',
-
-    'posterior_summ.js',
   ):
     print('<script type="text/javascript" src="%s"></script>' % jsurl, file=outf)
-  for jsfn in ('tree_plotter.js',):#, 'posterior_summ.js'):
+  for jsfn in ('tree_plotter.js', 'posterior_summ.js'):
     print('<script type="text/javascript">%s</script>' % plotutil.read_file(jsfn), file=outf)
   print('<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">', file=outf)
   print('<style type="text/css">%s</style>' % plotutil.read_file('tree.css'), file=outf)
