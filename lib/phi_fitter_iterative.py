@@ -3,6 +3,7 @@ import scipy.stats
 import common
 import binom
 from progressbar import progressbar
+import util
 from numba import njit
 
 # Matrices: M mutations, K clusters, S samples
@@ -79,7 +80,7 @@ def fit_eta_S(eta_S, var_reads_S, ref_reads_S, A, Z, method, iterations):
 def _fit_etas(adj, A, ref_reads, var_reads, method, iterations, parallel, eta_init=None):
   # TODO: I can probably rip out all the parallelism machinery, since I don't
   # use this any longer.
-  Z = common.make_ancestral_from_adj(adj)
+  Z = util.make_ancestral_from_adj(adj)
   M, K = A.shape
   _, S = ref_reads.shape
   # Numba only supports dot products on float arrays, not int arrays.

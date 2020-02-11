@@ -20,7 +20,7 @@ def _calc_eta(struct, phi):
   K, M = phi.shape
   assert len(struct) == K - 1
   adj = util.convert_parents_to_adjmatrix(struct)
-  Z = common.make_ancestral_from_adj(adj)
+  Z = util.make_ancestral_from_adj(adj)
   Z_inv = np.linalg.inv(Z)
   eta = np.dot(Z_inv, phi)
   return eta

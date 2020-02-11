@@ -9,7 +9,6 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
 import util
-import common
 
 def _calc_depth(adj):
   parents = util.find_parents(adj)
@@ -30,7 +29,7 @@ def _calc_depth(adj):
 def _calc_num_desc(adj):
   K = len(adj)
   assert adj.shape == (K,K)
-  anc = common.make_ancestral_from_adj(adj)
+  anc = util.make_ancestral_from_adj(adj)
   C = np.sum(anc, axis=1) - 1
   assert C[0] == K - 1
   return C[1:].astype(np.int)

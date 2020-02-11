@@ -2,6 +2,7 @@ import numpy as np
 from numba import njit, jit, prange
 import common
 import binom
+import util
 
 _EPS = 1e-10
 
@@ -37,7 +38,7 @@ def _fit_etas(adj, A, ref_reads, var_reads, omega, method, iterations, parallel,
   _, S = ref_reads.shape
   assert ref_reads.shape == var_reads.shape == omega.shape == (M, S)
 
-  Z = common.make_ancestral_from_adj(adj)
+  Z = util.make_ancestral_from_adj(adj)
   # Numba only supports dot products on float arrays, not int arrays.
   A = A.astype(np.float64)
   Z = Z.astype(np.float64)

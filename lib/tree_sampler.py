@@ -371,7 +371,7 @@ def _init_chain(seed, data_logmutrel, __calc_phi, __calc_llh_phi):
     init_adj = _init_cluster_adj_branching(K)
   common.ensure_valid_tree(init_adj)
 
-  init_anc = common.make_ancestral_from_adj(init_adj)
+  init_anc = util.make_ancestral_from_adj(init_adj)
   init_phi = __calc_phi(init_adj)
 
   init_samp = TreeSample(
@@ -416,7 +416,7 @@ def _generate_new_sample(old_samp, data_logmutrel, __calc_phi, __calc_llh_phi):
   new_phi = __calc_phi(new_adj)
   new_samp = TreeSample(
     adj = new_adj,
-    anc = common.make_ancestral_from_adj(new_adj),
+    anc = util.make_ancestral_from_adj(new_adj),
     phi = new_phi,
     llh_phi = __calc_llh_phi(new_adj, new_phi),
   )
