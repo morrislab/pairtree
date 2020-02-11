@@ -245,42 +245,8 @@ def _make_data_logmutrel(mutrel):
   logmutrel = Mutrel(rels=logrels, vids=mutrel.vids)
   return logmutrel
 
-def _determine_node_rels(adj):
-  adj = np.copy(adj)
-  assert np.all(np.diag(adj) == 1)
-  np.fill_diagonal(adj, 0)
-
-  K = len(adj)
-  node_rels = np.full((K, K), Models.diff_branches)
-  stack = [0]
-  visited = set()
-
-  np.fill_diagonal(node_rels, Models.cocluster)
-  node_rels[0,1:] = Models.A_B
-
-  while len(stack) > 0:
-    P = stack.pop()
-    visited.add(P)
-    C = list(np.flatnonzero(adj[P]))
-    if len(C) == 0:
-      continue
-
-    P_anc = list(np.flatnonzero(node_rels[P] == Models.B_A))
-    C_anc = P_anc + [P]
-    node_rels[np.ix_(C_anc,C)] = Models.A_B
-    node_rels[np.ix_(C,C_anc)] = Models.B_A
-
-    stack += C
-
-  assert visited == set(range(K))
-  assert np.all(np.diag(node_rels) == Models.cocluster)
-  assert np.all(node_rels[0,1:] == Models.A_B)
-  assert np.all(node_rels[1:,0] == Models.B_A)
-
-  return node_rels
-
 def _calc_tree_logmutrel(adj, data_logmutrel, check_vids=True):
-  node_rels = _determine_node_rels(adj)
+  node_rels = util.compute_node_relations(adj)
   K = len(node_rels)
   assert node_rels.shape == (K, K)
   assert data_logmutrel.rels.shape == (K-1, K-1, NUM_MODELS)

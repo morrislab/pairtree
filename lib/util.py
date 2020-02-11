@@ -2,6 +2,7 @@ import numpy as np
 import scipy.special
 import time
 from numba import njit
+from common import Models
 
 def logfactorial(X):
   return scipy.special.gammaln(X + 1)
@@ -134,3 +135,20 @@ def make_ancestral_from_adj(adj, check_validity=False):
   if check_validity:
     assert np.array_equal(Z[root], np.ones(K))
   return Z
+
+@njit
+def compute_node_relations(adj, check_validity=False):
+  K = len(adj)
+  anc = make_ancestral_from_adj(adj, check_validity)
+  np.fill_diagonal(anc, 0)
+
+  R = np.full((K, K), Models.diff_branches, dtype=np.int8)
+  for idx in range(K):
+    R[idx][anc[idx]   == 1] = Models.A_B
+    R[idx][anc[:,idx] == 1] = Models.B_A
+  np.fill_diagonal(R, Models.cocluster)
+
+  if check_validity:
+    assert np.all(R[0]   == Models.A_B)
+    assert np.all(R[:,0] == Models.B_A)
+  return R
