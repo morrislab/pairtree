@@ -4,14 +4,14 @@ import concurrent.futures
 from progressbar import progressbar
 import itertools
 
-from common import Models
+from common import Models, NUM_MODELS, ALL_MODELS
 import common
 import lh
 import mutrel
 
 def swap_A_B(arr):
   swapped = np.zeros(len(arr)) + np.nan
-  for midx, M in enumerate(Models._all):
+  for midx, M in enumerate(ALL_MODELS):
     if midx in (Models.garbage, Models.cocluster, Models.diff_branches):
       swapped[midx] = arr[midx]
     elif midx == Models.A_B:
@@ -69,12 +69,12 @@ def _complete_logprior(logprior):
     logtotal = -np.inf
   else:
     for K in logprior.keys():
-      assert K in Models._all
+      assert K in ALL_MODELS
       assert logprior[K] <= 0
     logtotal = scipy.special.logsumexp(list(logprior.values()))
 
   assert logtotal <= 0
-  remaining = set(Models._all) - set(logprior.keys())
+  remaining = set(ALL_MODELS) - set(logprior.keys())
   for K in remaining:
     logprior[K] = np.log(1 - np.exp(logtotal)) - np.log(len(remaining))
 
@@ -167,7 +167,7 @@ def merge_variants(to_merge, evidence, logprior):
     new_evidence.rels[:-1,:-1] = evidence.rels
 
     merged_row = np.sum(np.array([evidence.rels[V] for V in vidxs]), axis=0)
-    assert merged_row.shape == (M_old, len(Models._all))
+    assert merged_row.shape == (M_old, NUM_MODELS)
     merged_col = np.copy(merged_row)
     merged_col[:,Models.A_B] = merged_row[:,Models.B_A]
     merged_col[:,Models.B_A] = merged_row[:,Models.A_B]

@@ -1,4 +1,4 @@
-from common import Models
+from common import Models, NUM_MODELS, ALL_MODELS
 import colorlover as cl
 import numpy as np
 import common
@@ -10,7 +10,7 @@ def find_ml_relations(mutrel_posterior):
   return relations
 
 def make_colour_from_category(cat):
-  scalenum = len(Models._all)
+  scalenum = NUM_MODELS
   assert 0 <= cat < scalenum
   scale = cl.scales[str(scalenum)]['qual']['Set1']
   return scale[cat]
@@ -58,7 +58,7 @@ def write_table(title, mat, labels, colours, outf):
 
 def write_legend(outf):
   print('<br><table class="matrix"><tbody>', file=outf)
-  for midx, model in enumerate(Models._all):
+  for midx, model in enumerate(ALL_MODELS):
     colour = make_colour_from_category(midx)
     print('<tr><td style="background-color: %s">%s</td></tr>' % (colour, model), file=outf)
   print('</tbody></table>', file=outf)
@@ -71,7 +71,7 @@ def plot_ml_relations(mutrel_posterior, outf):
   write_legend(outf)
 
 def plot_separate_relations(mutrel_posterior, outf):
-  for midx, model in enumerate(Models._all):
+  for midx, model in enumerate(ALL_MODELS):
     mat = mutrel_posterior.rels[:,:,midx]
     mat, vidxs = common.reorder_square_matrix(mat)
     if model in ('cocluster', 'diff_branches'):

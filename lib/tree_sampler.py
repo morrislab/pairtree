@@ -10,6 +10,7 @@ import util
 
 Models = common.Models
 debug = common.debug
+from common import Models, debug, NUM_MODELS
 Mutrel = mutrel.Mutrel
 
 from collections import namedtuple
@@ -282,7 +283,7 @@ def _calc_tree_logmutrel(adj, data_logmutrel, check_vids=True):
   node_rels = _determine_node_rels(adj)
   K = len(node_rels)
   assert node_rels.shape == (K, K)
-  assert data_logmutrel.rels.shape == (K-1, K-1, len(Models._all))
+  assert data_logmutrel.rels.shape == (K-1, K-1, NUM_MODELS)
   if check_vids:
     assert list(data_logmutrel.vids) == ['S%s' % idx for idx in range(K-1)]
 

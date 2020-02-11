@@ -8,11 +8,11 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
 import resultserializer
 import evalutil
 from mutrel import Mutrel
-from common import Models
+from common import Models, NUM_MODELS
 
 def perturb_clustrel(clustrel):
   K = len(clustrel.rels)
-  new_rels = np.zeros((K+1, K+1, len(Models._all)))
+  new_rels = np.zeros((K+1, K+1, NUM_MODELS))
   new_rels[0,0,Models.cocluster] = 1
   new_rels[0,1:,Models.A_B] = 1
   new_rels[1:,0,Models.B_A] = 1

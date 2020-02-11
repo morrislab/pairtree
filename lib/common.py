@@ -22,10 +22,18 @@ def extract_vids(variants):
 def convert_variant_dict_to_tuple(V):
   return Variant(**{K: V[K] for K in Variant._fields})
 
-class Models:
-  _all = ('garbage', 'cocluster', 'A_B', 'B_A', 'diff_branches')
-for idx, M in enumerate(Models._all):
-  setattr(Models, M, idx)
+# An `IntEnum` would be cleaner, but it creates Numba problems, so use
+# `namedtuple` instead.
+_ModelChoice = namedtuple('_ModelChoice', (
+  'garbage',
+  'cocluster',
+  'A_B',
+  'B_A',
+  'diff_branches',
+))
+Models = _ModelChoice(garbage=0, cocluster=1, A_B=2, B_A=3, diff_branches=4)
+NUM_MODELS = len(Models)
+ALL_MODELS = _ModelChoice._fields
 
 def ensure_valid_tree(adj):
   # I had several issues with subtle bugs in my tree initialization algorithm
