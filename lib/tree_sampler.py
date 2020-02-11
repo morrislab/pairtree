@@ -7,6 +7,7 @@ import phi_fitter
 import hyperparams as hparams
 import math
 import util
+from numba import njit
 
 Models = common.Models
 debug = common.debug
@@ -97,7 +98,7 @@ def _init_cluster_adj_mutrels(data_logmutrel):
       new_adj = np.copy(adj)
       new_adj[parent,nidx] = 1
       truncated_adj = util.remove_rowcol(new_adj, others)
-      tree_logmutrel = _calc_tree_logmutrel(truncated_adj, truncated_logmutrel, check_vids=False)
+      tree_logmutrel = _calc_tree_logmutrel(truncated_adj, truncated_logmutrel)
       log_W_parents[parent] = np.sum(np.triu(tree_logmutrel))
     W_parents = _scaled_softmax(log_W_parents)
     assert np.all(W_parents[nodeidxs] == 0)
@@ -245,23 +246,21 @@ def _make_data_logmutrel(mutrel):
   logmutrel = Mutrel(rels=logrels, vids=mutrel.vids)
   return logmutrel
 
-def _calc_tree_logmutrel(adj, data_logmutrel, check_vids=True):
+@njit
+def _calc_tree_logmutrel(adj, data_logmutrel):
   node_rels = util.compute_node_relations(adj)
   K = len(node_rels)
   assert node_rels.shape == (K, K)
   assert data_logmutrel.rels.shape == (K-1, K-1, NUM_MODELS)
-  if check_vids:
-    assert list(data_logmutrel.vids) == ['S%s' % idx for idx in range(K-1)]
 
-  idxs = np.broadcast_to(np.arange(K-1), shape=(K-1, K-1))
-  rows = idxs.T
-  cols = idxs
   clust_rels = node_rels[1:,1:]
-  assert rows.shape == cols.shape == clust_rels.shape
-
-  tree_logmutrel = data_logmutrel.rels[rows,cols,clust_rels]
-  for axis in (0, 1):
-    tree_logmutrel = np.insert(tree_logmutrel, 0, 0, axis=axis)
+  # First row and column of `tree_logmutrel` will always be zero.
+  tree_logmutrel = np.zeros((K,K))
+  rng = range(K-1)
+  for J in rng:
+    for K in rng:
+      JK_clustrel = node_rels[J+1,K+1]
+      tree_logmutrel[J+1,K+1] = data_logmutrel.rels[J,K,JK_clustrel]
 
   assert np.array_equal(tree_logmutrel, tree_logmutrel.T)
   assert np.all(tree_logmutrel <= 0)
