@@ -19,8 +19,9 @@ PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/$BATCH
 TRUTH_DIR=$BASEDIR/scratch/results/sims.smallalpha.truth
 PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.rprop
 
-#BATCH=steph.pairtree.multichain
-#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+#TREE_TYPE=xeno
+#BATCH=steph.${TREE_TYPE}.pairtree.multichain.testlol
+#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.${TREE_TYPE}.pairtree.nostructs
 #PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/$BATCH
 
 source $SCRIPTDIR/util.sh
@@ -33,7 +34,7 @@ function run_pairtree {
     runid=$(basename $ssmfn | cut -d. -f1)
     outdir="$PAIRTREE_RESULTS_DIR/$runid"
     resultsfn="$outdir/$runid.results.npz"
-    [[  $runid =~ K100_ ]] && continue
+    #[[  $runid =~ K100_ ]] && continue
     #is_big_K $runid && continue
     is_run_complete $resultsfn && continue
     #[[ -f $resultsfn ]] || continue
@@ -70,8 +71,8 @@ function run_pairtree {
         "$resultsfn" \
         ">$runid.stdout" \
         "2>$runid.stderr) 2>$runid.time"
-    ) > $jobfn
-    sbatch $jobfn
+    ) #> $jobfn
+    #sbatch $jobfn
     rm $jobfn
   done
 }
@@ -114,9 +115,9 @@ function create_mutrel_from_clustrel {
 }
 
 function main {
-  #run_pairtree #| grep python3 | parallel -j80 --halt 1 --eta
-  create_neutree | parallel -j80 --halt 1 --eta
-  create_mutrel_from_clustrel | sort --random-sort | parallel -j5 --halt 1 --eta
+  run_pairtree #| grep python3 | parallel -j80 --halt 1 --eta
+  #create_neutree | parallel -j80 --halt 1 --eta
+  #create_mutrel_from_clustrel | sort --random-sort | parallel -j5 --halt 1 --eta
 }
 
 main

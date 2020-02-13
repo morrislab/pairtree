@@ -22,7 +22,7 @@ HAPPY_METHOD_NAMES = [
   ('pwgs_supervars', 'PhyloWGS'),
   ('pwgs_allvars', 'PhyloWGS (unclustered)'),
   ('pairtree_clustrel', 'Pairs tensor'),
-  ('mle_unconstrained', 'MLE lineage frequencies'),
+  ('mle_unconstrained', 'Unconstrained lineage frequencies'),
 ]
 SORTED_METHODS = [M for M, M_full in HAPPY_METHOD_NAMES]
 HAPPY_METHOD_NAMES = {M: M_full for (M, M_full) in HAPPY_METHOD_NAMES}
