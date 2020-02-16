@@ -7,7 +7,7 @@ import plotter
 from plotter import MISSING
 import pandas as pd
 
-def make_traces(results, method):
+def make_score_traces(results, method):
   S_vals = sorted(pd.unique(results['S']))
   traces = []
 
@@ -22,6 +22,44 @@ def make_traces(results, method):
     trace = plotter.make_box_trace(X, Y, group=str(S), name='%s samples' % S)
     traces.append(trace)
 
+  return traces
+
+def make_completion_traces(results, method):
+  S_vals = sorted(pd.unique(results['S']))
+  K_vals = sorted(pd.unique(results['K']))
+  traces = []
+
+  for S in S_vals:
+    prop_missing = {}
+
+    for K in K_vals:
+      total = len([
+        row for idx, row in results.iterrows() \
+        if row['K'] == K \
+        and row['S'] == S
+      ])
+      if total == 0:
+        continue
+      complete = len([
+        row for idx, row in results.iterrows() \
+        if row[method] != MISSING \
+        and row['K'] == K \
+        and row['S'] == S
+      ])
+      missing = total - complete
+      prop_missing[K] = missing / total
+
+    if len(prop_missing) == 0:
+      continue
+    K_sorted = sorted(prop_missing.keys())
+    X = ['%s subclones' % K for K in K_sorted]
+    Y = [100*prop_missing[k] for k in K_sorted]
+    traces.append({
+      'type': 'bar',
+      'x': X,
+      'y': Y,
+      'name': '%s samples' % S,
+      })
   return traces
 
 def main():
@@ -44,11 +82,13 @@ def main():
 
   for key in ('K', 'S'):
     results = plotter.augment(results, key)
-  traces = make_traces(results, args.method)
+  score_traces = make_score_traces(results, args.method)
+  completion_traces = make_completion_traces(results, args.method)
 
+  print(len(score_traces), len(completion_traces))
   figs = [
     plotter.make_fig(
-      traces,
+      score_traces,
       args.template,
       plotter.make_score_ytitle(args.score_type, args.plot_fn),
       args.max_y,
@@ -58,6 +98,16 @@ def main():
         'violinmode': 'overlay',
         'violingap': 0.0,
         'violingroupgap': 0.0,
+      },
+    ),
+    plotter.make_fig(
+      completion_traces,
+      args.template,
+      'Failure rate',
+      100,
+      log_y_axis = False,
+      layout_options = {
+        'barmode': 'group',
       },
     ),
   ]
