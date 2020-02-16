@@ -93,10 +93,9 @@ function make_results_paths {
     paths+="pastri=${BATCH}.pastri/$runid/$runid.$result_type.npz "
     #paths+="pairtree_single=sims.pairtree.singlechain/${runid}/${runid}.pairtree_trees.all.llh.$result_type.npz "
     if [[ $result_type == mutrel ]]; then
-      paths+="pairtree_clustrel=${BATCH}.pairtree.multichain/${runid}/${runid}.clustrel_mutrel.npz "
+      paths+="pairtree_clustrel=${BATCH}.pairtree/${runid}/${runid}.clustrel_mutrel.npz "
     fi
-    paths+="pairtree_multi=${BATCH}.pairtree.multichain/${runid}/${runid}.${result_type}.npz "
-    paths+="pairtree_rprop=${BATCH}.pairtree.rprop/${runid}/${runid}.${result_type}.npz "
+    paths+="pairtree_multi=${BATCH}.pairtree/${runid}/${runid}.${result_type}.npz "
     paths+="lichee=${BATCH}.lichee/$runid/$runid.$result_type.npz "
     paths+="citup=${BATCH}.citup.rawvars.qip/$runid/$runid.$result_type.npz "
   fi
@@ -203,7 +202,7 @@ function eval_runtime {
       cmd+="lichee=$RESULTSDIR/sims.lichee/$runid/$runid.time "
       #cmd+="pairtree_tensor=$RESULTSDIR/sims.pairtree.onlytensor/$runid/$runid.time "
       #cmd+="pairtree_single=$RESULTSDIR/sims.pairtree.singlechain/$runid/$runid.time "
-      cmd+="pairtree_multi=$RESULTSDIR/sims.pairtree.multichain/$runid/$runid.time "
+      cmd+="pairtree_multi=$RESULTSDIR/sims.pairtree/$runid/$runid.time "
       #cmd+="pairtree_quad=$RESULTSDIR/sims.pairtree.quadchain/$runid/$runid.time "
       #cmd+="pairtree_single_old=$RESULTSDIR/sims.pairtree.projection.singlechain.old_proposals/$runid/$runid.time "
       #cmd+="pairtree_multi_old=$RESULTSDIR/sims.pairtree.projection.multichain.old_proposals/$runid/$runid.time "
@@ -422,8 +421,8 @@ function main {
   export PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/${BATCH}.pairtree
   export TRUTH_DIR=$RESULTSDIR/${BATCH}.truth
   export MLE_MUTPHIS_DIR=$RESULTSDIR/${BATCH}.mle_unconstrained
-  make_sims_truth
-  make_mle_mutphis
+  #make_sims_truth
+  #make_mle_mutphis
   plot_results_sims
   #plot_runtime
 

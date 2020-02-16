@@ -53,8 +53,7 @@ function main {
   results=""
   results+="sims.smallalpha.citup.rawvars.qip "
   results+="sims.smallalpha.lichee "
-  results+="sims.smallalpha.pairtree.multichain "
-  results+="sims.smallalpha.pairtree.rprop "
+  results+="sims.smallalpha.pairtree "
   results+="sims.smallalpha.pastri "
   results+="sims.smallalpha.pwgs.supervars "
 
