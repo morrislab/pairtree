@@ -57,12 +57,30 @@ def plot(results, methods, template):
     for T in st:
       fig.add_trace(T, col=2, row=idx+1)
     # Whiskers run from `d1` (lower) to `d2` (higher).
-    max_x = max([calc_violin_stats(T['x'])['q3'] for T in st if len(T['x']) > 0])
-    fig.update_xaxes(range=(-0.5, 1.05*max_x), col=2, row=idx+1)
+    max_x = max([calc_violin_stats(T['x'])['q2'] for T in st if len(T['x']) > 0])
+    fig.update_xaxes(
+      range=(-0.15*max_x, 1.05*max_x),
+      col=2,
+      row=idx+1
+    )
   fig.update_xaxes(range=(100, 0), col=1)
 
-  fig.update_xaxes(title_text='Failure rate', row=N, col=1)
-  fig.update_xaxes(title_text='Score', row=N, col=2)
+  fig.update_xaxes(
+    title_text='Failure rate',
+    row=N,
+    col=1,
+  )
+  fig.update_xaxes(
+    zeroline=True,
+    zerolinewidth=2,
+    zerolinecolor='rgba(0,0,0,0.5)',
+    col=2,
+  )
+  fig.update_xaxes(
+    title_text='Score',
+    row=N,
+    col=2,
+  )
   fig.update_layout(showlegend=False, template=template)
   return [fig]
 
