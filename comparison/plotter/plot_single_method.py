@@ -85,7 +85,6 @@ def main():
   score_traces = make_score_traces(results, args.method)
   completion_traces = make_completion_traces(results, args.method)
 
-  print(len(score_traces), len(completion_traces))
   figs = [
     plotter.make_fig(
       score_traces,
