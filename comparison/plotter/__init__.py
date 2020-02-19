@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import plotly
+import plotly.io as pio
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 from collections import defaultdict
@@ -236,8 +236,14 @@ def read_plotly():
   with open(plotly_path) as F:
     return F.read()
 
-def write_figs(figs, outfn):
+def write_figs(figs, outfn, export_dims=None):
   plot = ''
+  if export_dims is None:
+    export_dims = {}
+  else:
+    # Duplicate, give that we modify it
+    export_dims = dict(export_dims)
+
   for idx, fig in enumerate(figs):
     imgfn = os.path.basename(outfn)
     if imgfn.endswith('.html'):
@@ -245,24 +251,25 @@ def write_figs(figs, outfn):
     imgfn = imgfn.replace('.', '_')
     imgfn = '%s_%s' % (imgfn, idx + 1)
 
-    plot += plotly.offline.plot(
+    if idx not in export_dims:
+      export_dims[idx] = (750, 450)
+
+    #print(pio.to_json(fig))
+    plot += pio.to_html(
       fig,
-      output_type = 'div',
-      include_plotlyjs = False,
+      include_plotlyjs = 'cdn',
       config = {
-        'showLink': True,
+        'showLink': False,
         'toImageButtonOptions': {
           'format': 'svg',
-          'width': 750,
-          'height': 450,
+          'width': export_dims[idx][0],
+          'height': export_dims[idx][1],
           'filename': imgfn,
         },
       },
     )
 
   with open(outfn, 'w') as outf:
-    #print('<script type="text/javascript">%s</script>' % read_plotly(), file=outf)
-    print( '<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>', file=outf)
     print(plot, file=outf)
 
 def set_missing_to(results, methods, val):
