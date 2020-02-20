@@ -12,6 +12,47 @@ import numpy as np
 
 from plotly.figure_factory._violin import calc_stats as calc_violin_stats
 
+def _plot_single_vs_others(results, single, methods, method_colours):
+  assert single in methods
+  others = plotter.sort_methods(set(methods) - set((single,)))
+
+  traces = []
+  for M in others:
+    points = [(row['runid'], row[M] - row[single]) for idx, row in results.iterrows() \
+      if MISSING not in (row[single], row[M])]
+    if len(points) == 0:
+      continue
+    runids, Y = zip(*points)
+    traces.append({
+      'type': 'box',
+      'y': Y,
+      'text': runids,
+      'name': plotter.HAPPY_METHOD_NAMES.get(M, M),
+      #'spanmode': 'hard',
+      #'bandwidth': 0.07,
+      'boxpoints': 'all',
+      'marker': {
+        'outliercolor': _format_colour(method_colours[M], 0.5),
+        'color': _format_colour(method_colours[M], 0.5),
+      },
+      'line': {
+        'color': _format_colour(method_colours[M]),
+      },
+      'jitter': 0.6,
+      'pointpos': 2.0,
+    })
+  fig = {
+    'data': traces,
+    'layout': {
+      'yaxis': {
+        'title': 'Frequency reconstruction error<br>relative to Pairtree',
+        'zeroline': True,
+        'zerolinewidth': 2,
+        'zerolinecolor': 'rgba(0,0,0,0.5)',
+      },
+    },
+  }
+  return fig
 
 def _plot_scores(results, methods, method_colours):
   score_traces = []
@@ -20,7 +61,6 @@ def _plot_scores(results, methods, method_colours):
   N = len(K_vals)
   M_sorted = list(reversed(plotter.sort_methods(methods)))
   M_happy = {M: plotter.HAPPY_METHOD_NAMES.get(M, M) for M in M_sorted}
-
 
   for kidx, K in enumerate(K_vals):
     K_rows = [row for idx, row in results.iterrows() if row['K'] == K]
@@ -137,6 +177,9 @@ def _plot_failure_rates(results, methods, method_colours, K_vals, S_vals):
         'showlegend': Kidx == 0,
       }, row=1, col=Kidx+1)
 
+  fig.update_xaxes(
+      tickangle = 45,
+  )
   fig.update_yaxes(
     showticklabels = False,
   )
@@ -179,6 +222,9 @@ def _plot_error_rate(results, methods, method_colours, K_vals, S_vals):
         'showlegend': Kidx == 0,
       }, row=1, col=Kidx+1)
 
+  fig.update_xaxes(
+      tickangle = 45,
+  )
   fig.update_yaxes(
     title = 'Median frequency reconstruction error<br>(Δbits / mutation / tissue sample)',
     col = 1,
@@ -218,36 +264,43 @@ def main():
   methods = set(methods)
   method_colours = _choose_method_colours(methods)
 
-  figs = [
-    _plot_scores(
+  figs = {
+    'scores': _plot_scores(
       results,
       methods - set(('mle_unconstrained',)),
       method_colours,
     ),
-    _plot_failure_rates(
+    'failure_rate': _plot_failure_rates(
       results,
       methods - set(('mle_unconstrained', 'pwgs_supervars', 'lichee')),
       method_colours,
       (3, 10),
       (1, 3, 10),
     ),
-    _plot_error_rate(
+    'error_rate': _plot_error_rate(
       results,
       methods - set(('mle_unconstrained', 'citup', 'pastri')),
       method_colours,
       (3, 10, 30),
       (1, 3, 10, 30, 100),
     ),
-  ]
+    'pairtree_vs_others': _plot_single_vs_others(
+      results,
+      'pairtree_multi',
+      methods - set(('mle_unconstrained',)),
+      method_colours,
+    ),
+  }
 
-  for F in figs:
+  for F in figs.values():
     if 'layout' not in F:
       F['layout'] = {}
     F['layout']['template'] = args.template
   plotter.write_figs(figs, args.plot_fn, export_dims = {
-    0: (700, 850),
-    1: (400, 485),
-    2: (400, 485),
+    'scores': (700, 850),
+    'failure_rate': (400, 485),
+    'error_rate': (500, 485),
+    'pairtree_vs_others': (600, 485),
   })
 
 if __name__ == '__main__':

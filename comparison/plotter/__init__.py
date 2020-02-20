@@ -231,11 +231,6 @@ def make_fig(traces, template, ytitle, max_y=None, layout_options=None, log_y_ax
     fig['layout'] = {**fig['layout'], **layout_options}
   return fig
 
-def read_plotly():
-  plotly_path = os.path.join(os.path.dirname(__file__), 'plotly', 'plotly.min.js')
-  with open(plotly_path) as F:
-    return F.read()
-
 def write_figs(figs, outfn, export_dims=None):
   plot = ''
   if export_dims is None:
@@ -244,16 +239,9 @@ def write_figs(figs, outfn, export_dims=None):
     # Duplicate, give that we modify it
     export_dims = dict(export_dims)
 
-  for idx, fig in enumerate(figs):
-    imgfn = os.path.basename(outfn)
-    if imgfn.endswith('.html'):
-      imgfn = imgfn[:-5]
-    imgfn = imgfn.replace('.', '_')
-    imgfn = '%s_%s' % (imgfn, idx + 1)
-
-    if idx not in export_dims:
-      export_dims[idx] = (750, 450)
-
+  for fname, fig in figs.items():
+    if fname not in export_dims:
+      export_dims[fname] = (750, 450)
     #print(pio.to_json(fig))
     plot += pio.to_html(
       fig,
@@ -262,9 +250,9 @@ def write_figs(figs, outfn, export_dims=None):
         'showLink': False,
         'toImageButtonOptions': {
           'format': 'svg',
-          'width': export_dims[idx][0],
-          'height': export_dims[idx][1],
-          'filename': imgfn,
+          'width': export_dims[fname][0],
+          'height': export_dims[fname][1],
+          'filename': fname,
         },
       },
     )
