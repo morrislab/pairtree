@@ -121,29 +121,56 @@ def write_cluster_stats(clusters, garbage, supervars, variants, outf):
     print('<tr>%s</tr>' % rowhtml, file=outf)
   print('</tbody></table>', file=outf)
 
+def _choose_plots(to_plot, to_omit, all_choices):
+  if to_plot is None:
+    plot_choices = set(all_choices)
+  else:
+    plot_choices = set(to_plot)
+
+  if to_omit is not None:
+    plot_choices -= set(to_omit)
+
+  # If we want to plot any of the phi matrices, we need to also plot the
+  # tree, so that the relevant data structures are generated below. This is
+  # silly, so I should fix it eventually -- we should be able to plot just
+  # the phis if we want.
+  if len(set(('phi', 'phi_hat', 'phi_error', 'phi_interleaved')) & plot_choices) > 0:
+    plot_choices.add('tree')
+
+  return plot_choices
+
 def main():
+  all_plot_choices = (
+    'tree',
+    'pairwise_separate',
+    'pairwise_mle',
+    'vaf_matrix',
+    'phi',
+    'phi_hat',
+    'phi_error',
+    'phi_interleaved',
+    'cluster_stats',
+    'eta',
+  )
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--tree-index', type=int, default=0)
-  parser.add_argument('--plot-tree', action='store_true')
-  parser.add_argument('--plot-pairwise-separate', action='store_true')
-  parser.add_argument('--plot-pairwise-mle', action='store_true')
-  parser.add_argument('--plot-vaf-matrix', action='store_true')
-  parser.add_argument('--plot-phi', action='store_true')
-  parser.add_argument('--plot-phi-hat', action='store_true')
-  parser.add_argument('--plot-phi-error', action='store_true')
-  parser.add_argument('--plot-phi-interleaved', action='store_true')
-  parser.add_argument('--plot-cluster-stats', action='store_true')
-  parser.add_argument('--plot-eta', action='store_true')
+  parser.add_argument('--plot', dest='plot_choices', nargs='+', choices=all_plot_choices,
+    help='Things to plot; by default, plot everything')
+  parser.add_argument('--omit-plots', dest='omit_plots', nargs='+', choices=all_plot_choices,
+    help='Things to omit from plotting; overrides --plot')
   parser.add_argument('--runid')
-  parser.add_argument('--tree-json', dest='tree_json_fn', help='Additional external file in which to store JSON, which is already stored statically in the HTML file')
+  parser.add_argument('--tree-json', dest='tree_json_fn',
+    help='Additional external file in which to store JSON, which is already stored statically in the HTML file')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
   parser.add_argument('results_fn')
   parser.add_argument('html_out_fn')
   args = parser.parse_args()
+
+  plot_choices = _choose_plots(args.plot_choices, args.omit_plots, all_plot_choices)
 
   results = resultserializer.load(args.results_fn)
   variants = inputparser.load_ssms(args.ssm_fn)
@@ -155,7 +182,7 @@ def main():
   with open(args.html_out_fn, 'w') as outf:
     write_header(args.runid, outf)
 
-    if args.plot_tree:
+    if 'tree' in plot_choices:
       tree_struct = util.make_tree_struct(
         results['struct'][tidx],
         results['count'][tidx],
@@ -167,19 +194,19 @@ def main():
       )
       _write_tree_html(
         tree_struct,
-        args.plot_phi,
-        args.plot_phi_hat,
-        args.plot_phi_error,
-        args.plot_phi_interleaved,
+        'phi' in plot_choices,
+        'phi_hat' in plot_choices,
+        'phi_error' in plot_choices,
+        'phi_interleaved' in plot_choices,
         outf,
       )
       if args.tree_json_fn is not None:
         _write_tree_json(tree_struct, args.tree_json_fn)
 
-    if args.plot_eta:
+    if 'eta' in plot_choices:
       _plot_eta(results['struct'][tidx], results['phi'][tidx], params['samples'], outf)
 
-    if args.plot_vaf_matrix:
+    if 'vaf_matrix' in plot_choices:
       vaf_plotter.plot_vaf_matrix(
         results['clusters'],
         variants,
@@ -191,11 +218,11 @@ def main():
         outf=outf,
       )
 
-    if args.plot_pairwise_mle:
+    if 'pairwise_mle' in plot_choices:
       relation_plotter.plot_ml_relations(results['clustrel_posterior'], outf)
-    if args.plot_pairwise_separate:
+    if 'pairwise_separate' in plot_choices:
       relation_plotter.plot_separate_relations(results['clustrel_posterior'], outf)
-    if args.plot_cluster_stats:
+    if 'cluster_stats' in plot_choices:
       write_cluster_stats(results['clusters'], results['garbage'], supervars, variants, outf)
 
 if __name__ == '__main__':
