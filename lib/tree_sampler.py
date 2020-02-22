@@ -675,7 +675,16 @@ def compute_posterior(adjms, phis, llhs, sort_by_llh=True):
     H = hash(parents.tobytes())
     if H in unique:
       assert np.isclose(L, unique[H]['llh'])
-      assert np.allclose(P, unique[H]['phi'])
+      # Use relaxed `atol`, or sometimes the phis (at least when computed by
+      # `projection`) won't be close for two tree samples with the same
+      # adjacency matrix. Identical tree structures with (slightly) different
+      # phis can arise despite the caching mechanism that stores phis for each
+      # tree structure. This occurs because different chains running on
+      # different cores might sample the same tree structure, but the caching
+      # mechanism is chain-specific. `projection` is not entirely
+      # deterministic, so it may compute slightly different phis for the same
+      # tree structure.
+      assert np.allclose(P, unique[H]['phi'], atol=1e-5)
       assert np.array_equal(parents, unique[H]['struct'])
       unique[H]['count'] += 1
     else:
