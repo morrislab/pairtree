@@ -473,9 +473,13 @@ VafMatrix.prototype._configure_toggles = function(container) {
       var is_active = E.classList.contains('active');
       if(is_active) {
         E.classList.remove('active');
+        E.classList.remove('btn-primary');
+        E.classList.add('btn-outline-primary');
         var new_display = 'none';
       } else {
         E.classList.add('active');
+        E.classList.remove('btn-outline-primary');
+        E.classList.add('btn-primary');
         var new_display = '';
       }
       for(let target of targets) {
