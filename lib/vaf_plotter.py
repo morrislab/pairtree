@@ -64,11 +64,11 @@ def make_phi_pseudovars(phi):
   } for cidx, row in enumerate(phi[1:])]
   return V
 
-def _make_checkbox(cls, label, active=True):
-  return '<label class="btn btn-primary %s toggle_%s"><input type="checkbox" autocomplete="off" %s> %s</label>' % (
+def _make_toggle(cls, label, active=True):
+  return '<button type="button" class="btn btn-primary %s toggle_%s shadow-none" data-toggle="button" aria-pressed="%s" autocomplete="off">%s</button>' % (
     'active' if active else '',
     cls,
-    'checked' if active else '',
+    'true' if active else 'false',
     label,
   )
 
@@ -81,10 +81,10 @@ def print_vaftable_header(sampnames, show_cluster_members, outf):
   print(f'<div id="{container_id}">', file=outf)
   print('<p><input type="text" class="filter" placeholder="s0,s1,..."></p>', file=outf)
   print('<div class="vafmatrix_toggles btn-group" data-toggle="buttons">', file=outf)
-  print(_make_checkbox('phi', '&phi;'), file=outf)
-  print(_make_checkbox('supervar', 'Supervariants'), file=outf)
-  print(_make_checkbox('cluster_member', 'Cluster members', active=show_cluster_members), file=outf)
-  print(_make_checkbox('garbage', 'Garbage'), file=outf)
+  print(_make_toggle('phi', '&phi;'), file=outf)
+  print(_make_toggle('supervar', 'Supervariants'), file=outf)
+  print(_make_toggle('cluster_member', 'Cluster members', active=show_cluster_members), file=outf)
+  print(_make_toggle('garbage', 'Garbage'), file=outf)
   print('</div>', file=outf)
   print('<br><br><br>', file=outf)
   print('<table class="matrix"><thead><tr>', file=outf)

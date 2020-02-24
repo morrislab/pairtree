@@ -62,7 +62,7 @@ def write_header(runid, outf):
   print('<script src="https://d3js.org/d3.v5.min.js"></script>', file=outf)
   for jsfn in ('highlight_table_labels.js', 'tree_plotter.js'):
     print('<script type="text/javascript">%s</script>' % plotutil.read_file(jsfn), file=outf)
-  print('<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">', file=outf)
+  print('<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">', file=outf)
   for cssfn in ('tree.css', 'matrix.css'):
     print('<style type="text/css">%s</style>' % plotutil.read_file(cssfn), file=outf)
   print('<style type="text/css">.container { margin: 30px; } td, th, table { padding: 5px; margin: 0; border-collapse: collapse; font-weight: normal; } span { visibility: hidden; } td:hover > span { visibility: visible; } .highlighted { background-color: black !important; color: white; }</style>', file=outf)
