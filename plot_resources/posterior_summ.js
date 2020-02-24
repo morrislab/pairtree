@@ -22,8 +22,7 @@ PosteriorSumm.prototype.plot = function(structs, container) {
     // Resize tree to fit in table.
     d3.select(tree_container)
       .select('svg')
-      .attr('width', '100%')
-      .attr('height', 'auto');
+      .attr('width', '100%');
   });
 }
 
