@@ -6,8 +6,14 @@ import numpy as np
 import util
 import warnings
 import binom
-import lhmath_numba
 import lhmath_native
+
+import os
+if os.environ.get('NUMBA_DISABLE_JIT', None) == '1':
+  NUMBA_AVAIL = False
+else:
+  NUMBA_AVAIL = True
+  import lhmath_numba
 
 def generate_logprob_phi(N):
   prob = {}
@@ -200,6 +206,8 @@ def quad(*args, **kwargs):
     return scipy.integrate.quad(*args, **kwargs)
 
 def calc_lh_quad(V1, V2, use_numba=True):
+  if not NUMBA_AVAIL:
+    use_numba = False
   max_splits = 50
   S = len(V1.total_reads) # S
   logprob_models = np.nan * np.ones((S, NUM_MODELS)) # SxM
