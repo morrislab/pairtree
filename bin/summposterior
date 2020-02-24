@@ -126,18 +126,39 @@ def _plot_congraph(congraph, outf):
 def write_footer(outf):
   print('</main></body></html>', file=outf)
 
+def _choose_plots(to_plot, to_omit, all_choices):
+  if to_plot is None:
+    plot_choices = set(all_choices)
+  else:
+    plot_choices = set(to_plot)
+
+  if to_omit is not None:
+    plot_choices -= set(to_omit)
+
+  return plot_choices
+
 def main():
+  all_plot_choices = (
+    'posterior_summ',
+    'congraph',
+  )
+
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--runid')
-  parser.add_argument('--plot-congraph', action='store_true')
+  parser.add_argument('--plot', dest='plot_choices', nargs='+', choices=all_plot_choices,
+    help='Things to plot; by default, plot everything')
+  parser.add_argument('--omit-plots', dest='omit_plots', nargs='+', choices=all_plot_choices,
+    help='Things to omit from plotting; overrides --plot')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
   parser.add_argument('results_fn')
   parser.add_argument('html_out_fn')
   args = parser.parse_args()
+
+  plot_choices = _choose_plots(args.plot_choices, args.omit_plots, all_plot_choices)
 
   results = resultserializer.Results(args.results_fn)
   variants = inputparser.load_ssms(args.ssm_fn)
@@ -147,10 +168,11 @@ def main():
 
   with open(args.html_out_fn, 'w') as outf:
     write_header(args.runid, outf)
-    if args.plot_congraph:
+    if 'congraph' in plot_choices:
       congraph = _make_congraph(results)
       _plot_congraph(congraph, outf)
-    summarize(results, params, supervars, outf)
+    if 'posterior_summ' in plot_choices:
+      summarize(results, params, supervars, outf)
     write_footer(outf)
 
 if __name__ == '__main__':
