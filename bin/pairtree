@@ -92,36 +92,30 @@ def main():
   params = inputparser.load_params(args.params_fn)
   logprior = {'garbage': -np.inf, 'cocluster': -np.inf}
 
-  if os.path.exists(args.results_fn):
-    results = resultserializer.load(args.results_fn)
-  else:
-    results = {'seed': seed}
+  results = resultserializer.Results(args.results_fn)
+  results.add('seed', seed)
+  results.save()
 
-  if 'clustrel_posterior' not in results:
-    if 'clusters' in params and 'garbage' in params:
-      supervars, results['clustrel_posterior'], results['clustrel_evidence'], results['clusters'], results['garbage'] = clustermaker.use_pre_existing(
-        variants,
-        logprior,
-        parallel,
-        params['clusters'],
-        params['garbage'],
-      )
-    else:
-      if 'mutrel_posterior' not in results:
-        results['mutrel_posterior'], results['mutrel_evidence'] = pairwise.calc_posterior(variants, logprior=logprior, rel_type='variant', parallel=parallel)
-        resultserializer.save(results, args.results_fn)
-      clustermaker._plot.prefix = os.path.basename(args.ssm_fn).split('.')[0]
-      supervars, results['clustrel_posterior'], results['clustrel_evidence'], results['clusters'], results['garbage'] = clustermaker.cluster_and_discard_garbage(
-        variants,
-        results['mutrel_posterior'],
-        results['mutrel_evidence'],
-        logprior,
-        parallel,
-      )
-
-    resultserializer.save(results, args.results_fn)
+  if results.has_mutrel('clustrel_posterior') and results.has_mutrel('clustrel_evidence') and results.has('clusters') and results.has('garbage'):
+    clustrel_posterior = results.get_mutrel('clustrel_posterior')
+    clustrel_evidence = results.get_mutrel('clustrel_evidence')
+    clusters = results.get('clusters')
+    garbage = results.get('garbage')
+    supervars = clustermaker.make_cluster_supervars(clusters, variants)
   else:
-    supervars = clustermaker.make_cluster_supervars(results['clusters'], variants)
+    assert 'clusters' in params and 'garbage' in params, 'Clusters not provided'
+    supervars, clustrel_posterior, clustrel_evidence, clusters, garbage = clustermaker.use_pre_existing(
+      variants,
+      logprior,
+      parallel,
+      params['clusters'],
+      params['garbage'],
+    )
+    results.add_mutrel('clustrel_posterior', clustrel_posterior)
+    results.add_mutrel('clustrel_evidence', clustrel_evidence)
+    results.add('clusters', clusters)
+    results.add('garbage', garbage)
+    results.save()
 
   if args.only_build_tensor:
     sys.exit()
@@ -130,10 +124,10 @@ def main():
   # Add empty initial cluster, which serves as tree root.
   superclusters.insert(0, [])
 
-  if 'struct' not in results:
+  if not results.has('struct'):
     if 'structures' not in params:
-      adjm, phi, llh, results['accept_rate'] = tree_sampler.sample_trees(
-        results['clustrel_posterior'],
+      adjm, phi, llh, accept_rate = tree_sampler.sample_trees(
+        clustrel_posterior,
         supervars,
         superclusters,
         args.trees_per_chain,
@@ -145,6 +139,7 @@ def main():
         seed,
         parallel,
       )
+      results.add('accept_rate', accept_rate)
     else:
       adjms = [util.convert_parents_to_adjmatrix(struct) for struct in params['structures']]
       adjm, phi, llh = tree_sampler.use_existing_structures(
@@ -156,13 +151,18 @@ def main():
         parallel
       )
 
-    results['struct'], results['count'], results['phi'], results['llh'], results['prob'] = tree_sampler.compute_posterior(
+    post_struct, post_count, post_phi, post_llh, post_prob = tree_sampler.compute_posterior(
       adjm,
       phi,
       llh,
       args.sort_by_llh,
     )
-    resultserializer.save(results, args.results_fn)
+    results.add('struct', post_struct)
+    results.add('count', post_count)
+    results.add('phi', post_phi)
+    results.add('llh', post_llh)
+    results.add('prob', post_prob)
+    results.save()
 
 if __name__ == '__main__':
   main()

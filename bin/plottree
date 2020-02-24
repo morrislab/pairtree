@@ -172,10 +172,10 @@ def main():
 
   plot_choices = _choose_plots(args.plot_choices, args.omit_plots, all_plot_choices)
 
-  results = resultserializer.load(args.results_fn)
+  results = resultserializer.Results(args.results_fn)
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.params_fn)
-  supervars = clustermaker.make_cluster_supervars(results['clusters'], variants)
+  supervars = clustermaker.make_cluster_supervars(results.get('clusters'), variants)
   supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
   tidx = args.tree_index
 
@@ -184,11 +184,11 @@ def main():
 
     if 'tree' in plot_choices:
       tree_struct = util.make_tree_struct(
-        results['struct'][tidx],
-        results['count'][tidx],
-        results['llh'][tidx],
-        results['prob'][tidx],
-        results['phi'][tidx],
+        results.get('struct')[tidx],
+        results.get('count')[tidx],
+        results.get('llh')[tidx],
+        results.get('prob')[tidx],
+        results.get('phi')[tidx],
         supervars,
         params['samples'],
       )
@@ -204,26 +204,26 @@ def main():
         _write_tree_json(tree_struct, args.tree_json_fn)
 
     if 'eta' in plot_choices:
-      _plot_eta(results['struct'][tidx], results['phi'][tidx], params['samples'], outf)
+      _plot_eta(results.get('struct')[tidx], results.get('phi')[tidx], params['samples'], outf)
 
     if 'vaf_matrix' in plot_choices:
       vaf_plotter.plot_vaf_matrix(
-        results['clusters'],
+        results.get('clusters'),
         variants,
         supervars,
-        results['garbage'],
-        results['phi'][tidx] if 'phi' in results else None,
+        results.get('garbage'),
+        results.get('phi')[tidx] if results.has('phi') else None,
         params['samples'],
         should_correct_vaf=True,
         outf=outf,
       )
 
     if 'pairwise_mle' in plot_choices:
-      relation_plotter.plot_ml_relations(results['clustrel_posterior'], outf)
+      relation_plotter.plot_ml_relations(results.get_mutrel('clustrel_posterior'), outf)
     if 'pairwise_separate' in plot_choices:
-      relation_plotter.plot_separate_relations(results['clustrel_posterior'], outf)
+      relation_plotter.plot_separate_relations(results.get_mutrel('clustrel_posterior'), outf)
     if 'cluster_stats' in plot_choices:
-      write_cluster_stats(results['clusters'], results['garbage'], supervars, variants, outf)
+      write_cluster_stats(results.get('clusters'), results.get('garbage'), supervars, variants, outf)
 
 if __name__ == '__main__':
   main()

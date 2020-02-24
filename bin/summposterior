@@ -49,15 +49,16 @@ def write_header(runid, outf):
     print('<h1>%s</h1>' % runid, file=outf)
 
 def summarize(results, params, supervars, outf):
-  N = len(results['prob'])
-  assert np.array_equal(np.argsort(-results['prob'], kind='stable'), np.arange(N))
+  prob = results.get('prob')
+  N = len(prob)
+  assert np.array_equal(np.argsort(-prob, kind='stable'), np.arange(N))
 
   _make_struct = lambda tidx: util.make_tree_struct(
-    results['struct'][tidx],
-    results['count'][tidx],
-    results['llh'][tidx],
-    results['prob'][tidx],
-    results['phi'][tidx],
+    results.get('struct')[tidx],
+    results.get('count')[tidx],
+    results.get('llh')[tidx],
+    prob[tidx],
+    results.get('phi')[tidx],
     supervars,
     params['samples'],
   )
@@ -75,8 +76,8 @@ def summarize(results, params, supervars, outf):
   print(plotutil.js_on_load("(new PosteriorSumm()).plot(results, '#trees .container');"), file=outf)
 
 def _make_congraph(results):
-  adjms = np.array([util.convert_parents_to_adjmatrix(struct) for struct in results['struct']])
-  weights = results['prob']
+  adjms = np.array([util.convert_parents_to_adjmatrix(struct) for struct in results.get('struct')])
+  weights = results.get('prob')
   assert len(weights) == len(adjms)
   assert np.isclose(1, np.sum(weights))
   graph = np.sum(weights[:,np.newaxis,np.newaxis] * adjms, axis=0)
@@ -138,10 +139,10 @@ def main():
   parser.add_argument('html_out_fn')
   args = parser.parse_args()
 
-  results = resultserializer.load(args.results_fn)
+  results = resultserializer.Results(args.results_fn)
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.params_fn)
-  supervars = clustermaker.make_cluster_supervars(results['clusters'], variants)
+  supervars = clustermaker.make_cluster_supervars(results.get('clusters'), variants)
   supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
 
   with open(args.html_out_fn, 'w') as outf:
