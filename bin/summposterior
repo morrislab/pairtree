@@ -82,6 +82,9 @@ def _make_congraph(results):
   graph = np.sum(weights[:,np.newaxis,np.newaxis] * adjms, axis=0)
   np.fill_diagonal(graph, 0)
 
+  assert np.allclose(1, graph[graph > 1])
+  graph[graph > 1] = 1
+
   parent_sum = np.sum(graph, axis=0)
   assert parent_sum[0] == 0 and np.allclose(1, parent_sum[1:])
   assert np.all(0 <= graph) and np.all(graph <= 1)
