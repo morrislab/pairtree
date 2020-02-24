@@ -29,12 +29,12 @@ def main():
   parser.add_argument('clustrel_mutrel_fn')
   args = parser.parse_args()
 
-  results = resultserializer.load(args.pairtree_results_fn)
-  clusters = [[]] + list(results['clusters'])
-  garbage = list(results['garbage'])
-  all_vids = set([V for C in results['clusters'] for V in C] + garbage)
+  results = resultserializer.Results(args.pairtree_results_fn)
+  clusters = [[]] + list(results.get('clusters'))
+  garbage = list(results.get('garbage'))
+  all_vids = set([V for C in results.get('clusters') for V in C] + garbage)
 
-  clustrel = perturb_clustrel(results['clustrel_posterior'])
+  clustrel = perturb_clustrel(results.get_mutrel('clustrel_posterior'))
   clustrel_mutrel = evalutil.make_mutrel_from_clustrel(clustrel, clusters)
   clustrel_mutrel = evalutil.add_garbage(clustrel_mutrel, garbage)
   assert set(clustrel_mutrel.vids) == all_vids

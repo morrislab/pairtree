@@ -10,13 +10,13 @@ import inputparser
 import neutree
 
 def convert(results, garbage):
-  N = len(results['struct'])
-  clusters = [[]] + list(results['clusters'])
+  N = len(results.get('struct'))
+  clusters = [[]] + list(results.get('clusters'))
   ntree = neutree.Neutree(
-    structs = results['struct'],
-    phis = results['phi'],
-    counts = results['count'],
-    logscores = results['llh'],
+    structs = results.get('struct'),
+    phis = results.get('phi'),
+    counts = results.get('count'),
+    logscores = results.get('llh'),
     clusterings = [clusters for idx in range(N)],
     garbage = garbage,
   )
@@ -32,7 +32,7 @@ def main():
   parser.add_argument('neutree_fn')
   args = parser.parse_args()
 
-  results = resultserializer.load(args.pairtree_results_fn)
+  results = resultserializer.Results(args.pairtree_results_fn)
   params = inputparser.load_params(args.params_fn)
   ntree = convert(results, params['garbage'])
   neutree.save(ntree, args.neutree_fn)
