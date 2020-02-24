@@ -23,6 +23,10 @@ class Results:
   # Pickle is a strictly unacceptable choice since it allows arbitrary code
   # execution. If I used Pickle (as I initially did), users could not safely
   # exchange results with one another.
+  #
+  # It's probably possible to append new files on `save()` to the zip file
+  # rather than rewriting the whole file. If/when file IO becomes a bottleneck,
+  # I should look into this.
 
   def __init__(self, fn):
     self._fn = fn
