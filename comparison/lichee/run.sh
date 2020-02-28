@@ -9,10 +9,10 @@ LICHEE_DIR=$HOME/.apps/lichee/LICHeE/release
 
 NUM_TREES=3000
 
-BATCH=sims.smallalpha.lichee
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.smallalpha.pairtree
-#BATCH=steph.xeno.lichee
-#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+#BATCH=sims.smallalpha.lichee
+#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.smallalpha.pairtree
+BATCH=steph.xeno.lichee
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 
 INDIR=$BASEDIR/scratch/inputs/$BATCH
 OUTBASE=$BASEDIR/scratch/results/$BATCH

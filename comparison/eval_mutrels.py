@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.ma as ma
 import argparse
 
 import os
@@ -43,6 +44,59 @@ def discard_garbage(mutrels, clustered, garbage, ignore_garbage_for):
     mutrels[name] = mutrel.remove_variants_by_vidx(mutrels[name], gidxs)
     assert set(mutrels[name].vids) == clustered
 
+def _score_distl1(rels, truth):
+  # Compute mean L1 distance.
+  M = len(rels)
+  dist = np.sum(np.abs(rels - truth), axis=2)
+  assert np.allclose(dist, dist.T)
+  assert np.allclose(0, np.diag(dist))
+  # A pairwise mutrel vector can have a maximum L1 distance of 2, when no
+  # elements have overlap with each other. Normalize this so scores can be
+  # interpreted as "mean proportion of miscalled relations", given hard 0/1
+  # calls for relation types.
+  dist /= 2
+  # Distances may be slightly higher than 1 because of floating point error.
+  # Set these to exactly 1.
+  dist[np.logical_and(dist > 1, np.isclose(1, dist))] = 1
+  assert np.all(0 <= dist) and np.all(dist <= 1)
+
+  # Take entries below main diagonal.
+  dist_lower = np.tril(dist, 1)
+  assert dist_lower.shape == (M, M)
+  # There are (M choose 2) elements below the diagonal, so divide by this
+  # when computing mean.
+  score = np.sum(dist_lower) / (0.5*M*(M - 1))
+  return score
+
+def _compute_kld(P, Q):
+  for A in (P, Q):
+    assert np.all(A >= 0)
+    assert np.allclose(1, np.sum(A, axis=2))
+
+  logP = ma.log2(ma.masked_equal(P, 0))
+  logQ = ma.log2(ma.masked_equal(Q, 0))
+  kld = np.sum(P * (logP - logQ), axis=2)
+
+  assert np.allclose(0, kld[kld < 0])
+  kld = np.abs(kld)
+  assert np.all(kld >= 0)
+  return kld
+
+def _score_jsd(rels, truth):
+  M = len(rels)
+  R = 0.5*(rels + truth)
+
+  kld1 = _compute_kld(rels, R)
+  kld2 = _compute_kld(truth, R)
+  jsd = 0.5*(kld1 + kld2)
+  assert np.allclose(1, jsd[jsd > 1])
+  jsd = np.minimum(1, jsd)
+
+  assert np.allclose(jsd, jsd.T)
+  joint_jsd = np.sum(np.tril(jsd, 1))
+  mean_jsd = joint_jsd / (0.5*M*(M-1))
+  return mean_jsd
+
 def compare(mutrels):
   assert 'truth' in mutrels
   M, _, num_models = mutrels['truth'].rels.shape
@@ -62,26 +116,7 @@ def compare(mutrels):
     assert np.array_equal(mrel.vids, mutrels['truth'].vids)
     mutrel.check_posterior_sanity(mrel.rels)
 
-    # Compute L1 distance.
-    dist = np.sum(np.abs(mrel.rels - mutrels['truth'].rels), axis=2)
-    assert np.allclose(dist, dist.T)
-    assert np.allclose(0, np.diag(dist))
-    # A pairwise mutrel vector can have a maximum L1 distance of 2, when no
-    # elements have overlap with each other. Normalize this so scores can be
-    # interpreted as "mean proportion of miscalled relations", given hard 0/1
-    # calls for relation types.
-    dist /= 2
-    # Distances may be slightly higher than 1 because of floating point error.
-    # Set these to exactly 1.
-    dist[np.logical_and(dist > 1, np.isclose(1, dist))] = 1
-    assert np.all(0 <= dist) and np.all(dist <= 1)
-
-    # Take entries below main diagonal.
-    dist_lower = np.tril(dist, 1)
-    assert dist_lower.shape == (M, M)
-    # There are (M choose 2) elements below the diagonal, so divide by this
-    # when computing mean.
-    scores[name] = np.sum(dist_lower) / (0.5*M*(M - 1))
+    scores[name] = _score_jsd(mrel.rels, mutrels['truth'].rels)
     if name == 'truth':
       assert np.isclose(0, scores[name])
     

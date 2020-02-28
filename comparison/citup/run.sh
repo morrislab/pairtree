@@ -1,4 +1,4 @@
-#!/bin/bash
+#senam!/bin/bash
 export OMP_NUM_THREADS=1
 
 BASEDIR=~/work/pairtree
@@ -11,10 +11,10 @@ CITUP_MODE=qip
 USE_SUPERVARS=false
 PARALLEL=1
 
-BATCH=sims.smallalpha.citup
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.smallalpha.pairtree
-#BATCH=steph.xeno.citup
-#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+#BATCH=sims.smallalpha.citup
+#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.smallalpha.pairtree
+BATCH=steph.xeno.citup
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 
 if [[ "$USE_SUPERVARS" == "true" ]]; then
   suffix="supervars"
@@ -52,15 +52,24 @@ function is_big_K {
   fi
 }
 
+function is_good_steph {
+  runid=$1
+  for other in SJBALL022610 SJBALL031 SJETV047 SJETV010nohypermut SJBALL022614 SJMLL026 SJBALL022611 SJERG009 SJETV010 SJETV043 SJBALL022613 SJMLL039 SJBALL022612 SJBALL036 SJBALL022609 SJBALL022610steph SJETV010stephR1 SJETV010stephR1R2 SJETV010stephR2; do
+    if [[ $other == $runid ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 function run_citup {
   for snvfn in $INDIR/*.snv; do
-  #for runid in SJBALL022610 SJBALL031 SJETV047 SJETV010nohypermut SJBALL022614 SJMLL026 SJBALL022611 SJERG009 SJETV010 SJETV043 SJBALL022613 SJMLL039 SJBALL022612 SJBALL036 SJBALL022609 SJBALL022610steph SJETV010stephR1 SJETV010stephR1R2 SJETV010stephR2; do
     runid=$(basename $snvfn | cut -d. -f1)
     snvfn=$INDIR/$runid.snv
     outfn="$outdir/${runid}.results.hdf5"
 
-    [[ -f $snvfn ]] || continue
-    is_big_K $runid || continue
+    is_good_steph $runid || continue
+    #is_big_K $runid || continue
     [[ -f $outfn ]] && continue
 
     outdir="$OUTDIR/$runid"
@@ -97,10 +106,11 @@ function run_citup {
     cmd+=") 2>$runid.time"
     cmd+="; cp -a \$CITUPTMP/log/latest/pipeline.log $outdir/"
 
-    jobfn=$(mktemp)
-    echo -e $cmd > $jobfn
-    sbatch $jobfn
-    rm $jobfn
+    echo -e $cmd
+    #jobfn=$(mktemp)
+    #echo -e $cmd > $jobfn
+    #sbatch $jobfn
+    #rm $jobfn
   done
 }
 
@@ -129,8 +139,8 @@ function convert_outputs {
 
 function main {
   #convert_inputs
-  #run_citup
-  convert_outputs
+  run_citup
+  #convert_outputs
 }
 
 main

@@ -19,7 +19,14 @@ def make_score_traces(results, method):
     points = sorted(points, key = lambda V: V[0])
     X, Y = zip(*points)
     X = ['%s subclones' % K for K in X]
-    trace = plotter.make_box_trace(X, Y, group=str(S), name='%s samples' % S)
+    trace = {
+      'type': 'box',
+      'x': X,
+      'y': Y,
+      'legendgroup': str(S),
+      'name': '%s samples' % S,
+      'boxmean': True,
+    }
     traces.append(trace)
 
   return traces
@@ -78,15 +85,15 @@ def main():
 
   results, methods = plotter.load_results(args.results_fn)
   plot_type = 'box'
-  plotter.munge(results, methods, args.baseline, args.score_type, plot_type)
+  plotter.munge(results, methods, args.baseline)
 
   for key in ('K', 'S'):
     results = plotter.augment(results, key)
   score_traces = make_score_traces(results, args.method)
   completion_traces = make_completion_traces(results, args.method)
 
-  figs = [
-    plotter.make_fig(
+  figs = {
+    f'scores_{args.method}': plotter.make_fig(
       score_traces,
       args.template,
       plotter.make_score_ytitle(args.score_type, args.plot_fn),
@@ -99,7 +106,7 @@ def main():
         'violingroupgap': 0.0,
       },
     ),
-    plotter.make_fig(
+    f'completion_{args.method}': plotter.make_fig(
       completion_traces,
       args.template,
       'Failure rate',
@@ -109,7 +116,7 @@ def main():
         'barmode': 'group',
       },
     ),
-  ]
+  }
   plotter.write_figs(figs, args.plot_fn)
 
 if __name__ == '__main__':

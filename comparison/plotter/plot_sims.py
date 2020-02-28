@@ -7,12 +7,33 @@ import plotter
 from plotter import MISSING
 import plotly.subplots
 import pandas as pd
-import plotly.express as px
 import numpy as np
 
 from plotly.figure_factory._violin import calc_stats as calc_violin_stats
 
-def _plot_single_vs_others(results, single, methods, method_colours):
+AXIS_TITLES = {}
+
+def _make_axis_titles():
+  AXIS_TITLES['mutphi'] = {
+    'all_scores': 'Frequency reconstruction error<br>(bits / mutation / tissue sample)',
+    'error_rate': 'Median frequency reconstruction error<br>(bits / mutation / tissue sample)',
+    'single_vs_others': 'Frequency reconstruction error (bits)<br>relative to %s',
+  }
+
+  AXIS_TITLES['mutrel'] = {
+    'all_scores': 'Pairwise relation error',
+    'error_rate': 'Median pairwise relation error',
+    'single_vs_others': 'Pairwise relation error<br>relative to %s',
+  }
+
+  for lpdist in ('l1', 'l2'):
+    AXIS_TITLES[f'mutdist{lpdist}'] = {
+      'all_scores': f'Frequency reconstruction error<br>({lpdist.upper()} distance)',
+      'error_rate': f'Median frequency reconstruction error<br>{lpdist.upper()} distance)',
+      'single_vs_others': f'Frequency reconstruction error ({lpdist.upper()} distance)<br>relative to %s',
+    }
+
+def _plot_single_vs_others(results, single, methods, method_colours, score_type):
   assert single in methods
   others = plotter.sort_methods(set(methods) - set((single,)))
 
@@ -32,11 +53,11 @@ def _plot_single_vs_others(results, single, methods, method_colours):
       #'bandwidth': 0.07,
       'boxpoints': 'all',
       'marker': {
-        'outliercolor': _format_colour(method_colours[M], 0.5),
-        'color': _format_colour(method_colours[M], 0.5),
+        'outliercolor': plotter.format_colour(method_colours[M], 0.5),
+        'color': plotter.format_colour(method_colours[M], 0.5),
       },
       'line': {
-        'color': _format_colour(method_colours[M]),
+        'color': plotter.format_colour(method_colours[M]),
       },
       'jitter': 0.6,
       'pointpos': 2.0,
@@ -45,16 +66,20 @@ def _plot_single_vs_others(results, single, methods, method_colours):
     'data': traces,
     'layout': {
       'yaxis': {
-        'title': 'Frequency reconstruction error<br>relative to Pairtree',
+        'title': AXIS_TITLES[score_type]['single_vs_others'] % plotter.HAPPY_METHOD_NAMES.get(single, single),
         'zeroline': True,
         'zerolinewidth': 2,
         'zerolinecolor': 'rgba(0,0,0,0.5)',
       },
     },
   }
+
+  if score_type != 'mutphi':
+    fig['layout']['yaxis']['tickformat'] = '%s%%'
+
   return fig
 
-def _plot_scores(results, methods, method_colours):
+def _plot_scores(results, methods, method_colours, score_type, use_same_x_limit=True):
   score_traces = []
   failure_traces = []
   K_vals = sorted(pd.unique(results['K']))
@@ -66,12 +91,15 @@ def _plot_scores(results, methods, method_colours):
     K_rows = [row for idx, row in results.iterrows() if row['K'] == K]
     missing_fracs = {M: len([row for row in K_rows if row[M] == MISSING]) / len(K_rows) for M in M_sorted}
     points = {M: [row[M] for row in K_rows if row[M] != MISSING] for M in M_sorted}
+    runids = {M: [row['runid'] for row in K_rows if row[M] != MISSING] for M in M_sorted}
 
     score_traces.append([{
       'type': 'box',
+      'boxmean': False,
       'x': points[M],
+      'text': runids[M],
       'name': M_happy[M],
-      'marker_color': _format_colour(method_colours[M]),
+      'marker_color': plotter.format_colour(method_colours[M]),
       'orientation': 'h',
       'width': 0.8,
       # Hack: only display the legend for the first trace. Otherwise, it will
@@ -85,10 +113,10 @@ def _plot_scores(results, methods, method_colours):
       'x': [missing_fracs[M] for M in M_sorted],
       'y': [M_happy[M] for M in M_sorted],
       'marker': {
-        'color': [_format_colour(method_colours[M], 0.5) for M in M_sorted],
+        'color': [plotter.format_colour(method_colours[M], 0.5) for M in M_sorted],
         'line': {
           'width': 2,
-          'color': [_format_colour(method_colours[M]) for M in M_sorted],
+          'color': [plotter.format_colour(method_colours[M]) for M in M_sorted],
         },
       },
       'orientation': 'h',
@@ -108,14 +136,22 @@ def _plot_scores(results, methods, method_colours):
     fig.add_trace(ft, col=1, row=idx+1)
     for T in st:
       fig.add_trace(T, col=2, row=idx+1)
-    # Whiskers run from `d1` (lower) to `d2` (higher).
-    max_x = max([calc_violin_stats(T['x'])['q2'] for T in st if len(T['x']) > 0])
+  fig.update_xaxes(range=(1, 0), col=1)
+
+  # Whiskers run from `d1` (lower) to `d2` (higher).
+  max_x = np.array([max([calc_violin_stats(T['x'])['q2'] for T in st if len(T['x']) > 0]) for st in score_traces])
+  min_x = np.array([min([np.min(T['x']) for T in st if len(T['x']) > 0]) for st in score_traces])
+  if use_same_x_limit:
+    max_x[:] = np.max(max_x)
+    min_x[:] = np.min(min_x)
+  for idx, (A, B) in enumerate(zip(min_x, max_x)):
+    assert B >= A
+    rng = B - A
     fig.update_xaxes(
-      range=(-0.15*max_x, 1.05*max_x),
+      range=(A - 0.05*rng, B + 0.05*rng),
       col=2,
       row=idx+1
     )
-  fig.update_xaxes(range=(1, 0), col=1)
 
   fig.update_xaxes(
     title_text='Failure rate',
@@ -133,11 +169,15 @@ def _plot_scores(results, methods, method_colours):
     col=2,
   )
   fig.update_xaxes(
-    title_text = 'Frequency reconstruction error<br>(Δbits / mutation / tissue sample)',
+    title_text = AXIS_TITLES[score_type]['all_scores'],
     row = N,
     col = 2,
   )
+
   fig.update_layout(showlegend=True, legend={'traceorder': 'reversed'})
+  if score_type != 'mutphi':
+    fig.update_xaxes(tickformat = '%s%%', col=2)
+
   return fig
 
 def _pluralize(N, unit):
@@ -172,7 +212,7 @@ def _plot_failure_rates(results, methods, method_colours, K_vals, S_vals):
         'x': [_pluralize(S, 'sample') for S in S_vals],
         'y': Y,
         'name': M_happy[M],
-        'line': {'color': _format_colour(method_colours[M]), 'width': 4,},
+        'line': {'color': plotter.format_colour(method_colours[M]), 'width': 4,},
         'marker': {'size': 14},
         'showlegend': Kidx == 0,
       }, row=1, col=Kidx+1)
@@ -191,7 +231,7 @@ def _plot_failure_rates(results, methods, method_colours, K_vals, S_vals):
   )
   return fig
 
-def _plot_error_rate(results, methods, method_colours, K_vals, S_vals):
+def _plot_error_rate(results, methods, method_colours, K_vals, S_vals, score_type):
   M_sorted = plotter.sort_methods(methods)
   M_happy = {M: plotter.HAPPY_METHOD_NAMES.get(M, M) for M in M_sorted}
   fig = plotly.subplots.make_subplots(
@@ -217,7 +257,7 @@ def _plot_error_rate(results, methods, method_colours, K_vals, S_vals):
         'x': [_pluralize(S, 'sample') for S in S_present],
         'y': [M_error[S] for S in S_present],
         'name': M_happy[M],
-        'line': {'color': _format_colour(method_colours[M]), 'width': 4,},
+        'line': {'color': plotter.format_colour(method_colours[M]), 'width': 4,},
         'marker': {'size': 14},
         'showlegend': Kidx == 0,
       }, row=1, col=Kidx+1)
@@ -226,24 +266,12 @@ def _plot_error_rate(results, methods, method_colours, K_vals, S_vals):
       tickangle = 45,
   )
   fig.update_yaxes(
-    title = 'Median frequency reconstruction error<br>(Δbits / mutation / tissue sample)',
+    title = AXIS_TITLES[score_type]['error_rate'],
     col = 1,
   )
+  if score_type != 'mutphi':
+    fig.update_yaxes(tickformat = '%s%%', col=1)
   return fig
-
-def _format_colour(triplet, opacity=1):
-  assert 0 <= opacity <= 1
-  return 'rgba(%s,%s,%s,%s)' % (*triplet, opacity)
-
-def _choose_method_colours(methods):
-  colour_scale = px.colors.qualitative.Plotly
-  method_colours = {M: colour_scale[idx] for idx, M in enumerate(plotter.sort_methods(methods))}
-
-  rgb = {}
-  for meth, C in method_colours.items():
-    assert len(C) == 7 and C.startswith('#')
-    rgb[meth] = [int(C[1:][idx:idx+2], 16) for idx in range(0, 6, 2)]
-  return rgb
 
 def main():
   parser = argparse.ArgumentParser(
@@ -253,22 +281,27 @@ def main():
   parser.add_argument('--template', default='seaborn')
   parser.add_argument('--score-type', required=True, choices=('mutrel', 'mutphi', 'mutdistl1', 'mutdistl2', 'cputime', 'walltime'))
   parser.add_argument('--baseline')
+  parser.add_argument('--hide-methods', default='')
   parser.add_argument('results_fn')
   parser.add_argument('plot_fn')
   args = parser.parse_args()
 
+  _make_axis_titles()
+
   results, methods = plotter.load_results(args.results_fn)
-  plotter.munge(results, methods, args.baseline, args.score_type, 'box')
+  plotter.munge(results, methods, args.baseline)
   for key in ('K', 'S'):
     results = plotter.augment(results, key)
   methods = set(methods)
-  method_colours = _choose_method_colours(methods)
+  methods -= set(args.hide_methods.split(','))
+  method_colours = plotter.choose_method_colours(methods)
 
   figs = {
     'scores': _plot_scores(
       results,
       methods - set(('mle_unconstrained',)),
       method_colours,
+      args.score_type
     ),
     'failure_rate': _plot_failure_rates(
       results,
@@ -283,25 +316,38 @@ def main():
       method_colours,
       (3, 10, 30),
       (1, 3, 10, 30, 100),
-    ),
-    'pairtree_vs_others': _plot_single_vs_others(
-      results,
-      'pairtree_multi',
-      methods - set(('mle_unconstrained',)),
-      method_colours,
+      args.score_type
     ),
   }
+
+  export_dims = {
+    'failure_rate': (400, 485),
+  }
+  if args.score_type == 'mutphi':
+    export_dims['scores'] = (700, 850)
+    export_dims['error_rate'] = (500, 485)
+  else:
+    export_dims['scores'] = (500, 850)
+    export_dims['error_rate'] = (600, 600)
+
+  for M in plotter.sort_methods(methods):
+    if M == 'mle_unconstrained':
+      continue
+    name = f'{M}_vs_others'
+    figs[name] = _plot_single_vs_others(
+      results,
+      M,
+      methods,# - set(('mle_unconstrained',)),
+      method_colours,
+      args.score_type
+    )
+    export_dims[name] = (600, 485)
 
   for F in figs.values():
     if 'layout' not in F:
       F['layout'] = {}
     F['layout']['template'] = args.template
-  plotter.write_figs(figs, args.plot_fn, export_dims = {
-    'scores': (700, 850),
-    'failure_rate': (400, 485),
-    'error_rate': (500, 485),
-    'pairtree_vs_others': (600, 485),
-  })
+  plotter.write_figs(figs, args.plot_fn, export_dims)
 
 if __name__ == '__main__':
   main()

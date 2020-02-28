@@ -7,13 +7,16 @@ from collections import defaultdict
 import sys
 import os
 import re
+import plotly.express as px
 
 MISSING = -1
+# Make this a list of pairs rather than dictionary so that we can be assured of
+# preserving order.
 HAPPY_METHOD_NAMES = [
-  ('truth', 'Truth'),
-  ('pairtree_handbuilt', 'Pairtree (manually constructed trees)'),
+  ('pairtree', 'Pairtree'),
   ('pairtree_single', 'Pairtree (single-chain)'),
-  ('pairtree_multi', 'Pairtree'),
+  ('pairtree_clustrel', 'Pairs tensor'),
+  ('pairtree_handbuilt', 'Pairtree (manually constructed trees)'),
   ('citup', 'CITUP'),
   ('lichee', 'LICHeE'),
   ('pastri', 'PASTRI'),
@@ -21,11 +24,18 @@ HAPPY_METHOD_NAMES = [
   ('pplus_allvars', 'PhyloPlus (unclustered)'),
   ('pwgs_supervars', 'PhyloWGS'),
   ('pwgs_allvars', 'PhyloWGS (unclustered)'),
-  ('pairtree_clustrel', 'Pairs tensor'),
   ('mle_unconstrained', 'Unconstrained lineage frequencies'),
 ]
 SORTED_METHODS = [M for M, M_full in HAPPY_METHOD_NAMES]
 HAPPY_METHOD_NAMES = {M: M_full for (M, M_full) in HAPPY_METHOD_NAMES}
+
+METHOD_COLOURS = {
+  'pairtree': '#ef553b',
+  'citup': '#636efa',
+  'lichee': '#00cc96',
+  'pastri': '#ab63fa',
+  'pwgs_supervars': '#ffa15a',
+}
 
 def augment(results, param_names):
   if len(param_names) < 1:
@@ -59,7 +69,7 @@ def load_results(resultsfn):
   return (results, methods)
 
 def get_method_names(results):
-  methnames = [K for K in results.keys() if K not in ('runid', 'truth')]
+  methnames = [K for K in results.keys() if K not in ('runid', 'baseline', 'truth')]
   return methnames
 
 def partition(results, methods, key):
@@ -284,19 +294,12 @@ def partition_by_threshold(parted, threshold):
   }
   return threshed
 
-def munge(results, methods, baseline, score_type, plot_type):
+def munge(results, methods, baseline):
   if baseline is not None:
     assert baseline in results
     for M in methods:
       present = results[M] != MISSING
       results.loc[present,M] -= results.loc[present,baseline]
-
-  if score_type == 'mutrel':
-    for M in methods:
-      present = results[M] != MISSING
-      results.loc[present,M] *= 100
-    if plot_type == 'violin':
-      set_missing_to(results, methods, 1)
 
 def make_score_ytitle(score_type, plot_fn):
   if score_type == 'mutrel':
@@ -322,4 +325,26 @@ def make_score_ytitle(score_type, plot_fn):
   else:
     raise Exception('Unknown score type %s' % score_type)
   return ytitle
+
+def choose_method_colours(methods):
+  colour_scale = px.colors.qualitative.Plotly
+  assert len(methods) <= len(colour_scale)
+  specified = set(methods) & set(METHOD_COLOURS.keys())
+  unspecified = set(methods) - specified
+
+  method_colours = {M: METHOD_COLOURS[M] for M in specified}
+  for idx, M in enumerate(sorted(unspecified)):
+    method_colours[M] = colour_scale[len(specified) + idx]
+  # Ensure colour uniqueness.
+  assert len(set(method_colours.values())) == len(method_colours)
+
+  rgb = {}
+  for meth, C in method_colours.items():
+    assert len(C) == 7 and C.startswith('#')
+    rgb[meth] = [int(C[1:][idx:idx+2], 16) for idx in range(0, 6, 2)]
+  return rgb
+
+def format_colour(triplet, opacity=1):
+  assert 0 <= opacity <= 1
+  return 'rgba(%s,%s,%s,%s)' % (*triplet, opacity)
 

@@ -3,6 +3,7 @@ set -euo pipefail
 command -v parallel > /dev/null || module load gnu-parallel
 
 BASEDIR=~/work/pairtree
+EXPTSDIR=~/work/pairtree-experiments
 SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 JOBDIR=~/jobs
 
@@ -10,19 +11,18 @@ PARALLEL=40
 TREE_CHAINS=$PARALLEL
 TREES_PER_CHAIN=3000
 PHI_ITERATIONS=10000
-PHI_FITTER=projection
+PHI_FITTER=rprop
 THINNED_FRAC=1.0
 BURNIN=0.333333
 
-BATCH=sims.smallalpha.pairtree.new
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.smallalpha.pairtree
-TRUTH_DIR=$BASEDIR/scratch/results/sims.smallalpha.truth
-PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.${PHI_FITTER}
+#BATCH=sims.smallalpha.pairtree.new
+#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.smallalpha.pairtree
+#TRUTH_DIR=$BASEDIR/scratch/results/sims.smallalpha.truth
+#PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.${PHI_FITTER}
 
-#TREE_TYPE=xeno
-#BATCH=steph.${TREE_TYPE}.pairtree.multichain.testlol
-#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.${TREE_TYPE}.pairtree.nostructs
-#PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/$BATCH
+BATCH=steph.xeno.pairtree.hbstruct
+PAIRTREE_INPUTS_DIR=$EXPTSDIR/inputs/steph.xeno.pairtree
+PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.${PHI_FITTER}
 
 source $SCRIPTDIR/util.sh
 
@@ -61,7 +61,7 @@ function run_pairtree {
         "--trees-per-chain $TREES_PER_CHAIN" \
         "--phi-iterations $PHI_ITERATIONS" \
         "--phi-fitter $PHI_FITTER" \
-        "--params $PAIRTREE_INPUTS_DIR/${runid}.params.json" \
+        "--params $PAIRTREE_INPUTS_DIR/${runid}.nostruct.params.json" \
         "--thinned-frac $THINNED_FRAC" \
         "--burnin $BURNIN" \
         "--gamma 0.7" \
@@ -71,8 +71,8 @@ function run_pairtree {
         "$resultsfn" \
         ">$runid.stdout" \
         "2>$runid.stderr) 2>$runid.time"
-    ) > $jobfn
-    sbatch $jobfn
+    ) #> $jobfn
+    #sbatch $jobfn
     rm $jobfn
   done
 }
@@ -89,7 +89,7 @@ function create_neutree {
       cmd="cd $outdir && "
       cmd+="OMP_NUM_THREADS=1 python3 $SCRIPTDIR/convert_outputs.py "
       cmd+="$resultsfn "
-      cmd+="${PAIRTREE_INPUTS_DIR}/${runid}.params.json "
+      cmd+="${PAIRTREE_INPUTS_DIR}/${runid}.hbstruct.params.json "
       cmd+="${basepath}.neutree.pickle "
       echo $cmd
     )
@@ -115,9 +115,9 @@ function create_mutrel_from_clustrel {
 }
 
 function main {
-  #run_pairtree #| grep python3 | parallel -j80 --halt 1 --eta
+  #run_pairtree | grep python3 | parallel -j2 --halt 1 --eta
   create_neutree | parallel -j80 --halt 1 --eta
-  create_mutrel_from_clustrel | sort --random-sort | parallel -j5 --halt 1 --eta
+  #create_mutrel_from_clustrel | sort --random-sort | parallel -j5 --halt 1 --eta
 }
 
 main

@@ -53,8 +53,8 @@ def main():
     results = plotter.augment(results, key)
 
   boxes = make_boxes(results, methods, args.single_method)
-  figs = [
-    plotter.make_fig(
+  figs = {
+      f'scores_{args.single_method}_vs_others': plotter.make_fig(
       boxes,
       args.template,
       plotter.make_score_ytitle(args.score_type, args.plot_fn),
@@ -63,7 +63,7 @@ def main():
       layout_options = {
       },
     ),
-  ]
+  }
   plotter.write_figs(figs, args.plot_fn)
 
 if __name__ == '__main__':

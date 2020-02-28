@@ -10,10 +10,10 @@ JOB_DIR=$HOME/jobs
 PYTHON2=$HOME/.apps/miniconda2/bin/python2
 PYTHON3=$HOME/.apps/miniconda3/bin/python3
 
-BATCH=sims.smallalpha.pastri
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.smallalpha.pairtree
-#BATCH=steph.xeno.pastri.hbclusters
-#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+#BATCH=sims.smallalpha.pastri
+#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.smallalpha.pairtree
+BATCH=steph.xeno.pastri.hbclusters
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 
 INDIR=$BASEDIR/scratch/inputs/$BATCH
 OUTDIR=$BASEDIR/scratch/results/$BATCH
@@ -64,9 +64,9 @@ function run_pastri {
     cmd+="2>$runid.stderr) 2>$runid.time"
 
     jobfn=$(mktemp)
-    echo -e $cmd > $jobfn
-    sbatch $jobfn
-    rm $jobfn
+    echo -e $cmd #> $jobfn
+    #sbatch $jobfn
+    #rm $jobfn
   done
 }
 
@@ -108,7 +108,7 @@ function convert_outputs {
 function main {
   #convert_inputs
   #run_pastri
-  #get_F_and_C
+  get_F_and_C
   convert_outputs
 }
 

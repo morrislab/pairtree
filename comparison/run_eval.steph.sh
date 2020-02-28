@@ -47,8 +47,8 @@ function make_results_paths {
   fi
 
   paths+="baseline=${BASELINE_DIR}/$runid/${runid}.${result_type}.npz "
+  paths+="pairtree=${BATCH}.xeno.pairtree.multichain.rprop/${runid}/${runid}.${result_type}.npz "
   paths+="pairtree_proj=${BATCH}.xeno.pairtree.multichain.projection/${runid}/${runid}.${result_type}.npz "
-  paths+="pairtree_rprop=${BATCH}.xeno.pairtree.multichain.rprop/${runid}/${runid}.${result_type}.npz "
   paths+="pairtree_hbstruct=${BASELINE_DIR}/${runid}/${runid}.${result_type}.npz "
   paths+="pwgs_supervars=${BATCH}.pwgs.supervars/$runid/${runid}.${result_type}.npz "
   paths+="lichee=${BATCH}.xeno.lichee/$runid/$runid.$result_type.npz "
@@ -150,12 +150,13 @@ function plot_results_steph {
     cmd="python3 $SCRIPTDIR/plotter/plot_steph.py "
     cmd+="--template seaborn "
     cmd+="--score-type $score_type "
+    cmd+="--hide-methods pairtree_hbstruct,pairtree_proj "
     if [[ $score_type == mutphi ]]; then
       cmd+="--baseline baseline "
     fi
     cmd+="$SCORESDIR/${BATCH}.${score_type}.{txt,html}"
     echo $cmd
-  done
+  done | para
 }
 
 function make_index {

@@ -8,16 +8,16 @@ PWGS_PATH=~/.apps/phylowgs
 PARALLEL=40
 NUM_CHAINS=1
 
-BATCH=sims.smallalpha.pwgs.supervars
-INDIR=$BASEDIR/scratch/inputs/$BATCH
-OUTBASE=$BASEDIR/scratch/results/$BATCH
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.smallalpha.pairtree
-
-#BATCH=steph.pwgs.supervars
-#BATCH=steph.pwgs.allvars
+#BATCH=sims.smallalpha.pwgs.supervars
 #INDIR=$BASEDIR/scratch/inputs/$BATCH
 #OUTBASE=$BASEDIR/scratch/results/$BATCH
-#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.smallalpha.pairtree
+
+BATCH=steph.pwgs.supervars
+#BATCH=steph.pwgs.allvars
+INDIR=$BASEDIR/scratch/inputs/$BATCH
+OUTBASE=$BASEDIR/scratch/results/$BATCH
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 
 function convert_inputs {
   mkdir -p $INDIR
