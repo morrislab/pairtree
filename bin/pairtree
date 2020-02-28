@@ -96,6 +96,10 @@ def main():
   results.add('seed', seed)
   results.save()
 
+  if not results.has('sampnames'):
+    assert 'samples' in params
+    results.add('sampnames', params['samples'])
+
   if results.has_mutrel('clustrel_posterior') and results.has_mutrel('clustrel_evidence') and results.has('clusters') and results.has('garbage'):
     clustrel_posterior = results.get_mutrel('clustrel_posterior')
     clustrel_evidence = results.get_mutrel('clustrel_evidence')
