@@ -57,10 +57,6 @@ TreePlotter.prototype._calculate_max_depth = function(root) {
   return _calc_max_depth(root);
 }
 
-TreePlotter.colours = {};
-TreePlotter.colours.node = '#428bca';
-TreePlotter.colours.node_bg = '#ffffff';
-
 TreePlotter.prototype._label_node = function(node_id) {
   if(LABEL_TYPE === 'digits') {
     return node_id;
@@ -73,7 +69,7 @@ TreePlotter.prototype._label_node = function(node_id) {
   return letters[node_id - 1];
 }
 
-TreePlotter.prototype._draw_tree = function(root, container, num_pops, left_sample, right_sample) {
+TreePlotter.prototype._draw_tree = function(root, container, num_pops, left_colour, right_colour, bg_colour) {
   // horiz_padding should be set to the maximum radius of a node, so a node
   // drawn on a boundry won't go over the canvas edge. Since max_area = 8000,
   // we have horiz_padding = sqrt(8000 / pi) =~ 51.
@@ -137,8 +133,8 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops, left_samp
           }
         }
       }).attr('fill', function(d) {
-        var base_colour = TreePlotter.colours.node;
-        return Util.rgba2hex(base_colour, d.data.opacities[side], TreePlotter.colours.node_bg);
+        var base_colour = (side == 'left') ? left_colour : right_colour;
+        return Util.rgba2hex(base_colour, d.data.opacities[side], bg_colour);
       });
   };
 
@@ -223,10 +219,21 @@ TreePlotter.prototype.plot = function(root, parents, phi, sampnames, container) 
   var K = phi.length;
   container = d3.select(container).append('div');
 
-  var left_sample = sampnames[0];
-  var right_sample = sampnames[0];
+  let params = (new URL(document.location)).searchParams;
+  var left_sample = params.has('leftsamp') ? params.get('leftsamp') : sampnames[0];
+  var right_sample = params.has('rightsamp') ? params.get('rightsamp') : sampnames[0];
+
+  var bg_colour = '#ffffff';
+  var default_colours = ['#428bca', '#cc4444'];
+  var left_colour = params.has('leftcolour') ? params.get('leftcolour') : default_colours[0];
+  var right_colour = params.has('rightcolour') ? params.get('rightcolour') : default_colours[1];
+
+  if(left_sample === right_sample) {
+    right_colour = left_colour;
+  }
+
   var root = this._generate_tree_struct(parents, phi, root, sampnames, left_sample, right_sample);
-  this._draw_tree(root, container, K, left_sample, right_sample);
+  this._draw_tree(root, container, K, left_colour, right_colour, bg_colour);
   resize_svg(container.selectAll('svg'));
 }
 
