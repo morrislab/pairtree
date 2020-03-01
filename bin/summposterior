@@ -15,7 +15,11 @@ import util
 import plotutil
 
 def write_header(runid, outf):
-  print('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Posterior summary</title>', file=outf)
+  title = 'Posterior summary'
+  if runid is not None:
+    title += ' for %s' % runid
+
+  print('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>%s</title>' % title, file=outf)
   for jsurl in (
     'https://d3js.org/d3.v5.min.js',
     #'https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js',
@@ -38,6 +42,10 @@ def write_header(runid, outf):
     'https://unpkg.com/popper.js@1',
     'https://unpkg.com/tippy.js@5',
     'https://cdn.jsdelivr.net/npm/cytoscape-popper@1.0.6/cytoscape-popper.min.js',
+
+    'https://cdn.jsdelivr.net/npm/canvas2svg@1.0.16/canvas2svg.min.js',
+    'https://cdn.jsdelivr.net/npm/cytoscape-svg@0.2.0/cytoscape-svg.min.js',
+    'https://cdn.jsdelivr.net/npm/file-saver@2.0.2/dist/FileSaver.min.js',
   ):
     print('<script type="text/javascript" src="%s"></script>' % jsurl, file=outf)
   for jsfn in ('tree_plotter.js', 'posterior_summ.js'):
@@ -98,15 +106,23 @@ def _plot_congraph(congraph, outf):
   <h2>Consensus graph</h2>
   <form>
     <div class="row">
-      <div class=" col">
+      <div class="col">
         <label for="threshold_chooser">Edge threshold: <span id="congraph_threshold"></span></label>
         <input type="range" id="threshold_chooser" class="form-control-range">
       </div>
 
-      <div class=" col">
+      <div class="col">
         <label for="layout_chooser">Layout</label>
         <select class="form-control" id="layout_chooser">
         </select>
+      </div>
+
+      <div class="col">
+        <label for="exporters">Export graph</label>
+        <div id="exporters">
+          <button id="export_svg" type="button" class="btn btn-primary">Export SVG</button>
+          <button id="export_png" type="button" class="btn btn-primary">Export PNG</button>
+        </div>
       </div>
     </div>
   </form>

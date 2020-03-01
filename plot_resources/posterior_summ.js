@@ -59,6 +59,7 @@ CongraphPlotter.prototype.plot = function(cgraph, container, threshold_display) 
     self._config_layout_chooser('#layout_chooser');
     self._config_edge_weight_display();
     self._config_threshold_chooser('#threshold_chooser', '#congraph_threshold', min_threshold, good_threshold);
+    self._config_exporters('#export_svg', '#export_png');
   });
 }
 
@@ -144,6 +145,22 @@ CongraphPlotter.prototype._config_layout_chooser = function(chooser) {
     const new_layout = this.value;
     self._layout = new_layout;
     self._run_layout();
+  });
+}
+
+CongraphPlotter.prototype._config_exporters = function(svg_sel, png_sel) {
+  let self = this;
+  d3.select(svg_sel).on('click', function(d) {
+    let svg = self._cy.svg();
+    let blob = new Blob([svg], {type:"image/svg+xml;charset=utf-8"})
+    saveAs(blob, 'congraph.svg');
+  });
+  d3.select(png_sel).on('click', function(d) {
+    let blob = self._cy.png({
+      output: 'blob',
+      scale: 5,
+    });
+    saveAs(blob, 'congraph.png');
   });
 }
 
