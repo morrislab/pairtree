@@ -75,7 +75,7 @@ def _fit_phis(adj, superclusters, supervars, method, iterations, parallel):
     #fitters['lol_init_proj'] = lambda: phi_fitter_lol.fit_etas(adj, superclusters, supervars, 'rprop', iterations, parallel, eta_init=fitters['projection']())
     #fitters['lol_init_prev'] = lambda: phi_fitter_lol.fit_etas(adj, superclusters, supervars, 'rprop', iterations, parallel, eta_init=last_eta[0])
 
-    Z = common.make_ancestral_from_adj(adj)
+    Z = util.make_ancestral_from_adj(adj)
     svids = common.extract_vids(supervars)
     total_reads = np.array([supervars[svid]['total_reads'] for svid in svids])
     var_reads = np.array([supervars[svid]['var_reads'] for svid in svids])
@@ -124,6 +124,6 @@ def _fit_phis(adj, superclusters, supervars, method, iterations, parallel):
     raise Exception('Unknown phi fitter %s' % method)
 
   assert np.allclose(1, np.sum(eta, axis=0))
-  Z = common.make_ancestral_from_adj(adj)
+  Z = util.make_ancestral_from_adj(adj)
   phi = np.dot(Z, eta)
   return (phi, eta)

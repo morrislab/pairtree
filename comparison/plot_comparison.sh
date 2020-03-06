@@ -2,7 +2,7 @@
 SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 BASEDIR=~/work/pairtree
 SCORESDIR=$BASEDIR/scratch/scores
-BATCH=sims
+BATCH=sims.smallalpha
 
 function plot_comparison {
   # To redirect port 80 to 8000:

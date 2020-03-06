@@ -1,6 +1,8 @@
 import numpy as np
 import scipy.special
 import time
+from numba import njit
+from common import Models
 
 def logfactorial(X):
   return scipy.special.gammaln(X + 1)
@@ -101,3 +103,52 @@ def lpdist(A, B, p=1):
   dist = np.sum(np.abs(A - B)**p)**(1/p)
   assert dist >= 0
   return dist
+
+@njit
+def make_ancestral_from_adj(adj, check_validity=False):
+  K = len(adj)
+  root = 0
+
+  if check_validity:
+    # By default, disable checks to improve performance.
+    assert np.all(1 == np.diag(adj))
+    expected_sum = 2 * np.ones(K)
+    expected_sum[root] = 1
+    assert np.array_equal(expected_sum, np.sum(adj, axis=0))
+
+  Z = np.copy(adj)
+  np.fill_diagonal(Z, 0)
+  stack = [root]
+  while len(stack) > 0:
+    P = stack.pop()
+    C = np.flatnonzero(Z[P])
+    if len(C) == 0:
+      continue
+    # Set ancestors of `C` to those of their parent `P`.
+    C_anc = np.copy(Z[:,P])
+    C_anc[P] = 1
+    # Turn `C_anc` into column vector.
+    Z[:,C] = np.expand_dims(C_anc, 1)
+    stack += list(C)
+  np.fill_diagonal(Z, 1)
+
+  if check_validity:
+    assert np.array_equal(Z[root], np.ones(K))
+  return Z
+
+@njit
+def compute_node_relations(adj, check_validity=False):
+  K = len(adj)
+  anc = make_ancestral_from_adj(adj, check_validity)
+  np.fill_diagonal(anc, 0)
+
+  R = np.full((K, K), Models.diff_branches, dtype=np.int8)
+  for idx in range(K):
+    R[idx][anc[idx]   == 1] = Models.A_B
+    R[idx][anc[:,idx] == 1] = Models.B_A
+  np.fill_diagonal(R, Models.cocluster)
+
+  if check_validity:
+    assert np.all(R[0]   == Models.A_B)
+    assert np.all(R[:,0] == Models.B_A)
+  return R

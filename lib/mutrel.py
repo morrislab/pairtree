@@ -1,14 +1,14 @@
 from collections import namedtuple
 import numpy as np
 import common
-from common import Models
+from common import Models, NUM_MODELS, ALL_MODELS
 import util
 
 Mutrel = namedtuple('Mutrel', ('vids', 'rels'))
 
 def init_mutrel(vids):
   M = len(vids)
-  mrel = Mutrel(vids=list(vids), rels=np.nan*np.ones((M, M, len(Models._all))))
+  mrel = Mutrel(vids=list(vids), rels=np.nan*np.ones((M, M, NUM_MODELS)))
   return mrel
 
 def remove_variants_by_vidx(mrel, vidxs):
@@ -47,7 +47,7 @@ def check_posterior_sanity(posterior):
   assert np.allclose(1, np.sum(posterior, axis=2))
 
   diag = range(len(posterior))
-  noncocluster = [getattr(Models, M) for M in Models._all if M != 'cocluster']
+  noncocluster = [getattr(Models, M) for M in ALL_MODELS if M != 'cocluster']
   for M in noncocluster:
     assert np.allclose(0, posterior[diag,diag,M])
   assert np.allclose(1, posterior[diag,diag,Models.cocluster])

@@ -120,7 +120,7 @@ def _merge_clusters(to_merge, clusters, variants, mutrel_posterior, mutrel_evide
   )
 
   M = len(clusters)
-  assert mutrel_posterior.rels.shape == mutrel_evidence.rels.shape == (M, M, len(Models._all))
+  assert mutrel_posterior.rels.shape == mutrel_evidence.rels.shape == (M, M, NUM_MODELS)
   assert len(mutrel_posterior.vids) == len(mutrel_evidence.vids) == M
   return (clusters, mutrel_posterior, mutrel_evidence)
 
@@ -155,7 +155,7 @@ def _discard_garbage(clusters, mutrel_posterior, mutrel_evidence):
   while True:
     M = len(clusters)
     assert len(mutrel_posterior.vids) == M
-    assert mutrel_posterior.rels.shape == (M, M, len(Models._all))
+    assert mutrel_posterior.rels.shape == (M, M, NUM_MODELS)
 
     garbage_pairs = np.argmax(mutrel_posterior.rels, axis=2) == Models.garbage
     if not np.any(garbage_pairs):

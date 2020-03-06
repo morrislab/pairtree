@@ -6,10 +6,6 @@ import numpy as np
 from common import Models
 from scipy import LowLevelCallable
 
-MODEL_A_B = Models.A_B
-MODEL_B_A = Models.B_A
-MODEL_DIFF_BRANCHES = Models.diff_branches
-
 def _make_betainc():
   addr = get_cython_function_address('scipy.special.cython_special', 'betainc')
   betainc_type = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double)
@@ -31,22 +27,22 @@ def _binom_logpmf(X, N, P):
 
 @numba.njit
 def _make_lower(phi1, midx):
-  if midx == MODEL_A_B:
+  if midx == Models.A_B:
     return 0
-  elif midx == MODEL_B_A:
+  elif midx == Models.B_A:
     return phi1
-  elif midx == MODEL_DIFF_BRANCHES:
+  elif midx == Models.diff_branches:
     return 0
   else:
     return np.nan
 
 @numba.njit
 def _make_upper(phi1, midx):
-  if midx == MODEL_A_B:
+  if midx == Models.A_B:
     return phi1
-  elif midx == MODEL_B_A:
+  elif midx == Models.B_A:
     return 1
-  elif midx == MODEL_DIFF_BRANCHES:
+  elif midx == Models.diff_branches:
     return 1 - phi1
   else:
     return np.nan

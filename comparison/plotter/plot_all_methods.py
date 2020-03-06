@@ -31,8 +31,8 @@ def main():
     'gt': 'positive',
   }
   names = {
-    'lte': '1, 3, or 10 tissue samples',
-    'gt': '30 or 100 tissue samples',
+    'lte': '1 or 3 tissue samples',
+    'gt': '10, 30, or 100 tissue samples',
   }
   colours = {
     'lte':'rgb(55,126,184)',

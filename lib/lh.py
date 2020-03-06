@@ -1,4 +1,4 @@
-from common import Models, Variant, _EPSILON, _LOGEPSILON
+from common import Models, Variant, _EPSILON, _LOGEPSILON, NUM_MODELS
 import scipy.stats
 import scipy.special
 import scipy.integrate
@@ -45,7 +45,7 @@ def calc_lh_grid(var1, var2):
 
   S = len(var1.total_reads) # S
   logprob_phi = generate_logprob_phi(N) # MxNxN
-  logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
+  logprob_models = np.nan * np.ones((S, NUM_MODELS)) # SxM
 
   for s in range(S):
     for modelidx in logprob_phi.keys():
@@ -81,7 +81,7 @@ def _gen_samples(modelidx, S):
 
 def calc_lh_mc_2D(var1, var2):
   S = len(var1.total_reads) # S
-  logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
+  logprob_models = np.nan * np.ones((S, NUM_MODELS)) # SxM
   for s in range(S):
     for modelidx in (Models.cocluster, Models.A_B, Models.B_A, Models.diff_branches):
       mcsamps = int(1e6)
@@ -96,7 +96,7 @@ def calc_lh_mc_2D(var1, var2):
 
 def calc_lh_mc_2D_dumb(var1, var2):
   S = len(var1.total_reads) # S
-  logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
+  logprob_models = np.nan * np.ones((S, NUM_MODELS)) # SxM
   for s in range(S):
     for modelidx in (Models.cocluster, Models.A_B, Models.B_A, Models.diff_branches):
       mcsamps = int(1e6)
@@ -160,7 +160,7 @@ def _calc_garbage_dumb(V1, V2):
 
 def calc_lh_mc_1D(V1, V2):
   S = len(V1.total_reads) # S
-  logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
+  logprob_models = np.nan * np.ones((S, NUM_MODELS)) # SxM
   for sidx in range(S):
     for modelidx in (Models.cocluster, Models.A_B, Models.B_A, Models.diff_branches):
       mcsamps = int(1e5)
@@ -202,7 +202,7 @@ def quad(*args, **kwargs):
 def calc_lh_quad(V1, V2, use_numba=True):
   max_splits = 50
   S = len(V1.total_reads) # S
-  logprob_models = np.nan * np.ones((S, len(Models._all))) # SxM
+  logprob_models = np.nan * np.ones((S, NUM_MODELS)) # SxM
 
   for sidx in range(S):
     V1_phi_mle = V1.vaf[sidx] / V1.omega_v[sidx]
@@ -309,7 +309,7 @@ def _compare_algorithms(V1, V2, S, good_samples):
     calc_lh_mc_1D,
     #calc_lh_grid,
   ):
-    result = np.zeros((S, len(Models._all)))
+    result = np.zeros((S, NUM_MODELS))
     time_start = time.perf_counter_ns()
     result[good_samples] = alg(V1, V2)
     time_end = time.perf_counter_ns()
@@ -331,7 +331,7 @@ def calc_lh(V1, V2, _calc_lh=None):
     _calc_lh = calc_lh_quad
 
   S = len(V1.omega_v)
-  evidence_per_sample = np.zeros((S, len(Models._all)))
+  evidence_per_sample = np.zeros((S, NUM_MODELS))
 
   if V1.id == V2.id:
     # If they're the same variant, they should cocluster with certainty.

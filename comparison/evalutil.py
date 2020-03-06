@@ -6,7 +6,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
 import util
 import mutrel
 import common
-from common import Models
+from common import Models, NUM_MODELS
 
 np.seterr(divide='raise', invalid='raise')
 
@@ -155,13 +155,13 @@ def make_clustrel_from_cluster_adj(cluster_adj):
   '''
   K = len(cluster_adj)
   assert cluster_adj.shape == (K, K)
-  cluster_anc = common.make_ancestral_from_adj(cluster_adj)
+  cluster_anc = util.make_ancestral_from_adj(cluster_adj)
   # In determining A_B relations, don't want to set mutations (i,j), where i
   # and j are in same cluster, to 1.
   assert np.all(1 == cluster_anc[0])
   np.fill_diagonal(cluster_anc, 0)
 
-  clustrel = np.zeros((K, K, len(Models._all)))
+  clustrel = np.zeros((K, K, NUM_MODELS))
   clustrel[:,:,Models.cocluster] = np.eye(K)
   clustrel[:,:,Models.A_B] = cluster_anc
   clustrel[:,:,Models.B_A] = clustrel[:,:,Models.A_B].T
@@ -179,8 +179,7 @@ def make_clustrel_from_cluster_adj(cluster_adj):
 def make_mutrel_from_clustrel(clustrel, clusters, check_sanity=True):
   mutrel.check_posterior_sanity(clustrel.rels)
   K = len(clusters)
-  num_models = len(Models._all)
-  assert clustrel.rels.shape == (K, K, num_models)
+  assert clustrel.rels.shape == (K, K, NUM_MODELS)
 
   vids, membership = make_membership_mat(clusters)
   # K: number of non-empty clusters
@@ -188,9 +187,9 @@ def make_mutrel_from_clustrel(clustrel, clusters, check_sanity=True):
   assert len(vids) == M
   assert membership.shape == (M, K)
 
-  mrel = np.zeros((M, M, num_models))
+  mrel = np.zeros((M, M, NUM_MODELS))
 
-  for modelidx in range(num_models):
+  for modelidx in range(NUM_MODELS):
     mut_vs_cluster = np.dot(membership, clustrel.rels[:,:,modelidx]) # MxK
     mrel[:,:,modelidx] = np.dot(mut_vs_cluster, membership.T)
   # Disable check to improve performance. Since this is called for each tree

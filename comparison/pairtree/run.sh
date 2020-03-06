@@ -9,7 +9,7 @@ PYTHON3=$HOME/.apps/miniconda3/bin/python3
 
 PARALLEL=40
 TREE_CHAINS=$PARALLEL
-TREES_PER_CHAIN=30000
+TREES_PER_CHAIN=3000
 PHI_ITERATIONS=10000
 PHI_FITTER=projection
 THINNED_FRAC=1.0
@@ -20,8 +20,9 @@ PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/$BATCH
 TRUTH_DIR=$BASEDIR/scratch/results/sims.smallalpha.truth
 PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.${PHI_FITTER}
 
-#BATCH=steph.pairtree.multichain
-#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+#TREE_TYPE=xeno
+#BATCH=steph.${TREE_TYPE}.pairtree.multichain.testlol
+#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.${TREE_TYPE}.pairtree.nostructs
 #PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/$BATCH
 
 source $SCRIPTDIR/util.sh
@@ -31,7 +32,7 @@ function run_pairtree {
     runid=$(basename $ssmfn | cut -d. -f1)
     outdir="$PAIRTREE_RESULTS_DIR/$runid"
     resultsfn="$outdir/$runid.results.npz"
-    [[  $runid =~ K100_ ]] || continue
+    #[[  $runid =~ K100_ ]] || continue
     #is_big_K $runid && continue
     is_run_complete $resultsfn && continue
     #[[ -f $resultsfn ]] || continue

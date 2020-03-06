@@ -15,12 +15,14 @@ def make_boxes(results, methods, single):
 
   traces = []
   for M in others:
-    points = [row[M] - row[single] for idx, row in results.iterrows() \
+    points = [(row['runid'], row[M] - row[single]) for idx, row in results.iterrows() \
       if MISSING not in (row[single], row[M])]
     if len(points) == 0:
       continue
+    runids, Y = zip(*points)
     traces.append(go.Box(
-      y = points,
+      y = Y,
+      text = runids,
       name = '%s (%s runs)' % (plotter.HAPPY_METHOD_NAMES.get(M, M), len(points)),
       boxpoints = 'all',
       jitter = 0.3,

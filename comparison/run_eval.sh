@@ -235,7 +235,7 @@ function compile_runtime {
 
 function partition_by_K {
   ptype=$1
-  threshold=10
+  threshold=30
 
   srcfn=$SCORESDIR/$BATCH.$ptype.txt
   dstfn_bigK=$SCORESDIR/$BATCH.$ptype.bigK.txt
@@ -335,6 +335,19 @@ function plot_single_vs_others {
   echo $cmd
 }
 
+function make_index {
+  cd $SCORESDIR
+  (
+    for anal in mutdistl1 mutdistl2 mutrel mutphi; do
+      echo "<h3>$anal</h3><ul>"
+      for foo in $BATCH.*$anal*.html; do
+        echo "<li><a href=$foo>$foo</a></li>"
+      done
+      echo "</ul>"
+    done
+  ) > index.html
+}
+
 function plot_results_sims {
   (
     eval_mutphis
@@ -356,12 +369,15 @@ function plot_results_sims {
       plot_all_methods mutdistl2 box $basefn.mutdistl2.$ksize.{txt,html}
     done
     for score_type in mutphi mutrel mutdistl1 mutdistl2; do
-      for method in pairtree_multi lichee; do
+      for method in pairtree_multi pairtree_clustrel lichee pwgs_supervars citup pastri; do
+        [[ $method == pairtree_clustrel && $score_type != mutrel ]] && continue
         plot_single_method    $method $score_type ${basefn}.${score_type}.txt ${basefn}.${method}.${score_type}.html
         plot_single_vs_others $method $score_type ${basefn}.${score_type}.txt ${basefn}.${method}_vs_others.${score_type}.html
       done
     done
   ) | para
+
+  make_index
 }
 
 function plot_results_steph {
@@ -406,8 +422,8 @@ function main {
   export PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/${BATCH}.pairtree
   export TRUTH_DIR=$RESULTSDIR/${BATCH}.truth
   export MLE_MUTPHIS_DIR=$RESULTSDIR/${BATCH}.mle_unconstrained
-  #make_sims_truth
-  #make_mle_mutphis
+  make_sims_truth
+  make_mle_mutphis
   plot_results_sims
   #plot_runtime
 

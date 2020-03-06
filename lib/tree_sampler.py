@@ -7,9 +7,11 @@ import phi_fitter
 import hyperparams as hparams
 import math
 import util
+from numba import njit
 
 Models = common.Models
 debug = common.debug
+from common import Models, debug, NUM_MODELS
 Mutrel = mutrel.Mutrel
 
 from collections import namedtuple
@@ -96,7 +98,7 @@ def _init_cluster_adj_mutrels(data_logmutrel):
       new_adj = np.copy(adj)
       new_adj[parent,nidx] = 1
       truncated_adj = util.remove_rowcol(new_adj, others)
-      tree_logmutrel = _calc_tree_logmutrel(truncated_adj, truncated_logmutrel, check_vids=False)
+      tree_logmutrel = _calc_tree_logmutrel(truncated_adj, truncated_logmutrel)
       log_W_parents[parent] = np.sum(np.triu(tree_logmutrel))
     W_parents = _scaled_softmax(log_W_parents)
     assert np.all(W_parents[nodeidxs] == 0)
@@ -244,57 +246,21 @@ def _make_data_logmutrel(mutrel):
   logmutrel = Mutrel(rels=logrels, vids=mutrel.vids)
   return logmutrel
 
-def _determine_node_rels(adj):
-  adj = np.copy(adj)
-  assert np.all(np.diag(adj) == 1)
-  np.fill_diagonal(adj, 0)
-
-  K = len(adj)
-  node_rels = np.full((K, K), Models.diff_branches)
-  stack = [0]
-  visited = set()
-
-  np.fill_diagonal(node_rels, Models.cocluster)
-  node_rels[0,1:] = Models.A_B
-
-  while len(stack) > 0:
-    P = stack.pop()
-    visited.add(P)
-    C = list(np.flatnonzero(adj[P]))
-    if len(C) == 0:
-      continue
-
-    P_anc = list(np.flatnonzero(node_rels[P] == Models.B_A))
-    C_anc = P_anc + [P]
-    node_rels[np.ix_(C_anc,C)] = Models.A_B
-    node_rels[np.ix_(C,C_anc)] = Models.B_A
-
-    stack += C
-
-  assert visited == set(range(K))
-  assert np.all(np.diag(node_rels) == Models.cocluster)
-  assert np.all(node_rels[0,1:] == Models.A_B)
-  assert np.all(node_rels[1:,0] == Models.B_A)
-
-  return node_rels
-
-def _calc_tree_logmutrel(adj, data_logmutrel, check_vids=True):
-  node_rels = _determine_node_rels(adj)
+@njit
+def _calc_tree_logmutrel(adj, data_logmutrel):
+  node_rels = util.compute_node_relations(adj)
   K = len(node_rels)
   assert node_rels.shape == (K, K)
-  assert data_logmutrel.rels.shape == (K-1, K-1, len(Models._all))
-  if check_vids:
-    assert list(data_logmutrel.vids) == ['S%s' % idx for idx in range(K-1)]
+  assert data_logmutrel.rels.shape == (K-1, K-1, NUM_MODELS)
 
-  idxs = np.broadcast_to(np.arange(K-1), shape=(K-1, K-1))
-  rows = idxs.T
-  cols = idxs
   clust_rels = node_rels[1:,1:]
-  assert rows.shape == cols.shape == clust_rels.shape
-
-  tree_logmutrel = data_logmutrel.rels[rows,cols,clust_rels]
-  for axis in (0, 1):
-    tree_logmutrel = np.insert(tree_logmutrel, 0, 0, axis=axis)
+  # First row and column of `tree_logmutrel` will always be zero.
+  tree_logmutrel = np.zeros((K,K))
+  rng = range(K-1)
+  for J in rng:
+    for K in rng:
+      JK_clustrel = node_rels[J+1,K+1]
+      tree_logmutrel[J+1,K+1] = data_logmutrel.rels[J,K,JK_clustrel]
 
   assert np.array_equal(tree_logmutrel, tree_logmutrel.T)
   assert np.all(tree_logmutrel <= 0)
@@ -371,7 +337,7 @@ def _init_chain(seed, data_logmutrel, __calc_phi, __calc_llh_phi):
     init_adj = _init_cluster_adj_branching(K)
   common.ensure_valid_tree(init_adj)
 
-  init_anc = common.make_ancestral_from_adj(init_adj)
+  init_anc = util.make_ancestral_from_adj(init_adj)
   init_phi = __calc_phi(init_adj)
 
   init_samp = TreeSample(
@@ -416,7 +382,7 @@ def _generate_new_sample(old_samp, data_logmutrel, __calc_phi, __calc_llh_phi):
   new_phi = __calc_phi(new_adj)
   new_samp = TreeSample(
     adj = new_adj,
-    anc = common.make_ancestral_from_adj(new_adj),
+    anc = util.make_ancestral_from_adj(new_adj),
     phi = new_phi,
     llh_phi = __calc_llh_phi(new_adj, new_phi),
   )
