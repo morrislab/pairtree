@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 export OMP_NUM_THREADS=1
 
 BASEDIR=~/work/pairtree
@@ -56,14 +57,14 @@ function run_citup {
   for snvfn in $INDIR/*.snv; do
   #for runid in SJBALL022610 SJBALL031 SJETV047 SJETV010nohypermut SJBALL022614 SJMLL026 SJBALL022611 SJERG009 SJETV010 SJETV043 SJBALL022613 SJMLL039 SJBALL022612 SJBALL036 SJBALL022609 SJBALL022610steph SJETV010stephR1 SJETV010stephR1R2 SJETV010stephR2; do
     runid=$(basename $snvfn | cut -d. -f1)
-    snvfn=$INDIR/$runid.snv
+    snvfn=$INDIR/${runid}.snv
+    outdir="$OUTDIR/$runid"
     outfn="$outdir/${runid}.results.hdf5"
 
     [[ -f $snvfn ]] || continue
-    is_big_K $runid || continue
-    [[ -f $outfn ]] && continue
+    #is_big_K $runid || continue
+    #[[ -f $outfn ]] && continue
 
-    outdir="$OUTDIR/$runid"
     clusterfn="$INDIR/${runid}.cluster"
     let num_clusters=$(cat $clusterfn | sort | uniq | wc -l)+1
 
@@ -129,8 +130,8 @@ function convert_outputs {
 
 function main {
   #convert_inputs
-  #run_citup
-  convert_outputs
+  run_citup
+  #convert_outputs
 }
 
 main
