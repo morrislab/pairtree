@@ -1,4 +1,5 @@
-#senam!/bin/bash
+#!/bin/bash
+set -euo pipefail
 export OMP_NUM_THREADS=1
 
 BASEDIR=~/work/pairtree
@@ -52,27 +53,21 @@ function is_big_K {
   fi
 }
 
-function is_good_steph {
-  runid=$1
-  for other in SJBALL022610 SJBALL031 SJETV047 SJETV010nohypermut SJBALL022614 SJMLL026 SJBALL022611 SJERG009 SJETV010 SJETV043 SJBALL022613 SJMLL039 SJBALL022612 SJBALL036 SJBALL022609 SJBALL022610steph SJETV010stephR1 SJETV010stephR1R2 SJETV010stephR2; do
-    if [[ $other == $runid ]]; then
-      return 0
-    fi
-  done
-  return 1
-}
-
 function run_citup {
   for snvfn in $INDIR/*.snv; do
     runid=$(basename $snvfn | cut -d. -f1)
-    snvfn=$INDIR/$runid.snv
+    for bad_runid in SJETV010{,nohypermut,stephR1,stephR2} SJBALL022610; do
+      if [[ $runid == $bad_runid ]]; then
+        continue 2
+      fi
+    done
+
+    outdir="$OUTDIR/$runid"
     outfn="$outdir/${runid}.results.hdf5"
 
-    is_good_steph $runid || continue
     #is_big_K $runid || continue
     [[ -f $outfn ]] && continue
 
-    outdir="$OUTDIR/$runid"
     clusterfn="$INDIR/${runid}.cluster"
     let num_clusters=$(cat $clusterfn | sort | uniq | wc -l)+1
 
