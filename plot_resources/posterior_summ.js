@@ -193,7 +193,8 @@ CongraphPlotter.prototype._draw = function(nodes, edges, container) {
   let self = this;
   this._cy = cytoscape({
     container: document.querySelector(container),
-    userZoomingEnabled: false,
+    wheelSensitivity: 0.1,
+    userZoomingEnabled: true,
     style: [{
       selector: 'node',
       style: {
