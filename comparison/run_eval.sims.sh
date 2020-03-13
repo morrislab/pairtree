@@ -79,9 +79,9 @@ function make_results_paths {
   paths+="pwgs_supervars=${BATCH}.pwgs.supervars/$runid/$runid.$result_type.npz "
   paths+="pastri=${BATCH}.pastri/$runid/$runid.$result_type.npz "
   if [[ $result_type == mutrel ]]; then
-    paths+="pairtree_clustrel=${BATCH}.pairtree/${runid}/${runid}.clustrel_mutrel.npz "
+    paths+="pairtree_clustrel=${BATCH}.pairtree.projection/${runid}/${runid}.clustrel_mutrel.npz "
   fi
-  paths+="pairtree=${BATCH}.pairtree/${runid}/${runid}.${result_type}.npz "
+  paths+="pairtree=${BATCH}.pairtree.projection/${runid}/${runid}.${result_type}.npz "
   paths+="lichee=${BATCH}.lichee/$runid/$runid.$result_type.npz "
   paths+="citup=${BATCH}.citup.rawvars.qip/$runid/$runid.$result_type.npz "
 
@@ -201,30 +201,30 @@ function compile_runtime {
   done
 }
 
-function partition_by_K {
-  ptype=$1
-  threshold=30
-
-  srcfn=$SCORESDIR/$BATCH.$ptype.txt
-  dstfn_bigK=$SCORESDIR/$BATCH.$ptype.bigK.txt
-  dstfn_smallK=$SCORESDIR/$BATCH.$ptype.smallK.txt
-
-  header=$(head -n1 $srcfn)
-  for dstfn in $dstfn_bigK $dstfn_smallK; do
-    echo $header > $dstfn
-  done
-
-  tail -n+2 $srcfn | while read line; do
-    runid=$(echo $line | cut -d, -f1)
-    K=$(echo $runid | egrep --only-matching 'K[[:digit:]]+' | cut -c2-)
-    if [[ $K -le $threshold ]]; then
-      dstfn=$dstfn_smallK
-    else
-      dstfn=$dstfn_bigK
-    fi
-    echo $line >> $dstfn
-  done
-}
+#function partition_by_K {
+#  ptype=$1
+#  threshold=30
+#
+#  srcfn=$SCORESDIR/$BATCH.$ptype.txt
+#  dstfn_bigK=$SCORESDIR/$BATCH.$ptype.bigK.txt
+#  dstfn_smallK=$SCORESDIR/$BATCH.$ptype.smallK.txt
+#
+#  header=$(head -n1 $srcfn)
+#  for dstfn in $dstfn_bigK $dstfn_smallK; do
+#    echo $header > $dstfn
+#  done
+#
+#  tail -n+2 $srcfn | while read line; do
+#    runid=$(echo $line | cut -d, -f1)
+#    K=$(echo $runid | egrep --only-matching 'K[[:digit:]]+' | cut -c2-)
+#    if [[ $K -le $threshold ]]; then
+#      dstfn=$dstfn_smallK
+#    else
+#      dstfn=$dstfn_bigK
+#    fi
+#    echo $line >> $dstfn
+#  done
+#}
 
 function plot_single_method {
   method=$1
@@ -272,15 +272,15 @@ function plot_sims {
 
 
 function plot_results_sims {
-  #(
-  #  eval_mutphis
-  #  eval_mutdists
-  #) | para
-  #eval_mutrels | parallel -j2 --halt 1 --eta
+  (
+    eval_mutphis
+    eval_mutdists
+  ) | para
+  eval_mutrels | parallel -j2 --halt 1 --eta
 
-  #for type in mutrel mutphi mutdistl1 mutdistl2; do
-  #  compile_scores $type
-  #done
+  for type in mutrel mutphi mutdistl1 mutdistl2; do
+    compile_scores $type
+  done
 
   (
     basefn="$SCORESDIR/$BATCH"

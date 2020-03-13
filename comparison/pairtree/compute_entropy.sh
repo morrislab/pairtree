@@ -6,8 +6,8 @@ PROTDIR=~/work/pairtree
 SCRIPTDIR=$(dirname "$(readlink -f "$0")")
 BASEDIR=~/work/pairtree
 
-BATCH=sims.smallalpha.pairtree
-PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.multichain
+BATCH=sims.smallalpha.pairtree.projection
+PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/$BATCH
 TRUTH_DIR=$BASEDIR/scratch/results/sims.smallalpha.truth
 SCORESDIR=$BASEDIR/scratch/scores
 

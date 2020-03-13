@@ -47,8 +47,7 @@ function make_results_paths {
   fi
 
   paths+="baseline=${BASELINE_DIR}/$runid/${runid}.${result_type}.npz "
-  paths+="pairtree=${BATCH}.xeno.pairtree.multichain.rprop/${runid}/${runid}.${result_type}.npz "
-  paths+="pairtree_proj=${BATCH}.xeno.pairtree.multichain.projection/${runid}/${runid}.${result_type}.npz "
+  paths+="pairtree=${BATCH}.xeno.pairtree.multichain.projection/${runid}/${runid}.${result_type}.npz "
   paths+="pairtree_hbstruct=${BASELINE_DIR}/${runid}/${runid}.${result_type}.npz "
   paths+="pwgs_supervars=${BATCH}.pwgs.supervars/$runid/${runid}.${result_type}.npz "
   paths+="lichee=${BATCH}.xeno.lichee/$runid/$runid.$result_type.npz "

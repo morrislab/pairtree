@@ -50,20 +50,18 @@ function create_evals {
 function main {
   results=""
 
-  #export PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.smallalpha.pairtree
+  #export PAIRTREE_INPUTS_DIR=$HOME/work/pairtree-experiments/inputs/sims.smallalpha.pairtree
   #export BASELINE_DIR=$RESULTSDIR/sims.smallalpha.truth
   #results+="sims.smallalpha.citup.rawvars.qip "
   #results+="sims.smallalpha.lichee "
-  #results+="sims.smallalpha.pairtree "
+  #results+="sims.smallalpha.pairtree.projection "
   #results+="sims.smallalpha.pastri "
   #results+="sims.smallalpha.pwgs.supervars "
 
   export PAIRTREE_INPUTS_DIR=$HOME/work/pairtree-experiments/inputs/steph.xeno.pairtree
   export BASELINE_DIR=$RESULTSDIR/steph.xeno.pairtree.hbstruct.projection
   results+="steph.xeno.pairtree.hbstruct.projection "
-  results+="steph.xeno.pairtree.hbstruct.rprop "
   results+="steph.xeno.pairtree.multichain.projection "
-  results+="steph.xeno.pairtree.multichain.rprop "
   results+="steph.xeno.lichee "
   results+="steph.pwgs.supervars "
 

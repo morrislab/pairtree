@@ -12,10 +12,10 @@ CITUP_MODE=qip
 USE_SUPERVARS=false
 PARALLEL=1
 
-#BATCH=sims.smallalpha.citup
-#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.smallalpha.pairtree
-BATCH=steph.xeno.citup
-PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
+BATCH=sims.smallalpha.citup
+PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/sims.smallalpha.pairtree
+#BATCH=steph.xeno.citup
+#PAIRTREE_INPUTS_DIR=$BASEDIR/scratch/inputs/steph.xeno.withgarb.pairtree
 
 if [[ "$USE_SUPERVARS" == "true" ]]; then
   suffix="supervars"
@@ -134,8 +134,8 @@ function convert_outputs {
 
 function main {
   #convert_inputs
-  run_citup
-  #convert_outputs
+  #run_citup
+  convert_outputs
 }
 
 main

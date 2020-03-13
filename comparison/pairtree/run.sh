@@ -16,13 +16,13 @@ PHI_FITTER=projection
 THINNED_FRAC=1.0
 BURNIN=0.333333
 
-BATCH=sims.smallalpha.pairtree
-PAIRTREE_INPUTS_DIR=$EXPTSDIR/inputs/$BATCH
-PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.${PHI_FITTER}
-
-#BATCH=steph.congraph
-#PAIRTREE_INPUTS_DIR=$EXPTSDIR/inputs/steph.xeno.pairtree
+#BATCH=sims.smallalpha.pairtree
+#PAIRTREE_INPUTS_DIR=$EXPTSDIR/inputs/$BATCH
 #PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.${PHI_FITTER}
+
+BATCH=steph.xeno.pairtree.hbstruct
+PAIRTREE_INPUTS_DIR=$EXPTSDIR/inputs/steph.xeno.pairtree
+PAIRTREE_RESULTS_DIR=$BASEDIR/scratch/results/${BATCH}.${PHI_FITTER}
 
 source $SCRIPTDIR/util.sh
 
@@ -31,7 +31,8 @@ function run_pairtree {
     runid=$(basename $ssmfn | cut -d. -f1)
     outdir="$PAIRTREE_RESULTS_DIR/$runid"
     resultsfn="$outdir/$runid.results.npz"
-    #[[  $runid =~ K100_ ]] || continue
+
+    #[[  $runid =~ K100_ ]] && continue
     #is_big_K $runid && continue
     is_run_complete $resultsfn && continue
     #[[ -f $resultsfn ]] || continue
@@ -41,12 +42,12 @@ function run_pairtree {
     cmd+="#!/bin/bash\n"
     cmd+="#SBATCH --nodes=1\n"
     cmd+="#SBATCH --ntasks=$PARALLEL\n"
-    cmd+="#SBATCH --mem=20GB\n"
-    cmd+="#SBATCH --time=95:59:00\n"
+    cmd+="#SBATCH --time=23:59:00\n"
     cmd+="#SBATCH --job-name pairtree_$runid\n"
     cmd+="#SBATCH --output=$JOBDIR/slurm_pairtree_${runid}_%j.txt\n"
-    cmd+="#SBATCH --partition=cpu\n"
     cmd+="#SBATCH --mail-type=NONE\n"
+    #cmd+="#SBATCH --partition=cpu\n"
+    #cmd+="#SBATCH --mem=20GB\n"
 
     cmd+="mkdir -p $outdir && cd $outdir && "
     cmd+="TIMEFORMAT='%R %U %S'; time ( "
@@ -58,7 +59,7 @@ function run_pairtree {
     cmd+="--trees-per-chain $TREES_PER_CHAIN "
     cmd+="--phi-iterations $PHI_ITERATIONS "
     cmd+="--phi-fitter $PHI_FITTER "
-    cmd+="--params $PAIRTREE_INPUTS_DIR/${runid}.params.json "
+    cmd+="--params $PAIRTREE_INPUTS_DIR/${runid}.hbstruct.params.json "
     cmd+="--thinned-frac $THINNED_FRAC "
     cmd+="--burnin $BURNIN "
     cmd+="--gamma 0.7 "
@@ -71,8 +72,8 @@ function run_pairtree {
     cmd+=">$runid.stdout "
     cmd+="2>$runid.stderr) 2>$runid.time "
 
-    echo -e $cmd > $jobfn
-    sbatch $jobfn
+    echo -e $cmd #> $jobfn
+    #sbatch $jobfn
     rm $jobfn
   done
 }
@@ -115,9 +116,9 @@ function create_mutrel_from_clustrel {
 }
 
 function main {
-  run_pairtree #| grep python3 | parallel -j2 --halt 1 --eta
-  #create_neutree | parallel -j80 --halt 1 --eta
-  #create_mutrel_from_clustrel | sort --random-sort | parallel -j5 --halt 1 --eta
+  #run_pairtree #| grep python3 | parallel -j2 --halt 1 --eta
+  create_neutree | parallel -j80 --halt 1 --eta
+  create_mutrel_from_clustrel | sort --random-sort | parallel -j5 --halt 1 --eta
 }
 
 main
