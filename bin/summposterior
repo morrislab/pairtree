@@ -19,6 +19,10 @@ def write_header(runid, outf):
   if runid is not None:
     title += ' for %s' % runid
 
+  # TODO: try the ELK layout algorithm instead of Klay. Currently,
+  # cytoscape.js-elk is a little outdated, and seems primed for an upgrade via
+  # this PR: https://github.com/cytoscape/cytoscape.js-elk/pull/15. It has not
+  # been merged as of March 2020, though, so I will wait until it is.
   print('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>%s</title>' % title, file=outf)
   for jsurl in (
     'https://d3js.org/d3.v5.min.js',
@@ -143,14 +147,16 @@ def write_footer(outf):
   print('</main></body></html>', file=outf)
 
 def _choose_plots(to_plot, to_omit, all_choices):
+  # Duplicate set.
   if to_plot is None:
     plot_choices = set(all_choices)
   else:
     plot_choices = set(to_plot)
 
   if to_omit is not None:
-    plot_choices -= set(to_omit)
+    plot_choices -= to_omit
 
+  assert plot_choices.issubset(all_choices)
   return plot_choices
 
 def main():
@@ -164,9 +170,9 @@ def main():
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--runid')
-  parser.add_argument('--plot', dest='plot_choices', nargs='+', choices=all_plot_choices,
+  parser.add_argument('--plot', dest='plot_choices', type=lambda s: set(s.split(',')),
     help='Things to plot; by default, plot everything')
-  parser.add_argument('--omit-plots', dest='omit_plots', nargs='+', choices=all_plot_choices,
+  parser.add_argument('--omit-plots', dest='omit_plots', type=lambda s: set(s.split(',')),
     help='Things to omit from plotting; overrides --plot')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')

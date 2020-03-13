@@ -122,14 +122,16 @@ def write_cluster_stats(clusters, garbage, supervars, variants, outf):
   print('</tbody></table>', file=outf)
 
 def _choose_plots(to_plot, to_omit, all_choices):
+  # Duplicate set.
   if to_plot is None:
     plot_choices = set(all_choices)
   else:
     plot_choices = set(to_plot)
 
   if to_omit is not None:
-    plot_choices -= set(to_omit)
+    plot_choices -= to_omit
 
+  assert plot_choices.issubset(all_choices)
   # If we want to plot any of the phi matrices, we need to also plot the
   # tree, so that the relevant data structures are generated below. This is
   # silly, so I should fix it eventually -- we should be able to plot just
@@ -140,7 +142,7 @@ def _choose_plots(to_plot, to_omit, all_choices):
   return plot_choices
 
 def main():
-  all_plot_choices = (
+  all_plot_choices = set((
     'tree',
     'pairwise_separate',
     'pairwise_mle',
@@ -151,15 +153,15 @@ def main():
     'phi_interleaved',
     'cluster_stats',
     'eta',
-  )
+  ))
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--tree-index', type=int, default=0)
-  parser.add_argument('--plot', dest='plot_choices', nargs='+', choices=all_plot_choices,
+  parser.add_argument('--plot', dest='plot_choices', type=lambda s: set(s.split(',')),
     help='Things to plot; by default, plot everything')
-  parser.add_argument('--omit-plots', dest='omit_plots', nargs='+', choices=all_plot_choices,
+  parser.add_argument('--omit-plots', dest='omit_plots', type=lambda s: set(s.split(',')),
     help='Things to omit from plotting; overrides --plot')
   parser.add_argument('--runid')
   parser.add_argument('--tree-json', dest='tree_json_fn',
