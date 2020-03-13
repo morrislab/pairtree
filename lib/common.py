@@ -1,5 +1,7 @@
 import numpy as np
 from collections import namedtuple
+import warnings
+from scipy.cluster.hierarchy import ClusterWarning
 
 _LOGEPSILON = -30
 _EPSILON    = np.exp(_LOGEPSILON)
@@ -106,7 +108,6 @@ def dfs(adjlist, root):
 
 def reorder_rows(mat, start=None, end=None):
   # Avoid importing sklearn unless necessary.
-  import warnings
   with warnings.catch_warnings():
     warnings.simplefilter('ignore', category=DeprecationWarning)
     import sklearn.cluster
@@ -120,15 +121,17 @@ def reorder_rows(mat, start=None, end=None):
   fullidxs = np.array(range(N))
   submat = mat[start:end]
 
-  # n_clusters doesn't matter, as we're only interested in the linkage tree
-  # between data points.
-  agglo = sklearn.cluster.AgglomerativeClustering(
-    n_clusters = len(submat),
-    affinity = 'l2',
-    linkage = 'average',
-    compute_full_tree = True,
-  )
-  labels = agglo.fit_predict(submat)
+  with warnings.catch_warnings():
+    warnings.simplefilter('ignore', category=ClusterWarning)
+    # n_clusters doesn't matter, as we're only interested in the linkage tree
+    # between data points.
+    agglo = sklearn.cluster.AgglomerativeClustering(
+      n_clusters = len(submat),
+      affinity = 'l2',
+      linkage = 'average',
+      compute_full_tree = True,
+    )
+    labels = agglo.fit_predict(submat)
   adjlist, root = agglo_children_to_adjlist(agglo.children_, agglo.n_leaves_)
   idxs = dfs(adjlist, root)
   submat = [submat[I] for I in idxs]
