@@ -3,7 +3,6 @@ import argparse
 import os
 import numpy as np
 import scipy.integrate
-import warnings
 import random
 import multiprocessing
 import sys
@@ -62,7 +61,6 @@ def _init_hyperparams(args):
 def main():
   np.set_printoptions(linewidth=400, precision=3, threshold=sys.maxsize, suppress=True)
   np.seterr(divide='raise', invalid='raise', over='raise')
-  warnings.simplefilter('ignore', category=scipy.integrate.IntegrationWarning)
 
   args = _parse_args()
   _init_hyperparams(args)
