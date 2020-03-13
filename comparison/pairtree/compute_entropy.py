@@ -56,7 +56,9 @@ def compute_tree_kld(P, Q):
   logP = np.log2(Parr[P_nonzero])
   logQ = np.log2(Qarr[P_nonzero])
   kld = np.sum(Parr[P_nonzero] * (logP - logQ))
-  assert kld >= 0
+  if kld < 0:
+    assert np.isclose(kld, 0)
+    kld = 0
   return kld
 
 def compute_tree_jsd(structs1, probs1, structs2, probs2):
@@ -186,6 +188,18 @@ def process(results, truth):
   for A in (keys, vals):
     print(*A, sep=',')
 
+def _load(npfn):
+  F = np.load(npfn)
+  # Specifying `allwoed_keys` avoids loading stuff that we're not going to use,
+  # which prevents us from suffering a "can't unpickle file without
+  # allow_pickle=True" problem for arbitrary Python objects stored in results
+  # that we don't use, and also saves loading useless stuff from disk.
+  allowed_keys = set(('struct', 'prob', 'count', 'llh', 'phi'))
+  F = {K: F[K] for K in F.keys() if K in allowed_keys}
+  if 'struct' in F:
+    F['struct'] = F['struct'].astype(np.int)
+  return F
+
 def main():
   np.set_printoptions(linewidth=400, precision=3, threshold=sys.maxsize, suppress=True)
   np.seterr(divide='raise', invalid='raise')
@@ -198,9 +212,9 @@ def main():
   parser.add_argument('results_fn')
   args = parser.parse_args()
 
-  results = np.load(args.results_fn)
+  results = _load(args.results_fn)
   if args.truth_fn is not None:
-    truth = np.load(args.truth_fn)
+    truth = _load(args.truth_fn)
   else:
     truth = None
   process(results, truth)
