@@ -3,6 +3,11 @@ import pickle
 import numpy as np
 from numba import njit
 
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
+import resultserializer
+
 @njit
 def _find_parents(adj):
   K = len(adj)
@@ -140,16 +145,15 @@ def write_truth(structs, phi, clusters, garbage, results_fn):
   phis = np.array([phi for _ in range(N)])
   counts = np.ones(N)
 
-  np.savez_compressed(
-    results_fn,
-    struct = structs,
-    count = counts,
-    phi = phis,
-    llh = llhs,
-    prob = probs,
-    clusters = clusters,
-    garbage = garbage,
-  )
+  results = resultserializer.Results(results_fn)
+  results.add('struct', structs)
+  results.add('count', counts)
+  results.add('phi', phis)
+  results.add('llh', llhs)
+  results.add('prob', probs)
+  results.add('clusters', clusters)
+  results.add('garbage', garbage)
+  results.save()
 
 def check_true_delta(struct, phi):
   import accupy
@@ -196,6 +200,7 @@ def main():
     print(num_trees)
   else:
     num_trees, structs = enum_trees(tau, phi, order, 'dfs')
+    structs = np.array(structs)
     ensure_truth_found(simdata['structure'], structs)
     write_truth(
       structs,
