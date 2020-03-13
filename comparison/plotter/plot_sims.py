@@ -15,22 +15,22 @@ AXIS_TITLES = {}
 
 def _make_axis_titles():
   AXIS_TITLES['mutphi'] = {
-    'all_scores': 'Frequency reconstruction error<br>(bits / mutation / tissue sample)',
-    'error_rate': 'Median frequency reconstruction error<br>(bits / mutation / tissue sample)',
-    'single_vs_others': 'Frequency reconstruction error (bits)<br>relative to %s',
+    'all_scores': 'Lineage frequency error<br>(bits / mutation / tissue sample)',
+    'error_rate': 'Mean lineage frequency error<br>(bits / mutation / tissue sample)',
+    'single_vs_others': 'Lineage frequency error<br>(bits / mutation / tissue sample)<br>relative to %s',
   }
 
   AXIS_TITLES['mutrel'] = {
-    'all_scores': 'Pairwise relation error',
-    'error_rate': 'Median pairwise relation error',
-    'single_vs_others': 'Pairwise relation error<br>relative to %s',
+    'all_scores': 'Pairwise relation error<br>(bits / mutation pair)',
+    'error_rate': 'Mean pairwise relation error<br>(bits / mutation pair)',
+    'single_vs_others': 'Pairwise relation error<br>(bits / mutation pair)r<br>relative to %s',
   }
 
   for lpdist in ('l1', 'l2'):
     AXIS_TITLES[f'mutdist{lpdist}'] = {
-      'all_scores': f'Frequency reconstruction error<br>({lpdist.upper()} distance)',
-      'error_rate': f'Median frequency reconstruction error<br>{lpdist.upper()} distance)',
-      'single_vs_others': f'Frequency reconstruction error ({lpdist.upper()} distance)<br>relative to %s',
+      'all_scores': f'Lineage frequency error<br>({lpdist.upper()} distance / mutation / tissue sample)',
+      'error_rate': f'Mean lineage frequency error<br>{lpdist.upper()} distance / mutation / tissue sample)',
+      'single_vs_others': f'Lineage frequency error<br>({lpdist.upper()} distance / mutation / tissue sample)<br>relative to %s',
     }
 
 def _plot_single_vs_others(results, single, methods, method_colours, score_type):
@@ -68,20 +68,17 @@ def _plot_single_vs_others(results, single, methods, method_colours, score_type)
       'yaxis': {
         'title': AXIS_TITLES[score_type]['single_vs_others'] % plotter.HAPPY_METHOD_NAMES.get(single, single),
         'zeroline': True,
-        'zerolinewidth': 2,
-        'zerolinecolor': 'rgba(0,0,0,0.5)',
+        'zerolinewidth': 1,
+        'zerolinecolor': 'rgba(0,0,0,0.3)',
       },
     },
   }
-
-  if score_type != 'mutphi':
-    fig['layout']['yaxis']['tickformat'] = '%s%%'
 
   return fig
 
 def _plot_scores(results, methods, method_colours, score_type, use_same_x_limit=True):
   score_traces = []
-  failure_traces = []
+  success_traces = []
   K_vals = sorted(pd.unique(results['K']))
   N = len(K_vals)
   M_sorted = list(reversed(plotter.sort_methods(methods)))
@@ -108,9 +105,9 @@ def _plot_scores(results, methods, method_colours, score_type, use_same_x_limit=
       # violated, the legend will be wrong.
       'showlegend': kidx == 0,
     } for M in M_sorted])
-    failure_traces.append({
+    success_traces.append({
       'type': 'bar',
-      'x': [missing_fracs[M] for M in M_sorted],
+      'x': [1 - missing_fracs[M] for M in M_sorted],
       'y': [M_happy[M] for M in M_sorted],
       'marker': {
         'color': [plotter.format_colour(method_colours[M], 0.5) for M in M_sorted],
@@ -127,12 +124,13 @@ def _plot_scores(results, methods, method_colours, score_type, use_same_x_limit=
     rows=N,
     cols=2,
     column_widths=[0.2, 0.8],
-    shared_yaxes=True,
+    shared_xaxes = True,
+    shared_yaxes = True,
     row_titles = ['%s subclones' % K for K in K_vals],
     horizontal_spacing = 0.03,
     vertical_spacing = 0.03,
   )
-  for idx, (st, ft) in enumerate(zip(score_traces, failure_traces)):
+  for idx, (st, ft) in enumerate(zip(score_traces, success_traces)):
     fig.add_trace(ft, col=1, row=idx+1)
     for T in st:
       fig.add_trace(T, col=2, row=idx+1)
@@ -154,7 +152,7 @@ def _plot_scores(results, methods, method_colours, score_type, use_same_x_limit=
     )
 
   fig.update_xaxes(
-    title_text='Failure rate',
+    title_text='Success rate',
     row=N,
     col=1,
   )
@@ -164,8 +162,8 @@ def _plot_scores(results, methods, method_colours, score_type, use_same_x_limit=
   )
   fig.update_xaxes(
     zeroline=True,
-    zerolinewidth=2,
-    zerolinecolor='rgba(0,0,0,0.5)',
+    zerolinewidth=1,
+    zerolinecolor='rgba(0,0,0,0.3)',
     col=2,
   )
   fig.update_xaxes(
@@ -175,9 +173,6 @@ def _plot_scores(results, methods, method_colours, score_type, use_same_x_limit=
   )
 
   fig.update_layout(showlegend=True, legend={'traceorder': 'reversed'})
-  if score_type != 'mutphi':
-    fig.update_xaxes(tickformat = '%s%%', col=2)
-
   return fig
 
 def _pluralize(N, unit):
@@ -186,7 +181,7 @@ def _pluralize(N, unit):
     lbl += 's'
   return lbl
 
-def _plot_failure_rates(results, methods, method_colours, K_vals, S_vals):
+def _plot_success_rates(results, methods, method_colours, K_vals, S_vals):
   M_sorted = plotter.sort_methods(methods)
   M_happy = {M: plotter.HAPPY_METHOD_NAMES.get(M, M) for M in M_sorted}
   fig = plotly.subplots.make_subplots(
@@ -198,15 +193,12 @@ def _plot_failure_rates(results, methods, method_colours, K_vals, S_vals):
   for Kidx, K in enumerate(K_vals):
     traces = {}
     for M in M_sorted:
-      M_failures = {}
+      M_successes = {}
       for S in S_vals:
         KS_rows = [row for idx, row in results.iterrows() if row['S'] == S and row['K'] == K]
-        M_failures[S] = len([row for row in KS_rows if row[M] == MISSING]) / len(KS_rows)
+        M_successes[S] = len([row for row in KS_rows if row[M] != MISSING]) / len(KS_rows)
 
-      Y = np.array([M_failures[S] for S in S_vals])
-      # Don't bother plotting if failure rate is 100% for all `S`.
-      #if np.all(Y == 1):
-      #  continue
+      Y = np.array([M_successes[S] for S in S_vals])
       fig.add_trace({
         'type': 'scatter',
         'x': [_pluralize(S, 'sample') for S in S_vals],
@@ -224,7 +216,7 @@ def _plot_failure_rates(results, methods, method_colours, K_vals, S_vals):
     showticklabels = False,
   )
   fig.update_yaxes(
-    title = 'Failure rate',
+    title = 'Success rate',
     tickformat = '%s%%',
     showticklabels = True,
     col = 1,
@@ -249,7 +241,7 @@ def _plot_error_rate(results, methods, method_colours, K_vals, S_vals, score_typ
         scores = np.array([row[M] for idx, row in results.iterrows() if row['S'] == S and row['K'] == K and row[M] != MISSING])
         if len(scores) == 0:
           continue
-        M_error[S] = np.median(scores)
+        M_error[S] = np.mean(scores)
 
       S_present = sorted(M_error.keys())
       fig.add_trace({
@@ -269,8 +261,6 @@ def _plot_error_rate(results, methods, method_colours, K_vals, S_vals, score_typ
     title = AXIS_TITLES[score_type]['error_rate'],
     col = 1,
   )
-  if score_type != 'mutphi':
-    fig.update_yaxes(tickformat = '%s%%', col=1)
   return fig
 
 def main():
@@ -303,7 +293,7 @@ def main():
       method_colours,
       args.score_type
     ),
-    'failure_rate': _plot_failure_rates(
+    'success_rate': _plot_success_rates(
       results,
       methods - set(('mle_unconstrained', 'pwgs_supervars', 'lichee')),
       method_colours,
@@ -321,14 +311,10 @@ def main():
   }
 
   export_dims = {
-    'failure_rate': (400, 485),
+    'success_rate': (400, 485),
   }
-  if args.score_type == 'mutphi':
-    export_dims['scores'] = (700, 850)
-    export_dims['error_rate'] = (500, 485)
-  else:
-    export_dims['scores'] = (500, 850)
-    export_dims['error_rate'] = (600, 600)
+  export_dims['scores'] = (700, 850)
+  export_dims['error_rate'] = (500, 485)
 
   for M in plotter.sort_methods(methods):
     if M == 'mle_unconstrained':
