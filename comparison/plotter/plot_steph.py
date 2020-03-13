@@ -58,7 +58,8 @@ def _plot_scores(results, methods, method_colours):
 
   for M in M_sorted:
     vals = np.array([row[M] for idx, row in results.iterrows()])
-    assert not np.any(vals == MISSING)
+
+    assert not np.any(vals == MISSING), '%s is missing %s' % (M, ','.join(results['runid'][results[M] == MISSING]))
     points[M] = vals
     runids[M] = [row['runid'] for idx, row in results.iterrows()]
 

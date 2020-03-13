@@ -29,14 +29,12 @@ def plot(results, result_key, logy=False):
   rows = len(unique_keys['K'])
   cols = len(unique_keys['S'])
 
-  fig = plotly.subplots.make_subplots(rows=rows, cols=cols, shared_yaxes=True, horizontal_spacing=0, vertical_spacing=0.05)
+  fig = plotly.subplots.make_subplots(rows=rows, cols=cols, shared_yaxes=False, horizontal_spacing=0.05, vertical_spacing=0.05)
   for idx, kval in enumerate(unique_keys['K']):
     fig.update_yaxes(title_text=f'K={kval}', row=idx+1, col=1)
   for idx, sval in enumerate(unique_keys['S']):
     fig.update_xaxes(title_text=f'S={sval}', row=rows, col=idx+1)
   fig.update_layout(showlegend=False)
-  if logy:
-    fig.update_layout(yaxis_type='log')
 
   for ridx in range(rows):
     for cidx in range(cols):
@@ -46,9 +44,12 @@ def plot(results, result_key, logy=False):
       fig.add_trace(go.Box(
         y = rows[result_key],
         name = f'(K,S) = ({K},{S}) ({len(rows)} runs)',
+        boxmean = True,
       ), row = ridx+1, col = cidx+1)
       fig.update_xaxes(showticklabels=False, row=ridx+1, col=cidx+1)
   fig.update_layout(title_text=result_key)
+  if logy:
+    fig.update_yaxes(type='log')
 
   html = plotly.offline.plot(
     fig,
