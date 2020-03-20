@@ -175,23 +175,16 @@ def _plot_scores(results, methods, method_colours, score_type, use_same_x_limit=
   fig.update_layout(showlegend=True, legend={'traceorder': 'reversed'})
   return fig
 
-def _pluralize(N, unit):
-  lbl = '%s %s' % (N, unit)
-  if N != 1:
-    lbl += 's'
-  return lbl
-
 def _plot_success_rates(results, methods, method_colours, K_vals, S_vals):
   M_sorted = plotter.sort_methods(methods)
   M_happy = {M: plotter.HAPPY_METHOD_NAMES.get(M, M) for M in M_sorted}
   fig = plotly.subplots.make_subplots(
     rows = 1,
     cols = len(K_vals),
-    subplot_titles = [_pluralize(K, 'subclone') for K in K_vals],
+    subplot_titles = [plotter.pluralize(K, 'subclone') for K in K_vals],
   )
 
   for Kidx, K in enumerate(K_vals):
-    traces = {}
     for M in M_sorted:
       M_successes = {}
       for S in S_vals:
@@ -201,7 +194,7 @@ def _plot_success_rates(results, methods, method_colours, K_vals, S_vals):
       Y = np.array([M_successes[S] for S in S_vals])
       fig.add_trace({
         'type': 'scatter',
-        'x': [_pluralize(S, 'sample') for S in S_vals],
+        'x': [plotter.pluralize(S, 'sample') for S in S_vals],
         'y': Y,
         'name': M_happy[M],
         'line': {'color': plotter.format_colour(method_colours[M]), 'width': 4,},
@@ -229,12 +222,11 @@ def _plot_error_rate(results, methods, method_colours, K_vals, S_vals, score_typ
   fig = plotly.subplots.make_subplots(
     rows = 1,
     cols = len(K_vals),
-    subplot_titles = [_pluralize(K, 'subclone') for K in K_vals],
+    subplot_titles = [plotter.pluralize(K, 'subclone') for K in K_vals],
     shared_yaxes = True,
   )
 
   for Kidx, K in enumerate(K_vals):
-    traces = {}
     for M in M_sorted:
       M_error = {}
       for S in S_vals:
@@ -246,7 +238,7 @@ def _plot_error_rate(results, methods, method_colours, K_vals, S_vals, score_typ
       S_present = sorted(M_error.keys())
       fig.add_trace({
         'type': 'scatter',
-        'x': [_pluralize(S, 'sample') for S in S_present],
+        'x': [plotter.pluralize(S, 'sample') for S in S_present],
         'y': [M_error[S] for S in S_present],
         'name': M_happy[M],
         'line': {'color': plotter.format_colour(method_colours[M]), 'width': 4,},

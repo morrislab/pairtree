@@ -326,6 +326,11 @@ def make_score_ytitle(score_type, plot_fn):
     raise Exception('Unknown score type %s' % score_type)
   return ytitle
 
+def hex2rgb(hex_colour):
+  assert len(hex_colour) == 7
+  assert hex_colour.startswith('#')
+  return [int(hex_colour[1:][idx:idx+2], 16) for idx in range(0, 6, 2)]
+
 def choose_method_colours(methods):
   colour_scale = px.colors.qualitative.Plotly
   assert len(methods) <= len(colour_scale)
@@ -338,13 +343,16 @@ def choose_method_colours(methods):
   # Ensure colour uniqueness.
   assert len(set(method_colours.values())) == len(method_colours)
 
-  rgb = {}
-  for meth, C in method_colours.items():
-    assert len(C) == 7 and C.startswith('#')
-    rgb[meth] = [int(C[1:][idx:idx+2], 16) for idx in range(0, 6, 2)]
+  rgb = {meth: hex2rgb(C) for meth, C in method_colours.items()}
   return rgb
 
 def format_colour(triplet, opacity=1):
   assert 0 <= opacity <= 1
   return 'rgba(%s,%s,%s,%s)' % (*triplet, opacity)
+
+def pluralize(N, unit):
+  lbl = '%s %s' % (N, unit)
+  if N != 1:
+    lbl += 's'
+  return lbl
 
