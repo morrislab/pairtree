@@ -9,6 +9,7 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import plotter
+from plotter import MISSING
 
 S_COLOURS = {S: plotter.hex2rgb(C) for S, C in {
   1: '#ef553b',
@@ -35,7 +36,7 @@ def partition(results, keys):
   unique = {K: sorted(set(V)) for K, V in key_vals.items()}
   return (results, unique)
 
-def plot(results, unique_keys, result_key, result_title, shared_y=False, log_y=False):
+def plot(results, unique_keys, result_key, ytitle, shared_y=False, log_y=False):
   K_vals = unique_keys['K']
   S_vals = unique_keys['S']
 
@@ -45,7 +46,7 @@ def plot(results, unique_keys, result_key, result_title, shared_y=False, log_y=F
     subplot_titles = [plotter.pluralize(K, 'subclone') for K in K_vals],
     shared_yaxes = shared_y,
     x_title = 'Tissue samples',
-    y_title = 'blah',
+    y_title = ytitle,
   )
   min_y, max_y = np.inf, -np.inf
 
@@ -76,7 +77,7 @@ def plot(results, unique_keys, result_key, result_title, shared_y=False, log_y=F
 
   fig.update_layout(
     showlegend = False,
-    title_text = result_title,
+    title_text = ytitle,
   )
   fig.update_xaxes(
     tickangle = 0,
@@ -101,11 +102,21 @@ def main():
   parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('--mutrels', dest='mutrel_fn')
   parser.add_argument('entropy_fn')
   parser.add_argument('plot_fn')
   args = parser.parse_args()
 
   results = pd.read_csv(args.entropy_fn)
+  if args.mutrel_fn is not None:
+    mrel_meth, mrel_fn = args.mutrel_fn.split('=', 1)
+    mrel = pd.read_csv(mrel_fn)
+    mrel = mrel.filter(('runid', mrel_meth))
+    mrel = mrel.rename(columns = {mrel_meth: 'mutrel'})
+    assert MISSING not in mrel['mutrel']
+    assert set(results['runid']) == set(mrel['runid'])
+    results = pd.merge(results, mrel, on='runid', how='outer')
+
   results['H_trees_pairtree_3_minus_H_trees_truth'] = results['H_trees_pairtree_3'] - results['H_trees_truth']
   results, unique_keys = partition(results, ('K', 'S'))
 
@@ -113,9 +124,10 @@ def main():
   export_dims = {}
 
   for name, title, shared_y, log_y in (
-    ('true_trees', 'True trees', False, True), 
-    ('jsd_parents_mean', 'JSD parents mean', True, False),
-    ('H_trees_pairtree_3_minus_H_trees_truth', 'Excess trees', False, False),
+    ('true_trees', 'Trees consistent with<br>true lineage frequencies', False, True), 
+    ('jsd_parents_mean', 'Mean Jensen-Shannon divergence between<br>true parents and Pairtree parents (bits)', True, False),
+    ('H_trees_pairtree_3_minus_H_trees_truth', 'Difference in tree entropy distribution<br>between truth and Pairtree (bits)', False, False),
+    ('mutrel', 'Pairwise relation error (bits)', True, False),
   ):
     figs[name] = plot(results, unique_keys, name, title, shared_y, log_y)
     export_dims[name] = (700, 400)

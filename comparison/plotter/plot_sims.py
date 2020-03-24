@@ -16,20 +16,20 @@ AXIS_TITLES = {}
 def _make_axis_titles():
   AXIS_TITLES['mutphi'] = {
     'all_scores': 'Lineage frequency error<br>(bits / mutation / tissue sample)',
-    'error_rate': 'Mean lineage frequency error<br>(bits / mutation / tissue sample)',
+    'error_rate': 'Median lineage frequency error<br>(bits / mutation / tissue sample)',
     'single_vs_others': 'Lineage frequency error<br>(bits / mutation / tissue sample)<br>relative to %s',
   }
 
   AXIS_TITLES['mutrel'] = {
     'all_scores': 'Pairwise relation error<br>(bits / mutation pair)',
-    'error_rate': 'Mean pairwise relation error<br>(bits / mutation pair)',
+    'error_rate': 'Median pairwise relation error<br>(bits / mutation pair)',
     'single_vs_others': 'Pairwise relation error<br>(bits / mutation pair)r<br>relative to %s',
   }
 
   for lpdist in ('l1', 'l2'):
     AXIS_TITLES[f'mutdist{lpdist}'] = {
       'all_scores': f'Lineage frequency error<br>({lpdist.upper()} distance / mutation / tissue sample)',
-      'error_rate': f'Mean lineage frequency error<br>{lpdist.upper()} distance / mutation / tissue sample)',
+      'error_rate': f'Median lineage frequency error<br>{lpdist.upper()} distance / mutation / tissue sample)',
       'single_vs_others': f'Lineage frequency error<br>({lpdist.upper()} distance / mutation / tissue sample)<br>relative to %s',
     }
 
@@ -182,6 +182,7 @@ def _plot_success_rates(results, methods, method_colours, K_vals, S_vals):
     rows = 1,
     cols = len(K_vals),
     subplot_titles = [plotter.pluralize(K, 'subclone') for K in K_vals],
+    x_title = 'Tissue samples',
   )
 
   for Kidx, K in enumerate(K_vals):
@@ -194,7 +195,7 @@ def _plot_success_rates(results, methods, method_colours, K_vals, S_vals):
       Y = np.array([M_successes[S] for S in S_vals])
       fig.add_trace({
         'type': 'scatter',
-        'x': [plotter.pluralize(S, 'sample') for S in S_vals],
+        'x': [str(S) for S in S_vals],
         'y': Y,
         'name': M_happy[M],
         'line': {'color': plotter.format_colour(method_colours[M]), 'width': 4,},
@@ -203,7 +204,8 @@ def _plot_success_rates(results, methods, method_colours, K_vals, S_vals):
       }, row=1, col=Kidx+1)
 
   fig.update_xaxes(
-      tickangle = 45,
+    tickangle = 0,
+    type = 'category',
   )
   fig.update_yaxes(
     showticklabels = False,
@@ -223,23 +225,35 @@ def _plot_error_rate(results, methods, method_colours, K_vals, S_vals, score_typ
     rows = 1,
     cols = len(K_vals),
     subplot_titles = [plotter.pluralize(K, 'subclone') for K in K_vals],
+    x_title = 'Tissue samples',
     shared_yaxes = True,
   )
 
   for Kidx, K in enumerate(K_vals):
     for M in M_sorted:
+      M_upper = {}
       M_error = {}
+      M_lower = {}
+
       for S in S_vals:
         scores = np.array([row[M] for idx, row in results.iterrows() if row['S'] == S and row['K'] == K and row[M] != MISSING])
         if len(scores) == 0:
           continue
-        M_error[S] = np.mean(scores)
+        M_lower[S] = np.quantile(scores, 0.25)
+        M_upper[S] = np.quantile(scores, 0.75)
+        M_error[S] = np.median(scores)
 
       S_present = sorted(M_error.keys())
       fig.add_trace({
         'type': 'scatter',
-        'x': [plotter.pluralize(S, 'sample') for S in S_present],
+        'x': [str(S) for S in S_present],
         'y': [M_error[S] for S in S_present],
+        'error_y': {
+          'type': 'data',
+          'symmetric': False,
+          'array': [M_upper[S] - M_error[S] for S in S_present],
+          'arrayminus': [M_error[S] - M_lower[S] for S in S_present],
+        },
         'name': M_happy[M],
         'line': {'color': plotter.format_colour(method_colours[M]), 'width': 4,},
         'marker': {'size': 14},
@@ -247,7 +261,8 @@ def _plot_error_rate(results, methods, method_colours, K_vals, S_vals, score_typ
       }, row=1, col=Kidx+1)
 
   fig.update_xaxes(
-      tickangle = 45,
+    tickangle = 45,
+    type = 'category',
   )
   fig.update_yaxes(
     title = AXIS_TITLES[score_type]['error_rate'],
@@ -287,7 +302,7 @@ def main():
     ),
     'success_rate': _plot_success_rates(
       results,
-      methods - set(('mle_unconstrained', 'pwgs_supervars', 'lichee')),
+      methods - set(('mle_unconstrained', 'pwgs_supervars', 'lichee', 'pairtree_clustrel')),
       method_colours,
       (3, 10),
       (1, 3, 10),

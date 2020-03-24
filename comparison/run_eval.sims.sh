@@ -272,15 +272,15 @@ function plot_sims {
 
 
 function plot_results_sims {
-  (
-    eval_mutphis
-    eval_mutdists
-  ) | para
-  eval_mutrels | parallel -j2 --halt 1 --eta
+  #(
+  #  eval_mutphis
+  #  eval_mutdists
+  #) | para
+  #eval_mutrels | parallel -j2 --halt 1 --eta
 
-  for type in mutrel mutphi mutdistl1 mutdistl2; do
-    compile_scores $type
-  done
+  #for type in mutrel mutphi mutdistl1 mutdistl2; do
+  #  compile_scores $type
+  #done
 
   (
     basefn="$SCORESDIR/$BATCH"

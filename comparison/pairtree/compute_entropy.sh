@@ -44,17 +44,23 @@ function combine {
 }
 
 function plot {
-  cmd="python3 $SCRIPTDIR/plot_entropy.py "
-  cmd+="$SCORESDIR/entropy.txt "
-  cmd+="$SCORESDIR/entropy.html"
-  echo $cmd | bash
+  cmd="python3 $SCRIPTDIR/plot_entropy.py"
+  cmd+=" $SCORESDIR/entropy.txt"
+  cmd+=" $SCORESDIR/entropy.rough.html"
+  echo $cmd
+
+  cmd="python3 $SCRIPTDIR/../plotter/plot_entropy.py"
+  cmd+=" --mutrels pairtree=$SCORESDIR/sims.smallalpha.mutrel.txt"
+  cmd+=" $SCORESDIR/entropy.txt "
+  cmd+=" $SCORESDIR/entropy.polished.html"
+  echo $cmd
 }
 
 function main {
-  compute_entropy | grep -v -e K30_ -e K100_ | parallel -j80 --halt 1 --eta
-  compute_entropy | grep    -e K30_ -e K100_ | parallel -j10 --halt 1 --eta
-  combine
-  plot
+  #compute_entropy | grep -v -e K30_ -e K100_ | parallel -j80 --halt 1 --eta
+  #compute_entropy | grep    -e K30_ -e K100_ | parallel -j10 --halt 1 --eta
+  #combine
+  plot | parallel -j10 --halt 1 --eta
 }
 
 main
