@@ -125,8 +125,8 @@ def main():
 
   for name, title, shared_y, log_y in (
     ('true_trees', 'Trees consistent with<br>true lineage frequencies', False, True), 
-    ('jsd_parents_mean', 'Mean Jensen-Shannon divergence between<br>true parents and Pairtree parents (bits)', True, False),
-    ('H_trees_pairtree_3_minus_H_trees_truth', 'Difference in tree entropy distribution<br>between truth and Pairtree (bits)', False, False),
+    ('jsd_parents_mean', 'Parent JSD between tree parents<br>and Pairtree parents (bits)', True, False),
+    ('H_trees_pairtree_3_minus_H_trees_truth', 'Difference in tree entropy distribution<br>between Pairtree and truth (bits)', False, False),
     ('mutrel', 'Pairwise relation error (bits)', True, False),
   ):
     figs[name] = plot(results, unique_keys, name, title, shared_y, log_y)
