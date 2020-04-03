@@ -41,7 +41,7 @@ def main():
       params['clusters'],
       variants,
       supervars,
-      [],
+      params['garbage'],
       None,
       params['samples'],
       should_correct_vaf=True,
