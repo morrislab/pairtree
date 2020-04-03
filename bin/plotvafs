@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+import argparse
+import os
+import sys
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
+import common
+import clustermaker
+import inputparser
+
+import vaf_plotter
+import plotutil
+
+def write_header(outf):
+  print('<meta charset="utf-8">', file=outf)
+  for jsfn in ('highlight_table_labels.js', 'tree_plotter.js'):
+    print('<script type="text/javascript">%s</script>' % plotutil.read_file(jsfn), file=outf)
+  print('<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">', file=outf)
+  for cssfn in ('matrix.css',):
+    print('<style type="text/css">%s</style>' % plotutil.read_file(cssfn), file=outf)
+  print('<style type="text/css">.container { margin: 30px; } td, th, table { padding: 5px; margin: 0; border-collapse: collapse; font-weight: normal; } span { visibility: hidden; } td:hover > span { visibility: visible; } .highlighted { background-color: black !important; color: white; }</style>', file=outf)
+
+def main():
+  parser = argparse.ArgumentParser(
+    description='LOL HI THERE',
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter
+  )
+  parser.add_argument('ssm_fn')
+  parser.add_argument('params_fn')
+  parser.add_argument('html_out_fn')
+  args = parser.parse_args()
+
+  variants = inputparser.load_ssms(args.ssm_fn)
+  params = inputparser.load_params(args.params_fn)
+  supervars = clustermaker.make_cluster_supervars(params['clusters'], variants)
+  supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
+
+  with open(args.html_out_fn, 'w') as outf:
+    write_header(outf)
+    vaf_plotter.plot_vaf_matrix(
+      params['clusters'],
+      variants,
+      supervars,
+      [],
+      None,
+      params['samples'],
+      should_correct_vaf=True,
+      outf=outf,
+    )
+
+if __name__ == '__main__':
+  main()
