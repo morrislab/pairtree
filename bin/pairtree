@@ -9,7 +9,6 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
 import common
-import pairwise
 import inputparser
 import tree_sampler
 import clustermaker

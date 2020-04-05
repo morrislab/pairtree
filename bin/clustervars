@@ -71,8 +71,8 @@ def cluster(variants, conc, iters):
   Z = np.zeros(N)
 
   # Beta distribution prior for phi
-  phi_alpha0 = 0.5
-  phi_beta0 = 0.5
+  phi_alpha0 = 1
+  phi_beta0 = 1
 
   clusterings = []
   llhs = []
