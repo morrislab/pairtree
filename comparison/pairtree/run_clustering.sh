@@ -28,6 +28,8 @@ function eval_clustering {
         echo "echo $sampid,\$(NUMBA_DISABLE_JIT=1 python3 $BASEDIR/comparison/pairtree/compare_clusterings.py $INPUTSDIR/$sampid.ssm $INPUTSDIR/$sampid.params.json $paramsfn)"
       done | parallel -j40 --halt 1 --eta 
     ) > $CLUSTERS/$model.txt
+
+    python3 $BASEDIR/comparison/pairtree/plot_clustering.py $CLUSTERS/$model.{txt,html}
   done
 }
 
