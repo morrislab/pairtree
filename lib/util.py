@@ -1,14 +1,63 @@
 import numpy as np
-import scipy.special
 import time
-from numba import njit
+from numba import njit, vectorize
 from common import Models
+import math
 
+@vectorize
+def lgamma(X):
+  return math.lgamma(X)
+
+@njit
 def logfactorial(X):
-  return scipy.special.gammaln(X + 1)
+  result = lgamma(X + 1)
+  return result
 
+@njit
 def log_N_choose_K(N, K):
   return logfactorial(N) - (logfactorial(K) + logfactorial(N - K))
+
+@njit
+def lbeta(X, Y):
+  return lgamma(X) + lgamma(Y) - lgamma(X + Y)
+
+@njit
+def beta_binom_logpmf(x, n, a, b):
+  # Numba doesn't like this assertion. Bleh.
+  #assert np.all(a > 0.) and np.all(b > 0.)
+  logpx = log_N_choose_K(n, x) + lbeta(x + a, n - x + b) - lbeta(a, b)
+  return logpx
+
+@njit
+def softmax(V):
+  B = np.max(V)
+  log_sum = B + np.log(np.sum(np.exp(V - B)))
+  log_softmax = V - log_sum
+  smax = np.exp(log_softmax)
+  # The vector sum will be close to 1 at this point, but not close enough to
+  # make np.random.choice happy -- sometimes it will issue the error
+  # "probabilities do not sum to 1" from mtrand.RandomState.choice.
+  # To fix this, renormalize the vector.
+  smax /= np.sum(smax)
+  #assert np.isclose(np.sum(smax), 1)
+  return smax
+
+@njit
+def sample_multinom(probs):
+  S = 0.
+  R = np.random.rand()
+  for idx, P in enumerate(probs):
+    S += P
+    if S >= R:
+      return idx
+  # Should not reach this point.
+  assert False
+
+@njit
+def isclose(arr, V, tol=1e-6):
+  # This is a poor person's version of `np.isclose`. Once Numba implements
+  # this, I should remove it.
+  return np.abs(arr - V) <= tol
 
 def time_exec(f):
   def wrap(*args):
@@ -20,17 +69,6 @@ def time_exec(f):
     return ret
   return wrap
 time_exec._ms = None
-
-def softmax(V):
-  log_softmax = V - scipy.special.logsumexp(V)
-  smax = np.exp(log_softmax)
-  # The vector sum will be close to 1 at this point, but not close enough to
-  # make np.random.choice happy -- sometimes it will issue the error
-  # "probabilities do not sum to 1" from mtrand.RandomState.choice.
-  # To fix this, renormalize the vector.
-  smax /= np.sum(smax)
-  assert np.isclose(np.sum(smax), 1)
-  return smax
 
 def remove_rowcol(arr, indices):
   '''Remove rows and columns at `indices`.'''

@@ -1,21 +1,6 @@
 import numpy as np
-import math
 from numba import njit
-
-@njit
-def _logfactorial(X):
-  result = np.empty(X.shape)
-  for idx in range(len(X)):
-    result[idx] = math.lgamma(X[idx] + 1)
-  return result
-
-@njit
-def _log_N_choose_K(N, K):
-  return _logfactorial(N) - (_logfactorial(K) + _logfactorial(N - K))
-
-@njit
-def isclose(arr, V, tol=1e-6):
-  return np.abs(arr - V) <= tol
+import util
 
 @njit
 def logpmf(X, N, P):
@@ -24,8 +9,8 @@ def logpmf(X, N, P):
   # of >1D (as I do with `results[idxs] = val`) is not supported by Numba.
   assert X.ndim == N.ndim == P.ndim == 1
 
-  P_isclose_0 = isclose(0, P)
-  P_isclose_1 = isclose(1, P)
+  P_isclose_0 = util.isclose(0, P)
+  P_isclose_1 = util.isclose(1, P)
   X_equals_0 = X == 0
   X_equals_N = X == N
   special = [
@@ -46,7 +31,7 @@ def logpmf(X, N, P):
   Nu = N[unfilled]
   Xu = X[unfilled]
   Pu = P[unfilled]
-  result[unfilled] = _log_N_choose_K(Nu, Xu) + Xu*np.log(Pu) + (Nu - Xu)*np.log(1 - Pu)
+  result[unfilled] = util.log_N_choose_K(Nu, Xu) + Xu*np.log(Pu) + (Nu - Xu)*np.log(1 - Pu)
   assert not np.any(np.isnan(result))
 
   return result

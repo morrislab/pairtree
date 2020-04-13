@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import numpy as np
-from numba import njit
-import math
+from numba import njit, vectorize
 import json
 
 import os
@@ -12,67 +11,106 @@ import inputparser
 import common
 import util
 
-from scipy.special import betaln
-
 @njit
-def _logfactorial(X):
-  result = np.empty(X.shape)
-  for idx in range(len(X)):
-    result[idx] = math.lgamma(X[idx] + 1)
-  return result
-
-@njit
-def _log_N_choose_K(N, K):
-  return _logfactorial(N) - (_logfactorial(K) + _logfactorial(N - K))
-
-def beta_binom_logpmf(x, n, a, b):
-  assert np.all(a > 0) and np.all(b > 0)
-  logpx = _log_N_choose_K(n, x) + betaln(x + a, n - x + b) - betaln(a, b)
-  return logpx
-
-def _extract_mat(variants, key):
-  vids = common.extract_vids(variants)
-  vids = common.sort_vids(vids)
-  arr = [variants[vid][key] for vid in vids]
-  return np.array(arr)
-
-def _calc_cweight(V, T_prime, phi_alpha0, phi_beta0, vidx, members):
+def _calc_cweight_pants(V, T_prime, phi_alpha0, phi_beta0, vidx, members):
   alpha_c = phi_alpha0 + np.sum(V[members],                    axis=0)
   beta_c  = phi_beta0  + np.sum(T_prime[members] - V[members], axis=0)
 
-  data_llh = beta_binom_logpmf(V[vidx], T_prime[vidx], alpha_c, beta_c)
+  data_llh = util.beta_binom_logpmf(V[vidx], T_prime[vidx], alpha_c, beta_c)
   membership_llh = np.log(len(members))
   return membership_llh + np.sum(data_llh)
 
-def calc_llh(V, T_prime, Z, phi_alpha0, phi_beta0):
-  uniq_Z  = set(list(Z))
-  assert uniq_Z == set(range(len(uniq_Z)))
+@njit
+def _calc_cweight_socks(V, T_prime, phi_alpha0, phi_beta0, vidx, members):
+  V_summed = np.sum(V[members], axis=0)
+  R_summed = np.sum(T_prime[members], axis=0) - V_summed
+  Vi = V[vidx]
+  Ti = T_prime[vidx]
+  Ri = Ti - Vi
 
-  llh = 0
-  for cidx in uniq_Z:
+  result  = util.log_N_choose_K(Ti, Vi)
+  result += util.lbeta(V_summed + Vi + phi_alpha0, R_summed + Ri + phi_beta0)
+  result -= util.lbeta(V_summed + phi_alpha0, R_summed + phi_beta0)
+
+  return np.log(len(members)) + np.sum(result)
+
+@njit
+def _calc_llh_pants(V, T_prime, Z, phi_alpha0, phi_beta0, conc):
+  uniq_Z  = set(list(Z))
+  C = len(uniq_Z)
+  #assert uniq_Z == set(range(C))
+  N = len(Z)
+  cluster_sizes = np.array([np.sum(Z == c) for c in range(C)])
+  assert np.sum(cluster_sizes) == N
+
+  llh  = np.log(C)
+  llh += np.sum(util.logfactorial(cluster_sizes - 1))
+  llh -= np.sum(np.log(conc + np.arange(N)))
+
+  for cidx in range(C):
     members = np.flatnonzero(Z == cidx)
     alpha_c = phi_alpha0 + np.sum(V[members],                    axis=0)
     beta_c  = phi_beta0  + np.sum(T_prime[members] - V[members], axis=0)
     for vidx in members:
-      llh += np.sum(beta_binom_logpmf(V[vidx], T_prime[vidx], alpha_c, beta_c))
+      llh += np.sum(util.beta_binom_logpmf(V[vidx], T_prime[vidx], alpha_c, beta_c))
   return llh
 
-def cluster(variants, conc, iters):
-  V = _extract_mat(variants, 'var_reads')
-  T = _extract_mat(variants, 'total_reads')
-  omega = _extract_mat(variants, 'omega_v')
-  T_prime = np.maximum(V, omega*T)
+@njit
+def _calc_llh_socks(V, T_prime, Z, phi_alpha0, phi_beta0, conc):
+  uniq_Z  = set(list(Z))
+  C = len(uniq_Z)
+  #assert uniq_Z == set(range(C))
+  N = len(Z)
+  cluster_sizes = np.array([np.sum(Z == c) for c in range(C)])
+  assert np.sum(cluster_sizes) == N
 
+  llh  = np.log(C)
+  llh += np.sum(util.logfactorial(cluster_sizes - 1))
+  llh -= np.sum(np.log(conc + np.arange(N)))
+
+  for cidx in range(C):
+    members = np.flatnonzero(Z == cidx)
+    V_summed = np.sum(V[members], axis=0)
+    T_summed = np.sum(T_prime[members], axis=0)
+    R_summed = T_summed - V_summed
+
+    llh_c  = util.log_N_choose_K(T_summed, V_summed)
+    llh_c += util.lbeta(V_summed + phi_alpha0, R_summed + phi_beta0)
+    llh_c -= util.lbeta(phi_alpha0, phi_beta0)
+
+    llh += np.sum(llh_c)
+
+  return llh
+
+@njit
+def _calc_new_cluster_weight_pants(V, T_prime, phi_alpha0, phi_beta0, vidx, conc):
+  return np.log(conc) + np.sum(util.beta_binom_logpmf(V[vidx], T_prime[vidx], phi_alpha0, phi_beta0))
+
+@njit
+def _calc_new_cluster_weight_socks(V, T_prime, phi_alpha0, phi_beta0, vidx, conc):
+  Vi = V[vidx]
+  Ti = T_prime[vidx]
+  Ri = Ti - Vi
+
+  result  = util.log_N_choose_K(Ti, Vi)
+  result += util.lbeta(Vi + phi_alpha0, Ri + phi_beta0)
+  # This is subtracted from *each element* of `result`, which is important.
+  result -= util.lbeta(phi_alpha0, phi_beta0)
+
+  return np.log(conc) + np.sum(result)
+
+@njit
+def cluster(V, T_prime, omega, conc, iters):
   # N: number of variants
   # C: number of clusters
   # Z: cluster assignments
   N = len(V)
   C = 1
-  Z = np.zeros(N)
+  Z = np.zeros(N, np.int32)
 
   # Beta distribution prior for phi
-  phi_alpha0 = 1
-  phi_beta0 = 1
+  phi_alpha0 = 1.
+  phi_beta0 = 1.
 
   clusterings = []
   llhs = []
@@ -97,25 +135,21 @@ def cluster(variants, conc, iters):
         members = np.flatnonzero(Z == cidx)
         cweights[cidx] = _calc_cweight(V, T_prime, phi_alpha0, phi_beta0, vidx, members)
       # Consider adding a new cluster.
-      cweights[C] = np.log(conc) + np.sum(beta_binom_logpmf(V[vidx], T_prime[vidx], phi_alpha0, phi_beta0))
+      cweights[C] = _calc_new_cluster_weight(V, T_prime, phi_alpha0, phi_beta0, vidx, conc)
 
       cweights -= np.log(conc + N - 1)
       cprobs = util.softmax(cweights)
-      assert np.isclose(1, np.sum(cprobs))
-      new_cluster = np.random.choice(len(cprobs), p=cprobs)
+      new_cluster = util.sample_multinom(cprobs)
       Z[vidx] = new_cluster
       if new_cluster == C:
         C += 1
 
-    llh = calc_llh(V, T_prime, Z, phi_alpha0, phi_beta0)
+    llh = _calc_llh(V, T_prime, Z, phi_alpha0, phi_beta0, conc)
     clusterings.append(np.copy(Z))
     llhs.append(llh)
     #print(I, C, llh)
 
-  return (
-    np.array(clusterings),
-    np.array(llhs),
-  )
+  return (clusterings, llhs)
 
 def make_unique(clusterings, llhs):
   uniq_clust, idxs = np.unique(clusterings, return_index=True, axis=0)
@@ -127,7 +161,6 @@ def list_clusters(Z, variants):
   assert uniq_Z == set(range(len(uniq_Z)))
 
   vids = common.extract_vids(variants)
-  vids = common.sort_vids(vids)
   clusters = [[vids[vidx] for vidx in np.flatnonzero(Z == cidx)] for cidx in sorted(uniq_Z)]
   return clusters
 
@@ -140,19 +173,33 @@ def main():
     help='Alpha for Chinese restaurant process. The larger this is, the stronger the preference for more clusters.')
   parser.add_argument('--iterations', type=int, default=100,
     help='Number of Gibbs sampling iterations')
+  parser.add_argument('--model', choices=('pants', 'socks'), default='socks')
   parser.add_argument('ssm_fn')
   parser.add_argument('in_params_fn')
   parser.add_argument('out_params_fn')
   args = parser.parse_args()
 
+  if args.model == 'socks':
+    globals()['_calc_llh'] = _calc_llh_socks
+    globals()['_calc_cweight'] = _calc_cweight_socks
+    globals()['_calc_new_cluster_weight'] = _calc_new_cluster_weight_socks
+  else:
+    globals()['_calc_llh'] = _calc_llh_pants
+    globals()['_calc_cweight'] = _calc_cweight_pants
+    globals()['_calc_new_cluster_weight'] = _calc_new_cluster_weight_pants
+
   variants = inputparser.load_ssms(args.ssm_fn)
+  V, T, T_prime, omega = inputparser.load_read_counts(variants)
   params = inputparser.load_params(args.in_params_fn)
 
   clusterings, llhs = cluster(
-    variants,
+    V,
+    T_prime,
+    omega,
     args.concentration,
     args.iterations,
   )
+  clusterings, llhs = np.array(clusterings), np.array(llhs)
   #clusterings, llhs = make_unique(clusterings, llhs)
   best = np.argmax(llhs)
   clusters = list_clusters(clusterings[best], variants)

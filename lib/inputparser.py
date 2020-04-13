@@ -1,9 +1,22 @@
 import csv
 import json
 import numpy as np
+import common
 
 def _extract_nums(S, dtype):
   return np.array(S.split(','), dtype=dtype)
+
+def _extract_mat(variants, key):
+  vids = common.extract_vids(variants)
+  arr = [variants[vid][key] for vid in vids]
+  return np.array(arr)
+
+def load_read_counts(variants):
+  V = _extract_mat(variants, 'var_reads')
+  T = _extract_mat(variants, 'total_reads')
+  omega = _extract_mat(variants, 'omega_v')
+  T_prime = np.maximum(V, omega*T)
+  return (V, T, T_prime, omega)
 
 def load_ssms(ssmfn, max_ssms=None):
   variants = {}
