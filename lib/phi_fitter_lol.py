@@ -97,8 +97,8 @@ def _calc_grad(var_reads, ref_reads, omega, A, Z, psi):
   phi = np.dot(Z, eta) # Kx1
 
   delta = 1e-20
-  phi[binom.isclose(phi, 0)] += delta
-  phi[binom.isclose(phi, 1)] -= delta
+  phi[util.isclose(phi, 0)] += delta
+  phi[util.isclose(phi, 1)] -= delta
 
   phi_muts = np.dot(A, phi) # Mx1
   dlogpx_dphi_muts = (var_reads / phi_muts) - (omega*ref_reads)/(1 - phi_muts*omega) # Mx1

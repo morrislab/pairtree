@@ -6,6 +6,7 @@ import numpy as np
 from common import Models
 from scipy import LowLevelCallable
 
+# TODO: Can I just replace this with `util.lbeta`? Would it be faster / less bullshit?
 def _make_betainc():
   addr = get_cython_function_address('scipy.special.cython_special', 'betainc')
   betainc_type = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double)
@@ -63,7 +64,7 @@ def _integral_separate_clusters(args):
   B = V2_ref_reads + 1
   betainc_upper = betacdf(A, B, V2_omega * upper)
   betainc_lower = betacdf(A, B, V2_omega * lower)
-  if binom.isclose(betainc_upper, betainc_lower):
+  if util.isclose(betainc_upper, betainc_lower):
     return 0
   logP += np.log(betainc_upper - betainc_lower)
   logP -= logsub

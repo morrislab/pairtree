@@ -37,8 +37,8 @@ def calc_mut_p(A, Z, psi):
 
   # Avoid numerical issues.
   delta = 1e-30
-  mut_p[binom.isclose(mut_p, 0)]   += delta
-  mut_p[binom.isclose(mut_p, 0.5)] -= delta
+  mut_p[util.isclose(mut_p, 0)]   += delta
+  mut_p[util.isclose(mut_p, 0.5)] -= delta
 
   return mut_p
 
