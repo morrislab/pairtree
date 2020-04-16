@@ -5,6 +5,7 @@ import binom
 import numpy as np
 from common import Models
 from scipy import LowLevelCallable
+import util
 
 # TODO: Can I just replace this with `util.lbeta`? Would it be faster / less bullshit?
 def _make_betainc():
