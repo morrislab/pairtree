@@ -102,10 +102,9 @@ def _calc_new_cluster_weight_socks(V, T_prime, phi_alpha0, phi_beta0, vidx, conc
 
 @njit
 def _compute_cweights_full(V, T_prime, Z, phi_alpha0, phi_beta0, vidx, conc, C):
-  Z_excluded = np.delete(Z, vidx)
-  V_excluded = np.delete(V, vidx, axis=0)
-  T_prime_excluded = np.delete(T_prime, vidx, axis=0)
-  llh_excluded = _calc_llh(V_excluded, T_prime_excluded, Z_excluded, phi_alpha0, phi_beta0, conc)
+  mask = np.ones(len(V), dtype=np.bool_)
+  mask[vidx] = 0
+  llh_excluded = _calc_llh(V[mask], T_prime[mask], Z[mask], phi_alpha0, phi_beta0, conc)
 
   cweights_full = np.full(C + 1, np.nan)
   Z_prime = np.copy(Z)
