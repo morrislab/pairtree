@@ -120,6 +120,8 @@ def _compute_cweights_full(V, T_prime, Z, phi_alpha0, phi_beta0, vidx, conc, C):
 @njit
 def _do_gibbs_iter(V, T_prime, phi_alpha0, phi_beta0, conc, C, Z, check_full_llh=False):
   N = len(Z)
+  Z = np.copy(Z)
+
   for vidx in range(N):
     old_cluster = Z[vidx]
     Z[vidx] = -1
@@ -153,7 +155,7 @@ def _do_gibbs_iter(V, T_prime, phi_alpha0, phi_beta0, conc, C, Z, check_full_llh
       C += 1
 
   llh = _calc_llh(V, T_prime, Z, phi_alpha0, phi_beta0, conc)
-  return (C, np.copy(Z), llh)
+  return (C, Z, llh)
 
 def cluster(V, T_prime, omega, conc, iters):
   # N: number of variants
