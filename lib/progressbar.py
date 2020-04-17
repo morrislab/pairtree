@@ -44,7 +44,9 @@ class progressbar_file:
     if self._total > -1:
       assert self._count <= self._total
 
-    if (datetime.datetime.now() - self._last_printed).total_seconds() >= self._update_min:
+    if self._count == 1 or \
+    self._count == self._total or \
+    (datetime.datetime.now() - self._last_printed).total_seconds() >= self._update_min:
       self._print()
 
   def _print(self):
