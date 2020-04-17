@@ -6,11 +6,12 @@ BASEDIR=$HOME/work/pairtree
 INPUTSDIR=$HOME/work/pairtree-experiments/inputs/sims.smallalpha.pairtree
 
 function run_clustering {
+  #for model in socks pants; do
   for model in socks; do
     clusterdir=$CLUSTERS/$model
     mkdir -p $clusterdir
 
-    for ssmfn in $INPUTSDIR/sim_K{30,100}_*.ssm; do
+    for ssmfn in $INPUTSDIR/sim_*.ssm; do
       runid=$(basename $ssmfn | cut -d. -f1)
       echo "echo $runid \$(NUMBA_DISABLE_JIT=0 python3 $BASEDIR/bin/clustervars --model $model $INPUTSDIR/$runid.{ssm,params.json} $clusterdir/$runid.clustered.params.json)"
     done
@@ -34,8 +35,8 @@ function eval_clustering {
 }
 
 function main {
-  #run_clustering
-  eval_clustering
+  run_clustering
+  #eval_clustering
 }
 
 main

@@ -10,6 +10,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
 import inputparser
 import common
 import util
+from progressbar import progressbar
 
 @njit
 def _calc_cweight_pants(V, T_prime, phi_alpha0, phi_beta0, vidx, members):
@@ -117,7 +118,44 @@ def _compute_cweights_full(V, T_prime, Z, phi_alpha0, phi_beta0, vidx, conc, C):
   return cweights_full
 
 @njit
-def cluster(V, T_prime, omega, conc, iters, check_gibbs_ratio=False):
+def _do_gibbs_iter(V, T_prime, phi_alpha0, phi_beta0, conc, C, Z, check_full_llh=False):
+  N = len(Z)
+  for vidx in range(N):
+    old_cluster = Z[vidx]
+    Z[vidx] = -1
+    if not np.any(Z == old_cluster):
+      # If `vidx` was the only member, remove this cluster.
+      # Do so by moving the last cluster to its index.
+      # (These operations are valid even if `highest == old_cluster`.)
+      highest = C - 1
+      Z[Z == highest] = old_cluster
+      C -= 1
+
+    # `cweights`: LLHs of each cluster destination for `vidx`
+    # cweights[C] = LLH of adding new cluster
+    cweights = np.empty(C + 1)
+    # Consider every possible destination.
+    for cidx in range(C):
+      members = np.flatnonzero(Z == cidx)
+      cweights[cidx] = _calc_cweight(V, T_prime, phi_alpha0, phi_beta0, vidx, members)
+    # Consider adding a new cluster.
+    cweights[C] = _calc_new_cluster_weight(V, T_prime, phi_alpha0, phi_beta0, vidx, conc)
+    cweights -= np.log(conc + N - 1)
+
+    if check_full_llh:
+      cweights_full = _compute_cweights_full(V, T_prime, Z, phi_alpha0, phi_beta0, vidx, conc, C)
+      assert np.all(util.isclose(cweights, cweights_full))
+
+    cprobs = util.softmax(cweights)
+    new_cluster = util.sample_multinom(cprobs)
+    Z[vidx] = new_cluster
+    if new_cluster == C:
+      C += 1
+
+  llh = _calc_llh(V, T_prime, Z, phi_alpha0, phi_beta0, conc)
+  return (C, np.copy(Z), llh)
+
+def cluster(V, T_prime, omega, conc, iters):
   # N: number of variants
   # C: number of clusters
   # Z: cluster assignments
@@ -132,52 +170,24 @@ def cluster(V, T_prime, omega, conc, iters, check_gibbs_ratio=False):
   clusterings = []
   llhs = []
 
-  for I in range(iters):
-    for vidx in range(N):
-      old_cluster = Z[vidx]
-      Z[vidx] = -1
-      if not np.any(Z == old_cluster):
-        # If `vidx` was the only member, remove this cluster.
-        # Do so by moving the last cluster to its index.
-        # (These operations are valid even if `highest == old_cluster`.)
-        highest = C - 1
-        Z[Z == highest] = old_cluster
-        C -= 1
+  with progressbar(total=iters, desc='Clustering variants', unit='iteration', dynamic_ncols=True) as pbar:
+    for I in range(iters):
+      pbar.update()
+      C, Z, llh = _do_gibbs_iter(V, T_prime, phi_alpha0, phi_beta0, conc, C, Z, check_full_llh=False)
+      #print(I, C, llh)
+      clusterings.append(Z)
+      llhs.append(llh)
 
-      # `cweights`: LLHs of each cluster destination for `vidx`
-      # cweights[C] = LLH of adding new cluster
-      cweights = np.empty(C + 1)
-      # Consider every possible destination.
-      for cidx in range(C):
-        members = np.flatnonzero(Z == cidx)
-        cweights[cidx] = _calc_cweight(V, T_prime, phi_alpha0, phi_beta0, vidx, members)
-      # Consider adding a new cluster.
-      cweights[C] = _calc_new_cluster_weight(V, T_prime, phi_alpha0, phi_beta0, vidx, conc)
-      cweights -= np.log(conc + N - 1)
-
-      if check_gibbs_ratio:
-        cweights_full = _compute_cweights_full(V, T_prime, Z, phi_alpha0, phi_beta0, vidx, conc, C)
-        assert np.all(util.isclose(cweights, cweights_full))
-
-      cprobs = util.softmax(cweights)
-      new_cluster = util.sample_multinom(cprobs)
-      Z[vidx] = new_cluster
-      if new_cluster == C:
-        C += 1
-
-    llh = _calc_llh(V, T_prime, Z, phi_alpha0, phi_beta0, conc)
-    clusterings.append(np.copy(Z))
-    llhs.append(llh)
-    #print(I, C, llh)
-
+  clusterings, llhs = np.array(clusterings), np.array(llhs)
+  clusterings, llhs = _make_unique(clusterings, llhs)
   return (clusterings, llhs)
 
-def make_unique(clusterings, llhs):
+def _make_unique(clusterings, llhs):
   uniq_clust, idxs = np.unique(clusterings, return_index=True, axis=0)
   uniq_llhs = llhs[idxs]
   return (uniq_clust, uniq_llhs)
 
-def list_clusters(Z, variants):
+def _list_clusters(Z, variants):
   uniq_Z  = set(list(Z))
   assert uniq_Z == set(range(len(uniq_Z)))
 
@@ -222,22 +232,9 @@ def main():
     omega,
     args.concentration,
     args.iterations,
-    check_gibbs_ratio = False,
   )
-  clusterings, llhs = np.array(clusterings), np.array(llhs)
-  #clusterings, llhs = make_unique(clusterings, llhs)
   best = np.argmax(llhs)
-  clusters = list_clusters(clusterings[best], variants)
-
-  best_posterior = util.softmax(llhs)[best]
-  print(
-    best,
-    llhs[best],
-    -llhs[best] / len(clusterings[0]) / np.log(2),
-    best_posterior,
-    len(clusterings),
-    len(clusters),
-  )
+  clusters = _list_clusters(clusterings[best], variants)
 
   params['clusters'] = clusters
   # If user hasn't already specified garbage, write the params with empty
