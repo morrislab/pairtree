@@ -13,7 +13,7 @@ function run_clustering {
 
     for ssmfn in $INPUTSDIR/sim_*.ssm; do
       runid=$(basename $ssmfn | cut -d. -f1)
-      echo "echo $runid \$(NUMBA_DISABLE_JIT=0 python3 $BASEDIR/bin/clustervars --model $model $INPUTSDIR/$runid.{ssm,params.json} $clusterdir/$runid.clustered.params.json)"
+      echo "echo $runid \$(NUMBA_DISABLE_JIT=0 python3 $BASEDIR/bin/clustervars --model $model $INPUTSDIR/$runid.{ssm,params.json} $clusterdir/$runid.clustered.params.json 2>$clusterdir/$runid.stderr)"
     done
   done | parallel -j40 --halt 1 --eta > /dev/null
 }
