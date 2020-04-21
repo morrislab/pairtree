@@ -88,7 +88,7 @@ def _compute_pairs(pairs, variants, logprior, posterior, evidence, pbar=None, pa
   logprior = _complete_logprior(logprior)
   # TODO: change ordering of pairs based on what will provide optimal
   # integration accuracy according to Quaid's advice.
-  pairs = [sorted(C) for C in pairs]
+  pairs = list(pairs)
   # Don't bother starting more workers than jobs.
   parallel = min(parallel, len(pairs))
 
