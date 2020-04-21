@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 import argparse
+import multiprocessing
+import numpy as np
+
 import os
 import sys
-
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
+
 import common
 import clustermaker
 import inputparser
-
 import vaf_plotter
+import relation_plotter
 import plotutil
 
 def write_header(outf):
@@ -25,6 +28,8 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('--parallel', dest='parallel', type=int, default=None)
+  parser.add_argument('--plot-relations', action='store_true')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
   parser.add_argument('html_out_fn')
@@ -32,11 +37,24 @@ def main():
 
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.params_fn)
-  supervars = clustermaker.make_cluster_supervars(params['clusters'], variants)
-  supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
 
+  if args.plot_relations:
+    logprior = {'garbage': -np.inf}
+    parallel = args.parallel if args.parallel is not None else multiprocessing.cpu_count()
+    supervars, clustrel_posterior, clustrel_evidence, _, _ = clustermaker.use_pre_existing(
+      variants,
+      logprior,
+      parallel,
+      params['clusters'],
+      params['garbage'],
+    )
+  else:
+    supervars = clustermaker.make_cluster_supervars(params['clusters'], variants)
+
+  supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
   with open(args.html_out_fn, 'w') as outf:
     write_header(outf)
+
     vaf_plotter.plot_vaf_matrix(
       params['clusters'],
       variants,
@@ -47,6 +65,10 @@ def main():
       should_correct_vaf=True,
       outf=outf,
     )
+
+    if args.plot_relations:
+      relation_plotter.plot_ml_relations(clustrel_posterior, outf)
+      relation_plotter.plot_separate_relations(clustrel_posterior, outf)
 
 if __name__ == '__main__':
   main()
