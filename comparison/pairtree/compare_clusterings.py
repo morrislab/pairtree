@@ -18,10 +18,8 @@ def convert_clustering_to_assignment(clusters):
 
 def extract_assignment(paramsfn):
   params = inputparser.load_params(paramsfn)
-  clusters = sorted(params['clusters'], key = lambda clust: len(clust))
   C = len(clusters)
-  clusters = list(params['clusters'])
-  vids, assign = convert_clustering_to_assignment(clusters)
+  vids, assign = convert_clustering_to_assignment(params['clusters'])
   return (C, vids, assign)
 
 # The two `_calc_llh` functions are copied  from `bin/clustervars`. I should
