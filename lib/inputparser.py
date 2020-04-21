@@ -52,6 +52,13 @@ def load_ssms(ssmfn, max_ssms=None):
   assert vids == set(range(len(variants)))
   return variants
 
+def remove_garbage(variants, garbage):
+  assert set(garbage).issubset(set(variants.keys()))
+  munged = dict(variants)
+  for vid in garbage:
+    del munged[vid]
+  return munged
+
 def load_params(paramsfn):
   if paramsfn is None:
     return {}

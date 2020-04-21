@@ -8,6 +8,7 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
 import inputparser
+import clustermaker
 import common
 import util
 from progressbar import progressbar
@@ -20,6 +21,10 @@ def _calc_cweight_pants(V, T_prime, phi_alpha0, phi_beta0, vidx, members):
   data_llh = util.beta_binom_logpmf(V[vidx], T_prime[vidx], alpha_c, beta_c)
   membership_llh = np.log(len(members))
   return membership_llh + np.sum(data_llh)
+
+@njit
+def _calc_llh_socks(V, T_prime, Z, phi_alpha0, phi_beta0, conc):
+  return clustermaker.calc_llh(V, T_prime, Z, phi_alpha0, phi_beta0, conc)
 
 @njit
 def _calc_cweight_socks(V, T_prime, phi_alpha0, phi_beta0, vidx, members):
@@ -54,34 +59,6 @@ def _calc_llh_pants(V, T_prime, Z, phi_alpha0, phi_beta0, conc):
     beta_c  = phi_beta0  + np.sum(T_prime[members] - V[members], axis=0)
     for vidx in members:
       llh += np.sum(util.beta_binom_logpmf(V[vidx], T_prime[vidx], alpha_c, beta_c))
-  return llh
-
-@njit
-def _calc_llh_socks(V, T_prime, Z, phi_alpha0, phi_beta0, conc):
-  uniq_Z  = set(list(Z))
-  C = len(uniq_Z)
-  #assert uniq_Z == set(range(C))
-  N = len(Z)
-  cluster_sizes = np.array([np.sum(Z == c) for c in range(C)])
-  assert np.sum(cluster_sizes) == N
-
-  llh  = C * np.log(conc)
-  llh += np.sum(util.logfactorial(cluster_sizes - 1))
-  llh -= np.sum(np.log(conc + np.arange(N)))
-
-  for cidx in range(C):
-    members = np.flatnonzero(Z == cidx)
-    V_summed = np.sum(V[members], axis=0)
-    T_summed = np.sum(T_prime[members], axis=0)
-    R_summed = T_summed - V_summed
-
-    binom_coef = util.log_N_choose_K(T_prime[members], V[members])
-    llh_c = np.sum(binom_coef, axis=0)
-    llh_c += util.lbeta(V_summed + phi_alpha0, R_summed + phi_beta0)
-    llh_c -= util.lbeta(phi_alpha0, phi_beta0)
-
-    llh += np.sum(llh_c)
-
   return llh
 
 @njit
@@ -197,6 +174,24 @@ def _list_clusters(Z, variants):
   clusters = [[vids[vidx] for vidx in np.flatnonzero(Z == cidx)] for cidx in sorted(uniq_Z)]
   return clusters
 
+def _sort_clusters(clusters, V, T_prime):
+  vids = common.sort_vids([vid for C in clusters for vid in C])
+  assert len(vids) == len(V) == len(T_prime)
+  vidmap = {vid: idx for idx, vid in enumerate(vids)}
+
+  phi_hat = []
+  for C in clusters:
+    vidxs = [vidmap[vid] for vid in C]
+    phi_hat.append(np.sum(V[vidxs], axis=0) / np.sum(T_prime[vidxs], axis=0))
+  phi_hat = np.array(phi_hat)
+
+  K, S = phi_hat.shape
+  phi_hat_mean = np.sum(phi_hat, axis=1) / S
+  order = np.argsort(-phi_hat_mean)
+
+  sorted_clusters = [clusters[idx] for idx in order]
+  return sorted_clusters
+
 def main():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
@@ -225,8 +220,14 @@ def main():
     globals()['_calc_new_cluster_weight'] = _calc_new_cluster_weight_pants
 
   variants = inputparser.load_ssms(args.ssm_fn)
-  V, T, T_prime, omega = inputparser.load_read_counts(variants)
   params = inputparser.load_params(args.in_params_fn)
+
+  # If user hasn't already specified garbage, write the params with empty
+  # garbage, since running Pairtree requires some value for this.
+  if 'garabage' not in params:
+    params['garbage'] = []
+  variants = inputparser.remove_garbage(variants, params['garbage'])
+  V, T, T_prime, omega = inputparser.load_read_counts(variants)
 
   clusterings, llhs = cluster(
     V,
@@ -237,12 +238,10 @@ def main():
   )
   best = np.argmax(llhs)
   clusters = _list_clusters(clusterings[best], variants)
+  clusters = _sort_clusters(clusters, V, T_prime)
 
+  # If clusters are already specified in `params`, they will be replaced.
   params['clusters'] = clusters
-  # If user hasn't already specified garbage, write the params with empty
-  # garbage, since running Pairtree requires some value for this.
-  if 'garabage' not in params:
-    params['garbage'] = []
   with open(args.out_params_fn, 'w') as F:
     json.dump(params, F)
 
