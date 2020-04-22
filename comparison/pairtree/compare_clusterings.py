@@ -19,8 +19,9 @@ def convert_clustering_to_assignment(clusters):
 
 def extract_assignment(paramsfn):
   params = inputparser.load_params(paramsfn)
+  clusters = params['clusters']
   C = len(clusters)
-  vids, assign = convert_clustering_to_assignment(params['clusters'])
+  vids, assign = convert_clustering_to_assignment(clusters)
   return (C, vids, assign)
 
 def main():
