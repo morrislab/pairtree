@@ -75,8 +75,12 @@ def _complete_logprior(logprior):
 
   assert logtotal <= 0
   remaining = set(ALL_MODELS) - set(logprior.keys())
+  if np.isclose(0, logtotal):
+    remaining_val = -np.inf
+  else:
+    remaining_val = np.log(1 - np.exp(logtotal)) - np.log(len(remaining))
   for K in remaining:
-    logprior[K] = np.log(1 - np.exp(logtotal)) - np.log(len(remaining))
+      logprior[K] = remaining_val
 
   logprior_vals = -np.inf * np.ones(len(logprior))
   for K in logprior:
