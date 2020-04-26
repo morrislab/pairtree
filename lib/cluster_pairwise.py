@@ -4,7 +4,9 @@ from progressbar import progressbar
 import common
 from common import Models
 import clustermaker
+from numba import njit
 
+@njit
 def _calc_llh(Z, log_clust_probs, log_notclust_probs, conc):
   log_clust_probs = np.triu(log_clust_probs)
   log_notclust_probs = np.triu(log_notclust_probs)
@@ -23,13 +25,14 @@ def _calc_llh(Z, log_clust_probs, log_notclust_probs, conc):
   for cidx in range(C):
     members = np.flatnonzero(Z == cidx)
     nonmembers = np.flatnonzero(Z != cidx)
-    p_clust_c = log_clust_probs[np.ix_(members, members)]
-    p_notclust_c = log_notclust_probs[np.ix_(members, nonmembers)]
+    p_clust_c = log_clust_probs[members][:,members]
+    p_notclust_c = log_notclust_probs[members][:,nonmembers]
     assert p_clust_c.size + p_notclust_c.size == N*len(members)
     llh += np.sum(p_clust_c) + np.sum(p_notclust_c)
 
   return llh
 
+@njit
 def _compute_cweights_full(log_clust_probs, log_notclust_probs, Z, vidx, conc, C):
   mask = np.ones(len(Z), dtype=np.bool_)
   mask[vidx] = 0
@@ -48,6 +51,7 @@ def _compute_cweights_full(log_clust_probs, log_notclust_probs, Z, vidx, conc, C
 
   return cweights_full
 
+@njit
 def _do_gibbs_iter(C, Z, log_clust_probs, log_notclust_probs, conc, check_full_llh=False):
   N = len(Z)
   Z = np.copy(Z)
@@ -70,7 +74,7 @@ def _do_gibbs_iter(C, Z, log_clust_probs, log_notclust_probs, conc, check_full_l
     for cidx in range(C):
       members = Z == cidx
       nonmembers = Z != cidx
-      cweights[cidx] = np.log(np.sum(members)) + np.sum(log_clust_probs[vidx,members]) + np.sum(log_notclust_probs[vidx,nonmembers])
+      cweights[cidx] = np.log(np.sum(members)) + np.sum(log_clust_probs[vidx][members]) + np.sum(log_notclust_probs[vidx][nonmembers])
     # Consider adding a new cluster.
     cweights[C] = np.log(conc) + np.sum(log_notclust_probs[vidx])
     cweights -= np.log(conc + N - 1)
@@ -170,7 +174,7 @@ def cluster(variants, raw_clusters, conc, iters, clust_prior, parallel):
         log_clust_probs,
         log_notclust_probs,
         conc,
-        check_full_llh = False,
+        check_full_llh = True,
       )
       llh = _calc_llh(Z, log_clust_probs, log_notclust_probs, conc)
       clusterings.append(Z)
