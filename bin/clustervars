@@ -63,6 +63,8 @@ def main():
     help='Number of tasks to run in parallel. By default, this is set to the number of CPU cores on the system. On hyperthreaded systems, this will be twice the number of physical CPUs.')
   parser.add_argument('--prior', type=float, default=None,
     help='Pairwise coclustering prior probability. Used only for --model=pairwise or --model=both.')
+  parser.add_argument('--init-from-existing', action='store_true',
+    help='Initialize clusters from those already provided in `in_params_fn`')
   parser.add_argument('--model', choices=('pairwise', 'linfreq', 'both'), default='linfreq',
     help='Clustering model to use')
   parser.add_argument('ssm_fn')
@@ -80,8 +82,8 @@ def main():
   garbage = orig_params.get('garbage', [])
   variants = inputparser.remove_garbage(variants, garbage)
 
-  init_with_existing = False
-  if init_with_existing and 'clusters' in orig_params:
+  if args.init_from_existing:
+    assert 'clusters' in orig_params
     init_clusters = orig_params['clusters']
   else:
     init_clusters = _make_init_clusters(variants)
@@ -91,7 +93,7 @@ def main():
   elif args.model == 'linfreq':
     vids, assigns, llhs = cluster_linfreq.cluster(variants, init_clusters, args.concentration, args.iterations)
   elif args.model == 'both':
-    pass
+    raise Exception('Not yet implemented')
   else:
     raise Exception('Unknown --model: %s' % args.model)
 
