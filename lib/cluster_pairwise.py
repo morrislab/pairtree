@@ -6,6 +6,9 @@ from common import Models
 import clustermaker
 
 def _calc_llh(Z, log_clust_probs, log_notclust_probs, conc):
+  log_clust_probs = np.triu(log_clust_probs)
+  log_notclust_probs = np.triu(log_notclust_probs)
+
   uniq_Z  = set(list(Z))
   C = len(uniq_Z)
   #assert uniq_Z == set(range(C))
@@ -23,11 +26,29 @@ def _calc_llh(Z, log_clust_probs, log_notclust_probs, conc):
     p_clust_c = log_clust_probs[np.ix_(members, members)]
     p_notclust_c = log_notclust_probs[np.ix_(members, nonmembers)]
     assert p_clust_c.size + p_notclust_c.size == N*len(members)
-    llh += np.sum(np.triu(p_clust_c)) + np.sum(np.triu(p_notclust_c))
+    llh += np.sum(p_clust_c) + np.sum(p_notclust_c)
 
   return llh
 
-def _do_gibbs_iter(C, Z, log_clust_probs, log_notclust_probs, conc):
+def _compute_cweights_full(log_clust_probs, log_notclust_probs, Z, vidx, conc, C):
+  mask = np.ones(len(Z), dtype=np.bool_)
+  mask[vidx] = 0
+  log_clust_probs_excluded = log_clust_probs[mask][:,mask]
+  log_notclust_probs_excluded = log_notclust_probs[mask][:,mask]
+  Z_excluded = Z[mask]
+  llh_excluded = _calc_llh(Z_excluded, log_clust_probs_excluded, log_notclust_probs_excluded, conc)
+
+  cweights_full = np.full(C + 1, np.nan)
+  Z_prime = np.copy(Z)
+
+  for cidx in range(C + 1):
+    Z_prime[vidx] = cidx
+    llh_included = _calc_llh(Z_prime, log_clust_probs, log_notclust_probs, conc)
+    cweights_full[cidx] = llh_included - llh_excluded
+
+  return cweights_full
+
+def _do_gibbs_iter(C, Z, log_clust_probs, log_notclust_probs, conc, check_full_llh=False):
   N = len(Z)
   Z = np.copy(Z)
 
@@ -54,7 +75,10 @@ def _do_gibbs_iter(C, Z, log_clust_probs, log_notclust_probs, conc):
     cweights[C] = np.log(conc) + np.sum(log_notclust_probs[vidx])
     cweights -= np.log(conc + N - 1)
 
-    #print(cweights)
+    if check_full_llh:
+      cweights_full = _compute_cweights_full(log_clust_probs, log_notclust_probs, Z, vidx, conc, C)
+      assert np.all(util.isclose(cweights, cweights_full))
+
     cprobs = util.softmax(cweights)
     new_cluster = util.sample_multinom(cprobs)
     Z[vidx] = new_cluster
@@ -140,7 +164,14 @@ def cluster(variants, raw_clusters, conc, iters, clust_prior, parallel):
   with progressbar(total=iters, desc='Clustering variants', unit='iteration', dynamic_ncols=True) as pbar:
     for I in range(iters):
       pbar.update()
-      C, Z = _do_gibbs_iter(C, Z, log_clust_probs, log_notclust_probs, conc)
+      C, Z = _do_gibbs_iter(
+        C,
+        Z,
+        log_clust_probs,
+        log_notclust_probs,
+        conc,
+        check_full_llh = False,
+      )
       llh = _calc_llh(Z, log_clust_probs, log_notclust_probs, conc)
       clusterings.append(Z)
       llhs.append(llh)
