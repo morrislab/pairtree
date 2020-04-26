@@ -12,11 +12,12 @@ def _extract_mat(variants, key):
   return np.array(arr)
 
 def load_read_counts(variants):
+  vids = common.extract_vids(variants)
   V = _extract_mat(variants, 'var_reads')
   T = _extract_mat(variants, 'total_reads')
   omega = _extract_mat(variants, 'omega_v')
   T_prime = np.maximum(V, omega*T)
-  return (V, T, T_prime, omega)
+  return (vids, V, T, T_prime, omega)
 
 def load_ssms(ssmfn, max_ssms=None):
   variants = {}

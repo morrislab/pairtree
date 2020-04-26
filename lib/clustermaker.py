@@ -7,34 +7,6 @@ from common import Models, debug
 from mutrel import Mutrel
 import util
 
-@njit
-def calc_llh(V, T_prime, Z, phi_alpha0, phi_beta0, conc):
-  uniq_Z  = set(list(Z))
-  C = len(uniq_Z)
-  #assert uniq_Z == set(range(C))
-  N = len(Z)
-  cluster_sizes = np.array([np.sum(Z == c) for c in range(C)])
-  assert np.sum(cluster_sizes) == N
-
-  llh  = C * np.log(conc)
-  llh += np.sum(util.logfactorial(cluster_sizes - 1))
-  llh -= np.sum(np.log(conc + np.arange(N)))
-
-  for cidx in range(C):
-    members = np.flatnonzero(Z == cidx)
-    V_summed = np.sum(V[members], axis=0)
-    T_summed = np.sum(T_prime[members], axis=0)
-    R_summed = T_summed - V_summed
-
-    binom_coef = util.log_N_choose_K(T_prime[members], V[members])
-    llh_c = np.sum(binom_coef, axis=0)
-    llh_c += util.lbeta(V_summed + phi_alpha0, R_summed + phi_beta0)
-    llh_c -= util.lbeta(phi_alpha0, phi_beta0)
-
-    llh += np.sum(llh_c)
-
-  return llh
-
 def _check_clusters(variants, clusters, garbage):
   for C in clusters:
       assert len(C) > 0
