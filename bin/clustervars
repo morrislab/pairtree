@@ -220,12 +220,17 @@ def main():
     globals()['_calc_new_cluster_weight'] = _calc_new_cluster_weight_pants
 
   variants = inputparser.load_ssms(args.ssm_fn)
-  params = inputparser.load_params(args.in_params_fn)
-
+  orig_params = inputparser.load_params(args.in_params_fn)
   # If user hasn't already specified garbage, write the params with empty
   # garbage, since running Pairtree requires some value for this.
-  if 'garabage' not in params:
-    params['garbage'] = []
+  #
+  # We expect `samples` will be specified.
+  assert 'samples' in orig_params
+  params = {
+    'garbage': orig_params.get('garbage', []),
+    'samples': orig_params['samples'],
+  }
+
   variants = inputparser.remove_garbage(variants, params['garbage'])
   V, T, T_prime, omega = inputparser.load_read_counts(variants)
 
@@ -240,7 +245,6 @@ def main():
   clusters = _list_clusters(clusterings[best], variants)
   clusters = _sort_clusters(clusters, V, T_prime)
 
-  # If clusters are already specified in `params`, they will be replaced.
   params['clusters'] = clusters
   with open(args.out_params_fn, 'w') as F:
     json.dump(params, F)

@@ -1,0 +1,206 @@
+#!/usr/bin/env python3
+import argparse
+import numpy as np
+import json
+import multiprocessing
+
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
+import inputparser
+from progressbar import progressbar
+import common
+from common import Models
+import util
+import clustermaker
+import resultserializer
+
+def _convert_clustering_to_assignment(clusters):
+  mapping = {vid: cidx for cidx, cluster in enumerate(clusters) for vid in cluster}
+  vids = common.sort_vids(mapping.keys())
+  assign = np.array([mapping[vid] for vid in vids], dtype=np.int32)
+  return (vids, assign)
+
+def _convert_assignment_to_clustering(Z, variants):
+  uniq_Z  = set(list(Z))
+  assert uniq_Z == set(range(len(uniq_Z)))
+
+  vids = common.extract_vids(variants)
+  clusters = [[vids[vidx] for vidx in np.flatnonzero(Z == cidx)] for cidx in sorted(uniq_Z)]
+  return clusters
+
+def _calc_llh(Z, log_clust_probs, log_notclust_probs, conc):
+  uniq_Z  = set(list(Z))
+  C = len(uniq_Z)
+  #assert uniq_Z == set(range(C))
+  N = len(Z)
+  cluster_sizes = np.array([np.sum(Z == c) for c in range(C)])
+  assert np.sum(cluster_sizes) == N
+
+  llh  = C * np.log(conc)
+  llh += np.sum(util.logfactorial(cluster_sizes - 1))
+  llh -= np.sum(np.log(conc + np.arange(N)))
+
+  for cidx in range(C):
+    members = np.flatnonzero(Z == cidx)
+    nonmembers = np.flatnonzero(Z != cidx)
+    p_clust_c = log_clust_probs[np.ix_(members, members)]
+    p_notclust_c = log_notclust_probs[np.ix_(members, nonmembers)]
+    assert p_clust_c.size + p_notclust_c.size == N*len(members)
+    llh += np.sum(np.triu(p_clust_c)) + np.sum(np.triu(p_notclust_c))
+
+  return llh
+
+def _do_gibbs_iter(C, Z, log_clust_probs, log_notclust_probs, conc):
+  N = len(Z)
+  Z = np.copy(Z)
+
+  for vidx in range(N):
+    old_cluster = Z[vidx]
+    Z[vidx] = -1
+    if not np.any(Z == old_cluster):
+      # If `vidx` was the only member, remove this cluster.
+      # Do so by moving the last cluster to its index.
+      # (These operations are valid even if `highest == old_cluster`.)
+      highest = C - 1
+      Z[Z == highest] = old_cluster
+      C -= 1
+
+    # `cweights`: LLHs of each cluster destination for `vidx`
+    # cweights[C] = LLH of adding new cluster
+    cweights = np.empty(C + 1)
+    # Consider every possible destination.
+    for cidx in range(C):
+      members = Z == cidx
+      nonmembers = Z != cidx
+      cweights[cidx] = np.log(np.sum(members)) + np.sum(log_clust_probs[vidx,members]) + np.sum(log_notclust_probs[vidx,nonmembers])
+    # Consider adding a new cluster.
+    cweights[C] = np.log(conc) + np.sum(log_notclust_probs[vidx])
+    cweights -= np.log(conc + N - 1)
+
+    #print(cweights)
+    cprobs = util.softmax(cweights)
+    new_cluster = util.sample_multinom(cprobs)
+    Z[vidx] = new_cluster
+    if new_cluster == C:
+      C += 1
+
+  return (C, Z)
+
+def cluster(variants, clusters, mutrel, conc, iters):
+  C = len(clusters)
+  vids, Z = _convert_clustering_to_assignment(clusters)
+  assert vids == mutrel.vids
+
+  delta = 1e-20
+  clust_probs    = np.maximum(delta,     mutrel.rels[:,:,Models.cocluster])
+  notclust_probs = np.maximum(delta, 1 - mutrel.rels[:,:,Models.cocluster])
+  log_clust_probs    = np.log(clust_probs)
+  log_notclust_probs = np.log(notclust_probs)
+  # These values should not play into the joint probabilities, so just set them
+  # to 0.
+  np.fill_diagonal(log_clust_probs, 0)
+  np.fill_diagonal(log_notclust_probs, 0)
+  assert np.allclose(log_clust_probs, log_clust_probs.T)
+  assert np.allclose(log_notclust_probs, log_notclust_probs.T)
+
+  clusterings = []
+  llhs = []
+
+  with progressbar(total=iters, desc='Clustering variants', unit='iteration', dynamic_ncols=True) as pbar:
+    for I in range(iters):
+      pbar.update()
+      C, Z = _do_gibbs_iter(C, Z, log_clust_probs, log_notclust_probs, conc)
+      llh = _calc_llh(Z, log_clust_probs, log_notclust_probs, conc)
+      clusterings.append(Z)
+      llhs.append(llh)
+
+  return (clusterings, llhs)
+
+def _make_init_clusters(variants, garbage):
+  garbage = set(garbage)
+  vids = common.extract_vids(variants)
+  clusters = [[vid] for vid in vids if vid not in garbage]
+  return clusters
+
+def _convert_superclusters(superclusters, clusters):
+  converted = []
+  for sc in superclusters:
+    converted.append([])
+    for svid in sc:
+      idx = int(svid[1:])
+      converted[-1] += clusters[idx]
+  return converted
+
+def main():
+  parser = argparse.ArgumentParser(
+    description='LOL HI THERE',
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter
+  )
+  parser.add_argument('--concentration', type=float, default=1e-2,
+    help='Alpha for Chinese restaurant process. The larger this is, the stronger the preference for more clusters.')
+  parser.add_argument('--iterations', type=int, default=100,
+    help='Number of Gibbs sampling iterations')
+  parser.add_argument('--parallel', dest='parallel', type=int, default=None,
+    help='Number of tasks to run in parallel. By default, this is set to the number of CPU cores on the system. On hyperthreaded systems, this will be twice the number of physical CPUs.')
+  parser.add_argument('--prior', type=float, default=None,
+    help='Coclustering prior probability')
+  parser.add_argument('ssm_fn')
+  parser.add_argument('in_params_fn')
+  parser.add_argument('out_params_fn')
+  args = parser.parse_args()
+
+  np.set_printoptions(linewidth=400, precision=3, threshold=sys.maxsize, suppress=True)
+  np.seterr(divide='raise', invalid='raise', over='raise')
+  parallel = args.parallel if args.parallel is not None else multiprocessing.cpu_count()
+
+  variants = inputparser.load_ssms(args.ssm_fn)
+  orig_params = inputparser.load_params(args.in_params_fn)
+
+  results = resultserializer.Results('/tmp/results.npz')
+  if results.has_mutrel('clustrel_posterior'):
+    clustrel_posterior = results.get_mutrel('clustrel_posterior')
+    clusters = results.get('clusters')
+    garbage = results.get('garbage')
+    supervars = clustermaker.make_cluster_supervars(clusters, variants)
+  else:
+    logprior = {'garbage': -np.inf}
+    if args.prior is not None:
+      logprior['cocluster'] = np.log(args.prior)
+
+    garbage = orig_params.get('garbage', [])
+    results.add('garbage', garbage)
+
+    if 'clusters' in orig_params:
+      clusters = orig_params['clusters']
+    else:
+      clusters = _make_init_clusters(variants, garbage)
+    results.add('clusters', clusters)
+
+    supervars, clustrel_posterior, clustrel_evidence, clusters, garbage = clustermaker.use_pre_existing(
+      variants,
+      logprior,
+      parallel,
+      clusters,
+      garbage,
+    )
+    results.add_mutrel('clustrel_posterior', clustrel_posterior)
+    results.save()
+
+  superclusters = clustermaker.make_superclusters(supervars)
+  clusterings, llhs = cluster(supervars, superclusters, clustrel_posterior, args.concentration, args.iterations)
+
+  best = np.argmax(llhs)
+  new_sc = _convert_assignment_to_clustering(clusterings[best], supervars)
+  new_clusters = _convert_superclusters(new_sc, clusters)
+
+  params = {
+    'clusters': new_clusters,
+    'garbage': garbage,
+    'samples': orig_params['samples'],
+  }
+  with open(args.out_params_fn, 'w') as F:
+    json.dump(params, F)
+
+if __name__ == '__main__':
+  main()
