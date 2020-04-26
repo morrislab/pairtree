@@ -14,15 +14,6 @@ import util
 from progressbar import progressbar
 
 @njit
-def _calc_cweight_pants(V, T_prime, phi_alpha0, phi_beta0, vidx, members):
-  alpha_c = phi_alpha0 + np.sum(V[members],                    axis=0)
-  beta_c  = phi_beta0  + np.sum(T_prime[members] - V[members], axis=0)
-
-  data_llh = util.beta_binom_logpmf(V[vidx], T_prime[vidx], alpha_c, beta_c)
-  membership_llh = np.log(len(members))
-  return membership_llh + np.sum(data_llh)
-
-@njit
 def _calc_llh_socks(V, T_prime, Z, phi_alpha0, phi_beta0, conc):
   return clustermaker.calc_llh(V, T_prime, Z, phi_alpha0, phi_beta0, conc)
 
@@ -39,31 +30,6 @@ def _calc_cweight_socks(V, T_prime, phi_alpha0, phi_beta0, vidx, members):
   result -= util.lbeta(V_summed + phi_alpha0, R_summed + phi_beta0)
 
   return np.log(len(members)) + np.sum(result)
-
-@njit
-def _calc_llh_pants(V, T_prime, Z, phi_alpha0, phi_beta0, conc):
-  uniq_Z  = set(list(Z))
-  C = len(uniq_Z)
-  #assert uniq_Z == set(range(C))
-  N = len(Z)
-  cluster_sizes = np.array([np.sum(Z == c) for c in range(C)])
-  assert np.sum(cluster_sizes) == N
-
-  llh  = C * np.log(conc)
-  llh += np.sum(util.logfactorial(cluster_sizes - 1))
-  llh -= np.sum(np.log(conc + np.arange(N)))
-
-  for cidx in range(C):
-    members = np.flatnonzero(Z == cidx)
-    alpha_c = phi_alpha0 + np.sum(V[members],                    axis=0)
-    beta_c  = phi_beta0  + np.sum(T_prime[members] - V[members], axis=0)
-    for vidx in members:
-      llh += np.sum(util.beta_binom_logpmf(V[vidx], T_prime[vidx], alpha_c, beta_c))
-  return llh
-
-@njit
-def _calc_new_cluster_weight_pants(V, T_prime, phi_alpha0, phi_beta0, vidx, conc):
-  return np.log(conc) + np.sum(util.beta_binom_logpmf(V[vidx], T_prime[vidx], phi_alpha0, phi_beta0))
 
 @njit
 def _calc_new_cluster_weight_socks(V, T_prime, phi_alpha0, phi_beta0, vidx, conc):
@@ -201,7 +167,6 @@ def main():
     help='Alpha for Chinese restaurant process. The larger this is, the stronger the preference for more clusters.')
   parser.add_argument('--iterations', type=int, default=100,
     help='Number of Gibbs sampling iterations')
-  parser.add_argument('--model', choices=('pants', 'socks'), default='socks')
   parser.add_argument('ssm_fn')
   parser.add_argument('in_params_fn')
   parser.add_argument('out_params_fn')
@@ -210,14 +175,9 @@ def main():
   np.set_printoptions(linewidth=400, precision=3, threshold=sys.maxsize, suppress=True)
   np.seterr(divide='raise', invalid='raise', over='raise')
 
-  if args.model == 'socks':
-    globals()['_calc_llh'] = _calc_llh_socks
-    globals()['_calc_cweight'] = _calc_cweight_socks
-    globals()['_calc_new_cluster_weight'] = _calc_new_cluster_weight_socks
-  else:
-    globals()['_calc_llh'] = _calc_llh_pants
-    globals()['_calc_cweight'] = _calc_cweight_pants
-    globals()['_calc_new_cluster_weight'] = _calc_new_cluster_weight_pants
+  globals()['_calc_llh'] = _calc_llh_socks
+  globals()['_calc_cweight'] = _calc_cweight_socks
+  globals()['_calc_new_cluster_weight'] = _calc_new_cluster_weight_socks
 
   variants = inputparser.load_ssms(args.ssm_fn)
   orig_params = inputparser.load_params(args.in_params_fn)
