@@ -131,11 +131,10 @@ def _convert_clustering_to_assignment(clusters):
   assign = np.array([mapping[vid] for vid in vids], dtype=np.int32)
   return (vids, assign)
 
-def cluster(variants, raw_clusters, conc, iters, clust_prior, parallel):
+def cluster(variants, raw_clusters, conc, iters, coclust_logprior, parallel):
   logprior = {'garbage': -np.inf}
-  if clust_prior is not None:
-    S = len(list(variants.values())[0]['var_reads'])
-    logprior['cocluster'] = S * np.log(clust_prior)
+  if coclust_logprior is not None:
+    logprior['cocluster'] = coclust_logprior
 
   vids = common.extract_vids(variants)
   assert set(vids) == set([vid for clust in raw_clusters for vid in clust])

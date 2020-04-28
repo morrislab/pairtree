@@ -50,6 +50,14 @@ def _sort_clusters(clusters, variants):
   sorted_clusters = [clusters[idx] for idx in order]
   return sorted_clusters
 
+def _make_coclust_logprior(prior, variants, scale_prior_with_samps=True):
+  assert 0 < prior <= 1
+  logprior = np.log(prior)
+  if scale_prior_with_samps:
+    S = len(list(variants.values())[0]['var_reads'])
+    logprior *= S
+  return logprior
+
 def main():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
@@ -61,7 +69,7 @@ def main():
     help='Number of Gibbs sampling iterations')
   parser.add_argument('--parallel', dest='parallel', type=int, default=None,
     help='Number of tasks to run in parallel. By default, this is set to the number of CPU cores on the system. On hyperthreaded systems, this will be twice the number of physical CPUs.')
-  parser.add_argument('--prior', type=float, default=None,
+  parser.add_argument('--prior', type=float, default=0.25,
     help='Pairwise coclustering prior probability. Used only for --model=pairwise or --model=both.')
   parser.add_argument('--init-from-existing', action='store_true',
     help='Initialize clusters from those already provided in `in_params_fn`')
@@ -89,7 +97,8 @@ def main():
     init_clusters = _make_init_clusters(variants)
 
   if args.model == 'pairwise':
-    vids, assigns, llhs = cluster_pairwise.cluster(variants, init_clusters, args.concentration, args.iterations, args.prior, parallel)
+    coclust_logprior = _make_coclust_logprior(args.prior, variants)
+    vids, assigns, llhs = cluster_pairwise.cluster(variants, init_clusters, args.concentration, args.iterations, coclust_logprior, parallel)
   elif args.model == 'linfreq':
     vids, assigns, llhs = cluster_linfreq.cluster(variants, init_clusters, args.concentration, args.iterations)
   elif args.model == 'both':
