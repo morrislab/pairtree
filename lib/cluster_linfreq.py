@@ -5,7 +5,7 @@ from progressbar import progressbar
 import inputparser
 
 @njit
-def _calc_llh(V, T_prime, Z, phi_alpha0, phi_beta0, conc):
+def _calc_llh(V, T_prime, Z, phi_alpha0, phi_beta0, logconc):
   uniq_Z  = set(list(Z))
   C = len(uniq_Z)
   #assert uniq_Z == set(range(C))
@@ -13,9 +13,9 @@ def _calc_llh(V, T_prime, Z, phi_alpha0, phi_beta0, conc):
   cluster_sizes = np.array([np.sum(Z == c) for c in range(C)])
   assert np.sum(cluster_sizes) == N
 
-  llh  = C * np.log(conc)
+  llh  = C * logconc
   llh += np.sum(util.logfactorial(cluster_sizes - 1))
-  llh -= np.sum(np.log(conc + np.arange(N)))
+  llh -= np.sum(np.log(np.exp(logconc) + np.arange(N)))
 
   for cidx in range(C):
     members = np.flatnonzero(Z == cidx)
@@ -47,7 +47,7 @@ def _calc_cweight(V, T_prime, phi_alpha0, phi_beta0, vidx, members):
   return np.log(len(members)) + np.sum(result)
 
 @njit
-def _calc_new_cluster_weight(V, T_prime, phi_alpha0, phi_beta0, vidx, conc):
+def _calc_new_cluster_weight(V, T_prime, phi_alpha0, phi_beta0, vidx, logconc):
   Vi = V[vidx]
   Ti = T_prime[vidx]
   Ri = Ti - Vi
@@ -57,26 +57,26 @@ def _calc_new_cluster_weight(V, T_prime, phi_alpha0, phi_beta0, vidx, conc):
   # This is subtracted from *each element* of `result`, which is important.
   result -= util.lbeta(phi_alpha0, phi_beta0)
 
-  return np.log(conc) + np.sum(result)
+  return logconc + np.sum(result)
 
 @njit
-def _compute_cweights_full(V, T_prime, Z, phi_alpha0, phi_beta0, vidx, conc, C):
+def _compute_cweights_full(V, T_prime, Z, phi_alpha0, phi_beta0, vidx, logconc, C):
   mask = np.ones(len(V), dtype=np.bool_)
   mask[vidx] = 0
-  llh_excluded = _calc_llh(V[mask], T_prime[mask], Z[mask], phi_alpha0, phi_beta0, conc)
+  llh_excluded = _calc_llh(V[mask], T_prime[mask], Z[mask], phi_alpha0, phi_beta0, logconc)
 
   cweights_full = np.full(C + 1, np.nan)
   Z_prime = np.copy(Z)
 
   for cidx in range(C + 1):
     Z_prime[vidx] = cidx
-    llh_included = _calc_llh(V, T_prime, Z_prime, phi_alpha0, phi_beta0, conc)
+    llh_included = _calc_llh(V, T_prime, Z_prime, phi_alpha0, phi_beta0, logconc)
     cweights_full[cidx] = llh_included - llh_excluded
 
   return cweights_full
 
 @njit
-def _do_gibbs_iter(V, T_prime, phi_alpha0, phi_beta0, conc, C, Z, check_full_llh=False):
+def _do_gibbs_iter(V, T_prime, phi_alpha0, phi_beta0, logconc, C, Z, check_full_llh=False):
   N = len(Z)
   Z = np.copy(Z)
 
@@ -99,11 +99,11 @@ def _do_gibbs_iter(V, T_prime, phi_alpha0, phi_beta0, conc, C, Z, check_full_llh
       members = np.flatnonzero(Z == cidx)
       cweights[cidx] = _calc_cweight(V, T_prime, phi_alpha0, phi_beta0, vidx, members)
     # Consider adding a new cluster.
-    cweights[C] = _calc_new_cluster_weight(V, T_prime, phi_alpha0, phi_beta0, vidx, conc)
-    cweights -= np.log(conc + N - 1)
+    cweights[C] = _calc_new_cluster_weight(V, T_prime, phi_alpha0, phi_beta0, vidx, logconc)
+    cweights -= np.log(np.exp(logconc) + N - 1)
 
     if check_full_llh:
-      cweights_full = _compute_cweights_full(V, T_prime, Z, phi_alpha0, phi_beta0, vidx, conc, C)
+      cweights_full = _compute_cweights_full(V, T_prime, Z, phi_alpha0, phi_beta0, vidx, logconc, C)
       assert np.all(util.isclose(cweights, cweights_full))
 
     cprobs = util.softmax(cweights)
@@ -112,18 +112,18 @@ def _do_gibbs_iter(V, T_prime, phi_alpha0, phi_beta0, conc, C, Z, check_full_llh
     if new_cluster == C:
       C += 1
 
-  llh = _calc_llh(V, T_prime, Z, phi_alpha0, phi_beta0, conc)
+  llh = _calc_llh(V, T_prime, Z, phi_alpha0, phi_beta0, logconc)
   return (C, Z, llh)
 
-def cluster(variants, raw_clusters, conc, iters):
+def cluster(variants, raw_clusters, logconc, iters):
   vids, V, T, T_prime, omega = inputparser.load_read_counts(variants)
 
-  # N: number of variants
+  # M: number of variants
   # C: number of clusters
   # Z: cluster assignments
-  N = len(V)
+  M = len(V)
   C = 1
-  Z = np.zeros(N, np.int32)
+  Z = np.zeros(M, np.int32)
 
   # Beta distribution prior for phi
   phi_alpha0 = 1.
@@ -135,7 +135,7 @@ def cluster(variants, raw_clusters, conc, iters):
   with progressbar(total=iters, desc='Clustering variants', unit='iteration', dynamic_ncols=True) as pbar:
     for I in range(iters):
       pbar.update()
-      C, Z, llh = _do_gibbs_iter(V, T_prime, phi_alpha0, phi_beta0, conc, C, Z, check_full_llh=False)
+      C, Z, llh = _do_gibbs_iter(V, T_prime, phi_alpha0, phi_beta0, logconc, C, Z, check_full_llh=False)
       #print(I, C, llh)
       clusterings.append(Z)
       llhs.append(llh)

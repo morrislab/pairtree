@@ -58,13 +58,20 @@ def _make_coclust_logprior(prior, variants, scale_prior_with_samps=True):
     logprior *= S
   return logprior
 
+def _normalize_logconc(logconc, S):
+  logconc /= np.log10(np.e)
+  logconc *= S
+  logconc = np.maximum(-600, logconc)
+  logconc = np.minimum(600,  logconc)
+  return logconc
+
 def main():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('--concentration', type=float, default=1e-2,
-    help='Alpha for Chinese restaurant process. The larger this is, the stronger the preference for more clusters.')
+  parser.add_argument('--concentration', dest='logconc', type=float, default=-2,
+    help='log10(alpha) for Chinese restaurant process. The larger this is, the stronger the preference for more clusters.')
   parser.add_argument('--iterations', type=int, default=100,
     help='Number of Gibbs sampling iterations')
   parser.add_argument('--parallel', dest='parallel', type=int, default=None,
@@ -96,11 +103,14 @@ def main():
   else:
     init_clusters = _make_init_clusters(variants)
 
+  S = len(list(variants.values())[0]['var_reads'])
+  logconc = _normalize_logconc(args.logconc, S)
+
   if args.model == 'pairwise':
     coclust_logprior = _make_coclust_logprior(args.prior, variants)
-    vids, assigns, llhs = cluster_pairwise.cluster(variants, init_clusters, args.concentration, args.iterations, coclust_logprior, parallel)
+    vids, assigns, llhs = cluster_pairwise.cluster(variants, init_clusters, np.exp(logconc), args.iterations, coclust_logprior, parallel)
   elif args.model == 'linfreq':
-    vids, assigns, llhs = cluster_linfreq.cluster(variants, init_clusters, args.concentration, args.iterations)
+    vids, assigns, llhs = cluster_linfreq.cluster(variants, init_clusters, logconc, args.iterations)
   elif args.model == 'both':
     raise Exception('Not yet implemented')
   else:

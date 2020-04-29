@@ -225,7 +225,7 @@ def _calc_lh_and_posterior(V1, V2, logprior):
   posterior = _calc_posterior(evidence, logprior)
   return (evidence, posterior)
 
-def _examine(V1, V2, variants, _calc_lh=None):
+def _examine(V1, V2, variants, logprior=None, _calc_lh=None):
   E, Es = lh.calc_lh(*[common.convert_variant_dict_to_tuple(V) for V in (variants[V1], variants[V2])], _calc_lh)
   Es -= np.max(Es, axis=1)[:,None]
   sep = np.nan * np.ones(len(variants[V1]['var_reads']))[:,None]
@@ -245,7 +245,5 @@ def _examine(V1, V2, variants, _calc_lh=None):
     Es,
   ))
 
-  logprior = {'garbage': -np.inf, 'cocluster': -np.inf}
-  post1 = _calc_posterior(E, _complete_logprior(None))
-  post2 = _calc_posterior(E, _complete_logprior(logprior))
-  return (persamp, E, post1, post2)
+  post = _calc_posterior(E, _complete_logprior(logprior))
+  return (persamp, E, post)
