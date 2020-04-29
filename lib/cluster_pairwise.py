@@ -3,11 +3,10 @@ import util
 from progressbar import progressbar
 import common
 from common import Models
-import clustermaker
 from numba import njit
 
 @njit
-def _calc_llh(Z, log_clust_probs, log_notclust_probs, conc):
+def _calc_llh(Z, log_clust_probs, log_notclust_probs, logconc):
   log_clust_probs = np.triu(log_clust_probs)
   log_notclust_probs = np.triu(log_notclust_probs)
 
@@ -18,9 +17,9 @@ def _calc_llh(Z, log_clust_probs, log_notclust_probs, conc):
   cluster_sizes = np.array([np.sum(Z == c) for c in range(C)])
   assert np.sum(cluster_sizes) == N
 
-  llh  = C * np.log(conc)
+  llh  = C * logconc
   llh += np.sum(util.logfactorial(cluster_sizes - 1))
-  llh -= np.sum(np.log(conc + np.arange(N)))
+  llh -= np.sum(np.log(np.exp(logconc) + np.arange(N)))
 
   for cidx in range(C):
     members = np.flatnonzero(Z == cidx)
@@ -33,26 +32,26 @@ def _calc_llh(Z, log_clust_probs, log_notclust_probs, conc):
   return llh
 
 @njit
-def _compute_cweights_full(log_clust_probs, log_notclust_probs, Z, vidx, conc, C):
+def _compute_cweights_full(log_clust_probs, log_notclust_probs, Z, vidx, logconc, C):
   mask = np.ones(len(Z), dtype=np.bool_)
   mask[vidx] = 0
   log_clust_probs_excluded = log_clust_probs[mask][:,mask]
   log_notclust_probs_excluded = log_notclust_probs[mask][:,mask]
   Z_excluded = Z[mask]
-  llh_excluded = _calc_llh(Z_excluded, log_clust_probs_excluded, log_notclust_probs_excluded, conc)
+  llh_excluded = _calc_llh(Z_excluded, log_clust_probs_excluded, log_notclust_probs_excluded, logconc)
 
   cweights_full = np.full(C + 1, np.nan)
   Z_prime = np.copy(Z)
 
   for cidx in range(C + 1):
     Z_prime[vidx] = cidx
-    llh_included = _calc_llh(Z_prime, log_clust_probs, log_notclust_probs, conc)
+    llh_included = _calc_llh(Z_prime, log_clust_probs, log_notclust_probs, logconc)
     cweights_full[cidx] = llh_included - llh_excluded
 
   return cweights_full
 
 @njit
-def _do_gibbs_iter(C, Z, log_clust_probs, log_notclust_probs, conc, check_full_llh=False):
+def _do_gibbs_iter(C, Z, log_clust_probs, log_notclust_probs, logconc, check_full_llh=False):
   N = len(Z)
   Z = np.copy(Z)
 
@@ -76,11 +75,11 @@ def _do_gibbs_iter(C, Z, log_clust_probs, log_notclust_probs, conc, check_full_l
       nonmembers = Z != cidx
       cweights[cidx] = np.log(np.sum(members)) + np.sum(log_clust_probs[vidx][members]) + np.sum(log_notclust_probs[vidx][nonmembers])
     # Consider adding a new cluster.
-    cweights[C] = np.log(conc) + np.sum(log_notclust_probs[vidx])
-    cweights -= np.log(conc + N - 1)
+    cweights[C] = logconc + np.sum(log_notclust_probs[vidx])
+    cweights -= np.log(np.exp(logconc) + N - 1)
 
     if check_full_llh:
-      cweights_full = _compute_cweights_full(log_clust_probs, log_notclust_probs, Z, vidx, conc, C)
+      cweights_full = _compute_cweights_full(log_clust_probs, log_notclust_probs, Z, vidx, logconc, C)
       assert np.all(util.isclose(cweights, cweights_full))
 
     cprobs = util.softmax(cweights)
@@ -131,30 +130,9 @@ def _convert_clustering_to_assignment(clusters):
   assign = np.array([mapping[vid] for vid in vids], dtype=np.int32)
   return (vids, assign)
 
-def cluster(variants, raw_clusters, conc, iters, coclust_logprior, parallel):
-  logprior = {'garbage': -np.inf}
-  if coclust_logprior is not None:
-    logprior['cocluster'] = coclust_logprior
-
+def cluster(variants, raw_clusters, supervars, superclusters, clustrel_posterior, logconc, iters):
   vids = common.extract_vids(variants)
   assert set(vids) == set([vid for clust in raw_clusters for vid in clust])
-
-  #import resultserializer
-  #results = resultserializer.Results('/tmp/results.npz')
-  #if results.has_mutrel('clustrel_posterior'):
-  #  supervars = clustermaker.make_cluster_supervars(raw_clusters, variants)
-  #  clustrel_posterior = results.get_mutrel('clustrel_posterior')
-  #else:
-  supervars, clustrel_posterior, _, _, _ = clustermaker.use_pre_existing(
-    variants,
-    logprior,
-    parallel,
-    raw_clusters,
-    [],
-  )
-  #  results.add_mutrel('clustrel_posterior', clustrel_posterior)
-  #  results.save()
-  superclusters = clustermaker.make_superclusters(supervars)
 
   C = len(superclusters)
   assert C == len(raw_clusters)
@@ -173,10 +151,10 @@ def cluster(variants, raw_clusters, conc, iters, coclust_logprior, parallel):
         Z,
         log_clust_probs,
         log_notclust_probs,
-        conc,
+        logconc,
         check_full_llh = True,
       )
-      llh = _calc_llh(Z, log_clust_probs, log_notclust_probs, conc)
+      llh = _calc_llh(Z, log_clust_probs, log_notclust_probs, logconc)
       clusterings.append(Z)
       llhs.append(llh)
 

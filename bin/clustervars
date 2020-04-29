@@ -11,6 +11,7 @@ import inputparser
 import common
 import cluster_pairwise
 import cluster_linfreq
+import clustermaker
 
 def _convert_assignment_to_clustering(Z, vids):
   uniq_Z  = set(list(Z))
@@ -50,12 +51,11 @@ def _sort_clusters(clusters, variants):
   sorted_clusters = [clusters[idx] for idx in order]
   return sorted_clusters
 
-def _make_coclust_logprior(prior, variants, scale_prior_with_samps=True):
+def _make_coclust_logprior(prior, S, scale_prior_with_samps=True):
   assert 0 < prior <= 1
-  logprior = np.log(prior)
+  logprior = {'garbage': -np.inf, 'cocluster': np.log(prior)}
   if scale_prior_with_samps:
-    S = len(list(variants.values())[0]['var_reads'])
-    logprior *= S
+    logprior['cocluster'] *= S
   return logprior
 
 def _normalize_logconc(logconc, S):
@@ -65,11 +65,43 @@ def _normalize_logconc(logconc, S):
   logconc = np.minimum(600,  logconc)
   return logconc
 
+def _cluster(model, variants, init_clusters, logconc, coclust_prior, iterations_per_chain, seed, chains, parallel):
+  S = len(list(variants.values())[0]['var_reads'])
+  logconc = _normalize_logconc(logconc, S)
+
+  if model == 'pairwise':
+    logprior = _make_coclust_logprior(coclust_prior, S)
+    supervars, clustrel_posterior, _, _, _ = clustermaker.use_pre_existing(
+      variants,
+      logprior,
+      parallel,
+      init_clusters,
+      [],
+    )
+    superclusters = clustermaker.make_superclusters(supervars)
+    vids, assigns, llhs = cluster_pairwise.cluster(variants, init_clusters, supervars, superclusters, clustrel_posterior, logconc, iterations_per_chain)
+
+  elif model == 'linfreq':
+    vids, assigns, llhs = cluster_linfreq.cluster(variants, init_clusters, logconc, iterations_per_chain)
+
+  elif model == 'both':
+    raise Exception('Not yet implemented')
+
+  else:
+    raise Exception('Unknown --model: %s' % model)
+
+  assigns, llhs = _make_unique(assigns, llhs)
+  return (vids, assigns, llhs)
+
 def main():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('--seed', dest='seed', type=int,
+    help='Integer seed used for pseudo-random number generator. Running with the same seed on the same inputs will produce exactly the same result.')
+  parser.add_argument('--chains', dest='chains', type=int, default=1,
+    help='Number of Gibbs sampling chains to run')
   parser.add_argument('--concentration', dest='logconc', type=float, default=-2,
     help='log10(alpha) for Chinese restaurant process. The larger this is, the stronger the preference for more clusters.')
   parser.add_argument('--iterations', type=int, default=100,
@@ -87,6 +119,13 @@ def main():
   parser.add_argument('out_params_fn')
   args = parser.parse_args()
 
+  if args.seed is not None:
+    seed = args.seed
+  else:
+    # Maximum seed is 2**32 - 1.
+    seed = np.random.randint(2**32)
+  np.random.seed(seed)
+
   np.set_printoptions(linewidth=400, precision=3, threshold=sys.maxsize, suppress=True)
   np.seterr(divide='raise', invalid='raise', over='raise')
   parallel = args.parallel if args.parallel is not None else multiprocessing.cpu_count()
@@ -103,20 +142,17 @@ def main():
   else:
     init_clusters = _make_init_clusters(variants)
 
-  S = len(list(variants.values())[0]['var_reads'])
-  logconc = _normalize_logconc(args.logconc, S)
-
-  if args.model == 'pairwise':
-    coclust_logprior = _make_coclust_logprior(args.prior, variants)
-    vids, assigns, llhs = cluster_pairwise.cluster(variants, init_clusters, np.exp(logconc), args.iterations, coclust_logprior, parallel)
-  elif args.model == 'linfreq':
-    vids, assigns, llhs = cluster_linfreq.cluster(variants, init_clusters, logconc, args.iterations)
-  elif args.model == 'both':
-    raise Exception('Not yet implemented')
-  else:
-    raise Exception('Unknown --model: %s' % args.model)
-
-  assigns, llhs = _make_unique(assigns, llhs)
+  vids, assigns, llhs = _cluster(
+    args.model,
+    variants,
+    init_clusters,
+    args.logconc,
+    args.prior,
+    args.iterations,
+    args.seed,
+    args.chains,
+    args.parallel,
+  )
   best_assign = _select_best(assigns, llhs)
   clusters = _convert_assignment_to_clustering(best_assign, vids)
   clusters = _sort_clusters(clusters, variants)
