@@ -1,7 +1,6 @@
 import numpy as np
 from numba import njit
 import util
-from progressbar import progressbar
 import inputparser
 
 @njit
@@ -115,7 +114,8 @@ def _do_gibbs_iter(V, T_prime, phi_alpha0, phi_beta0, logconc, C, Z, check_full_
   llh = _calc_llh(V, T_prime, Z, phi_alpha0, phi_beta0, logconc)
   return (C, Z, llh)
 
-def cluster(variants, raw_clusters, logconc, iters):
+def cluster(variants, raw_clusters, logconc, iters, seed, progress_queue):
+  np.random.seed(seed % 2**32)
   vids, V, T, T_prime, omega = inputparser.load_read_counts(variants)
 
   # M: number of variants
@@ -132,12 +132,11 @@ def cluster(variants, raw_clusters, logconc, iters):
   clusterings = []
   llhs = []
 
-  with progressbar(total=iters, desc='Clustering variants', unit='iteration', dynamic_ncols=True) as pbar:
-    for I in range(iters):
-      pbar.update()
-      C, Z, llh = _do_gibbs_iter(V, T_prime, phi_alpha0, phi_beta0, logconc, C, Z, check_full_llh=False)
-      #print(I, C, llh)
-      clusterings.append(Z)
-      llhs.append(llh)
+  for I in range(iters):
+    if progress_queue is not None:
+      progress_queue.put(I)
+    C, Z, llh = _do_gibbs_iter(V, T_prime, phi_alpha0, phi_beta0, logconc, C, Z, check_full_llh=False)
+    clusterings.append(Z)
+    llhs.append(llh)
 
   return (vids, np.array(clusterings), np.array(llhs))

@@ -12,6 +12,7 @@ import common
 import cluster_pairwise
 import cluster_linfreq
 import clustermaker
+from progressbar import progressbar
 
 def _convert_assignment_to_clustering(Z, vids):
   uniq_Z  = set(list(Z))
@@ -65,7 +66,67 @@ def _normalize_logconc(logconc, S):
   logconc = np.minimum(600,  logconc)
   return logconc
 
-def _cluster(model, variants, init_clusters, logconc, coclust_prior, iterations_per_chain, seed, chains, parallel):
+def _launch_parallel(run_chain, args, iter_per_chain, nchains, parallel, seed):
+  import concurrent.futures
+  import multiprocessing
+  import queue
+  import time
+  import sys
+
+  jobs = []
+  total = iter_per_chain * nchains
+  manager = multiprocessing.Manager()
+  progress_queue = manager.Queue()
+
+  with progressbar(total=total, desc='Clustering variants', unit='iter', dynamic_ncols=True) as pbar:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
+      for C in range(nchains):
+        jobs.append(ex.submit(run_chain, *args, seed + C + 1, progress_queue))
+      while True:
+        finished = 0
+        last_check = time.perf_counter()
+        for J in jobs:
+          if J.done():
+            exception = J.exception(timeout=0.001)
+            if exception is not None:
+              print('Exception occurred in child process:', exception, file=sys.stderr)
+              raise exception
+            else:
+              finished += 1
+
+        if finished == nchains:
+          break
+        while time.perf_counter() - last_check < 5:
+          try:
+            progress_queue.get(timeout=5)
+            pbar.update()
+          except queue.Empty:
+            pass
+
+  results = [J.result() for J in jobs]
+  return results
+
+def _unpack_results(results):
+  vids = None
+  clusterings = []
+  llhs = []
+
+  for R in results:
+    V, C, L = R
+    if vids is None:
+      vids = V
+    else:
+      assert V == vids
+    clusterings.append(C)
+    llhs.append(L)
+
+  return (
+    vids,
+    np.array([row for collection in clusterings for row in collection]),
+    np.array([llh for collection in llhs for llh in collection]),
+  )
+
+def _cluster(model, variants, init_clusters, logconc, coclust_prior, iterations_per_chain, seed, nchains, parallel):
   S = len(list(variants.values())[0]['var_reads'])
   logconc = _normalize_logconc(logconc, S)
 
@@ -79,17 +140,25 @@ def _cluster(model, variants, init_clusters, logconc, coclust_prior, iterations_
       [],
     )
     superclusters = clustermaker.make_superclusters(supervars)
-    vids, assigns, llhs = cluster_pairwise.cluster(variants, init_clusters, supervars, superclusters, clustrel_posterior, logconc, iterations_per_chain)
-
+    run_chain = cluster_pairwise.cluster
+    # Using a lambda function would be cleaner than this, but lambdas can't be
+    # pickled, so they don't work with multiprocessing. Apparently only
+    # top-level module functions can be pickled.
+    args = (variants, init_clusters, supervars, superclusters, clustrel_posterior, logconc, iterations_per_chain)
   elif model == 'linfreq':
-    vids, assigns, llhs = cluster_linfreq.cluster(variants, init_clusters, logconc, iterations_per_chain)
-
+    run_chain = cluster_linfreq.cluster
+    args = (variants, init_clusters, logconc, iterations_per_chain)
   elif model == 'both':
     raise Exception('Not yet implemented')
-
   else:
     raise Exception('Unknown --model: %s' % model)
 
+  if parallel > 0:
+    results = _launch_parallel(run_chain, args, iterations_per_chain, nchains, parallel, seed)
+  else:
+    results = [run_chain(*args, seed + C + 1, progress_queue=None) for C in range(nchains)]
+
+  vids, assigns, llhs = _unpack_results(results)
   assigns, llhs = _make_unique(assigns, llhs)
   return (vids, assigns, llhs)
 
@@ -149,7 +218,7 @@ def main():
     args.logconc,
     args.prior,
     args.iterations,
-    args.seed,
+    seed,
     args.chains,
     args.parallel,
   )

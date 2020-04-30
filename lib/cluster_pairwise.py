@@ -1,6 +1,5 @@
 import numpy as np
 import util
-from progressbar import progressbar
 import common
 from common import Models
 from numba import njit
@@ -130,7 +129,8 @@ def _convert_clustering_to_assignment(clusters):
   assign = np.array([mapping[vid] for vid in vids], dtype=np.int32)
   return (vids, assign)
 
-def cluster(variants, raw_clusters, supervars, superclusters, clustrel_posterior, logconc, iters):
+def cluster(variants, raw_clusters, supervars, superclusters, clustrel_posterior, logconc, iters, seed, progress_queue):
+  np.random.seed(seed % 2**32)
   vids = common.extract_vids(variants)
   assert set(vids) == set([vid for clust in raw_clusters for vid in clust])
 
@@ -143,20 +143,20 @@ def cluster(variants, raw_clusters, supervars, superclusters, clustrel_posterior
   clusterings = []
   llhs = []
 
-  with progressbar(total=iters, desc='Clustering variants', unit='iteration', dynamic_ncols=True) as pbar:
-    for I in range(iters):
-      pbar.update()
-      C, Z = _do_gibbs_iter(
-        C,
-        Z,
-        log_clust_probs,
-        log_notclust_probs,
-        logconc,
-        check_full_llh = True,
-      )
-      llh = _calc_llh(Z, log_clust_probs, log_notclust_probs, logconc)
-      clusterings.append(Z)
-      llhs.append(llh)
+  for I in range(iters):
+    if progress_queue is not None:
+      progress_queue.put(I)
+    C, Z = _do_gibbs_iter(
+      C,
+      Z,
+      log_clust_probs,
+      log_notclust_probs,
+      logconc,
+      check_full_llh = True,
+    )
+    llh = _calc_llh(Z, log_clust_probs, log_notclust_probs, logconc)
+    clusterings.append(Z)
+    llhs.append(llh)
 
   raw_clusterings = _convert_svid_assign_to_raw_assign(clusterings, vids, raw_clusters)
   return (vids, raw_clusterings, np.array(llhs))
