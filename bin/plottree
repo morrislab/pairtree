@@ -16,21 +16,12 @@ import json
 import util
 import plotutil
 
-def _calc_eta(struct, phi):
-  K, M = phi.shape
-  assert len(struct) == K - 1
-  adj = util.convert_parents_to_adjmatrix(struct)
-  Z = util.make_ancestral_from_adj(adj)
-  Z_inv = np.linalg.inv(Z)
-  eta = np.dot(Z_inv, phi)
-  return eta
-
 def _plot_eta(struct, phi, sampnames, outf):
   # Avoid Plotly dependency unless user wants this plot.
   import plotly.graph_objs as go
   import plotly.io as pio
 
-  eta = _calc_eta(struct, phi)
+  eta = util.calc_eta(struct, phi)
   traces = [go.Bar(
     name = 'Pop. %s' % cidx,
     x = sampnames,
@@ -42,7 +33,7 @@ def _plot_eta(struct, phi, sampnames, outf):
   layout = go.Layout(
     barmode = 'stack',
     bargap = 0.1,
-    template = 'seaborn',
+    template = 'plotly_white',
     xaxis = {'title': 'Sample'},
     yaxis = {
       'title': 'Population frequency',

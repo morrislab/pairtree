@@ -123,6 +123,8 @@ def cluster(variants, raw_clusters, logconc, iters, seed, progress_queue):
   # Z: cluster assignments
   M = len(V)
   C = 1
+  # TODO: unlike the pairwise model, the linfreq model doesn't respect
+  # `raw_clusters`. I should fix this.
   Z = np.zeros(M, np.int32)
 
   # Beta distribution prior for phi

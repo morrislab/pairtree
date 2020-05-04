@@ -190,3 +190,17 @@ def compute_node_relations(adj, check_validity=False):
     assert np.all(R[0]   == Models.A_B)
     assert np.all(R[:,0] == Models.B_A)
   return R
+
+def calc_eta(struct, phi):
+  K, M = phi.shape
+  assert len(struct) == K - 1
+  adj = convert_parents_to_adjmatrix(struct)
+  Z = make_ancestral_from_adj(adj)
+  Z_inv = np.linalg.inv(Z)
+  eta = np.dot(Z_inv, phi)
+
+  assert np.allclose(0, eta[eta < 0])
+  eta = np.abs(eta)
+  # Renormalize.
+  eta = eta / np.sum(eta, axis=0)
+  return eta
