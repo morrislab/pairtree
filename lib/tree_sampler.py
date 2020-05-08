@@ -270,7 +270,7 @@ def _make_W_dests_mutrel(subtree_head, curr_parent, adj, anc, data_logmutrel):
   assert subtree_head > 0
   assert adj[curr_parent,subtree_head] == 1
   cluster_idx = subtree_head - 1
-  assert data_logmutrel.vids[cluster_idx] == 'S%s' % cluster_idx
+  assert data_logmutrel.vids[cluster_idx] == 'S%s' % (cluster_idx + 1)
   K = len(adj)
 
   logweights = np.full(K, -np.inf)

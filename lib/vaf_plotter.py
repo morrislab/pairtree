@@ -53,8 +53,7 @@ def make_phi_pseudovars(phi):
   M, S = phi.shape
   omega_v = 0.5 * np.ones(S)
   V = [{
-    'id': 'P%s' % cidx,
-    'name': 'P%s' % cidx,
+    'id': 'P%s' % (cidx + 1),
     'cluster': cidx,
     'vaf': omega_v * row,
     'omega_v': omega_v,
@@ -62,6 +61,8 @@ def make_phi_pseudovars(phi):
     'ref_reads': np.full_like(omega_v, np.nan),
     'total_reads': np.full_like(omega_v, np.nan),
   } for cidx, row in enumerate(phi[1:])]
+  for v in V:
+    v['name'] = v['id']
   return V
 
 def _make_toggle(cls, label, active=True):

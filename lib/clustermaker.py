@@ -108,7 +108,7 @@ def make_cluster_supervars(clusters, variants):
   for cidx, cluster in enumerate(clusters):
     assert len(cluster) > 0
     cvars = [variants[vid] for vid in cluster]
-    S_name = 'S%s' % len(supervars)
+    S_name = 'S%s' % (len(supervars) + 1)
     supervars[S_name] = _make_supervar(S_name, cvars)
 
   return supervars

@@ -163,7 +163,7 @@ def _reorder_subclones(data):
   new_data['struct'] = np.array([new_parents[idx] for idx in range(1, K)], dtype=np.int)
 
   old_svids = new_data['clustrel_posterior'].vids
-  new_svids = ['S%s' % (old_to_new[int(svid[1:]) + 1] - 1) for svid in old_svids]
+  new_svids = ['S%s' % old_to_new[int(svid[1:])] for svid in old_svids]
   new_data['clustrel_posterior'] = new_data['clustrel_posterior']._replace(vids = new_svids)
 
   return new_data

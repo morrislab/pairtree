@@ -17,7 +17,7 @@ def perturb_clustrel(clustrel):
   new_rels[0,1:,Models.A_B] = 1
   new_rels[1:,0,Models.B_A] = 1
   new_rels[1:,1:,:] = clustrel.rels
-  new_vids = list(clustrel.vids) + ['S%s' % len(clustrel.vids)]
+  new_vids = ['S0'] + list(clustrel.vids)
   return Mutrel(vids=new_vids, rels=new_rels)
 
 def main():

@@ -171,7 +171,7 @@ def make_clustrel_from_cluster_adj(cluster_adj):
   clustrel[already_filled == 0, Models.diff_branches] = 1
 
   assert np.array_equal(np.ones((K,K)), np.sum(clustrel, axis=2))
-  vids = ['S%s' % idx for idx in range(K)]
+  vids = ['S%s' % (idx + 1) for idx in range(K)]
   clustrel = mutrel.Mutrel(vids=vids, rels=clustrel)
   mutrel.check_posterior_sanity(clustrel.rels)
   return clustrel
