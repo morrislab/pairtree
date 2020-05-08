@@ -132,6 +132,42 @@ def _choose_plots(to_plot, to_omit, all_choices):
 
   return plot_choices
 
+def _reorder_subclones(data):
+  old_to_new = {}
+  new_to_old = {}
+  K = len(data['struct']) + 1
+  root = 0
+
+  def _reorder(old_idx):
+    assert old_idx not in old_to_new
+    new_idx = len(new_to_old)
+    assert new_idx not in new_to_old
+    old_to_new[old_idx] = new_idx
+    new_to_old[new_idx] = old_idx
+
+    children = np.flatnonzero(data['struct'] == old_idx) + 1
+    children = sorted(children, key = lambda I: -np.mean(data['phi'][I]))
+    for C in children:
+      _reorder(C)
+
+  _reorder(root)
+  for D in (old_to_new, new_to_old):
+    assert D[root] == root
+    assert set(D.keys()) == set(D.values()) == set(range(K))
+
+  new_data = dict(data)
+  new_data['clusters'] = [data['clusters'][new_to_old[idx] - 1] for idx in range(1, K)]
+  new_data['phi'] = np.array([data['phi'][new_to_old[idx]] for idx in range(K)])
+
+  new_parents = {old_to_new[idx + 1]: old_to_new[parent] for idx, parent in enumerate(data['struct'])}
+  new_data['struct'] = np.array([new_parents[idx] for idx in range(1, K)], dtype=np.int)
+
+  old_svids = new_data['clustrel_posterior'].vids
+  new_svids = ['S%s' % (old_to_new[int(svid[1:]) + 1] - 1) for svid in old_svids]
+  new_data['clustrel_posterior'] = new_data['clustrel_posterior']._replace(vids = new_svids)
+
+  return new_data
+
 def main():
   all_plot_choices = set((
     'tree',
@@ -155,6 +191,8 @@ def main():
   parser.add_argument('--omit-plots', dest='omit_plots', type=lambda s: set(s.split(',')),
     help='Things to omit from plotting; overrides --plot')
   parser.add_argument('--runid')
+  parser.add_argument('--reorder-subclones', action='store_true',
+    help='Reorder subclones according to depth-first search through tree structure')
   parser.add_argument('--tree-json', dest='tree_json_fn',
     help='Additional external file in which to store JSON, which is already stored statically in the HTML file')
   parser.add_argument('ssm_fn')
@@ -168,22 +206,37 @@ def main():
   results = resultserializer.Results(args.results_fn)
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.params_fn)
-  supervars = clustermaker.make_cluster_supervars(results.get('clusters'), variants)
-  supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
+
   tidx = args.tree_index
+  data = {K: results.get(K)[tidx] for K in (
+    'struct',
+    'count',
+    'llh',
+    'prob',
+    'phi',
+  )}
+  data['garbage'] = results.get('garbage')
+  data['clusters'] = results.get('clusters')
+  data['samples'] = results.get('sampnames')
+  data['clustrel_posterior'] = results.get_mutrel('clustrel_posterior')
+  if args.reorder_subclones:
+    data = _reorder_subclones(data)
+
+  supervars = clustermaker.make_cluster_supervars(data['clusters'], variants)
+  supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
 
   with open(args.html_out_fn, 'w') as outf:
     write_header(args.runid, outf)
 
     if 'tree' in plot_choices:
       tree_struct = util.make_tree_struct(
-        results.get('struct')[tidx],
-        results.get('count')[tidx],
-        results.get('llh')[tidx],
-        results.get('prob')[tidx],
-        results.get('phi')[tidx],
+        data['struct'],
+        data['count'],
+        data['llh'],
+        data['prob'],
+        data['phi'],
         supervars,
-        params['samples'],
+        data['samples'],
       )
       _write_tree_html(
         tree_struct,
@@ -197,26 +250,26 @@ def main():
         _write_tree_json(tree_struct, args.tree_json_fn)
 
     if 'eta' in plot_choices:
-      _plot_eta(results.get('struct')[tidx], results.get('phi')[tidx], params['samples'], outf)
+      _plot_eta(data['struct'], data['phi'], data['samples'], outf)
 
     if 'vaf_matrix' in plot_choices:
       vaf_plotter.plot_vaf_matrix(
-        results.get('clusters'),
+        data['clusters'],
         variants,
         supervars,
-        results.get('garbage'),
-        results.get('phi')[tidx] if results.has('phi') else None,
-        params['samples'],
+        data['garbage'],
+        data['phi'],
+        data['samples'],
         should_correct_vaf=True,
         outf=outf,
       )
 
     if 'pairwise_mle' in plot_choices:
-      relation_plotter.plot_ml_relations(results.get_mutrel('clustrel_posterior'), outf)
+      relation_plotter.plot_ml_relations(data['clustrel_posterior'], outf)
     if 'pairwise_separate' in plot_choices:
-      relation_plotter.plot_separate_relations(results.get_mutrel('clustrel_posterior'), outf)
+      relation_plotter.plot_separate_relations(data['clustrel_posterior'], outf)
     if 'cluster_stats' in plot_choices:
-      write_cluster_stats(results.get('clusters'), results.get('garbage'), supervars, variants, outf)
+      write_cluster_stats(data['clusters'], data['garbage'], supervars, variants, outf)
 
 if __name__ == '__main__':
   main()
