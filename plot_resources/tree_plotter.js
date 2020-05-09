@@ -5,8 +5,9 @@ var NODE_TYPE = 'circle';
 
 // Following two functions from https://stackoverflow.com/a/18473154.
 function polarToCartesian(centerX, centerY, radius, angleInDegrees) {
-  var angleInRadians = (angleInDegrees-90) * Math.PI / 180.0;
-
+  // Add 90 degrees to rotate coordinate system so that arcs start at the
+  // bottom of the circle and rotate clockwise.
+  var angleInRadians = (angleInDegrees + 90) * Math.PI/180.0;
   return {
     x: centerX + (radius * Math.cos(angleInRadians)),
     y: centerY + (radius * Math.sin(angleInRadians))
@@ -14,14 +15,14 @@ function polarToCartesian(centerX, centerY, radius, angleInDegrees) {
 }
 
 function describeArc(x, y, radius, startAngle, endAngle) {
-  var start = polarToCartesian(x, y, radius, endAngle);
-  var end = polarToCartesian(x, y, radius, startAngle);
-
+  var start = polarToCartesian(x, y, radius, startAngle);
+  var end = polarToCartesian(x, y, radius, endAngle);
   var largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
-
   var d = [
     "M", start.x, start.y,
-    "A", radius, radius, 0, largeArcFlag, 0, end.x, end.y
+    "A", radius, radius, 0, largeArcFlag, 1, end.x, end.y,
+    "L", x, y,
+    "L", start.x, start.y,
   ].join(" ");
 
   return d;
@@ -69,7 +70,7 @@ TreePlotter.prototype._label_node = function(node_id) {
   return letters[node_id - 1];
 }
 
-TreePlotter.prototype._draw_tree = function(root, container, num_pops, left_colour, right_colour, bg_colour) {
+TreePlotter.prototype._draw_tree = function(root, container, num_pops, sampnames, samp_colours, bg_colour) {
   // horiz_padding should be set to the maximum radius of a node, so a node
   // drawn on a boundry won't go over the canvas edge. Since max_area = 8000,
   // we have horiz_padding = sqrt(8000 / pi) =~ 51.
@@ -79,7 +80,6 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops, left_colo
       w = Math.max(150, 120*max_depth - m[1] - m[3]),
       h = 430 - m[0] - m[2],
       i = 0;
-  var colours = ColourAssigner.assign_colours(num_pops);
 
   // Compute the new tree layout.
   var tree = d3.tree().size([h, w]);
@@ -112,29 +112,31 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops, left_colo
   // Enter any new nodes at the parent's previous position.
   var nodeEnter = node.enter().append('svg:g');
   nodeEnter.attr('class', 'population')
-    .attr('fill', function(d, i) { return colours[d.data.name]; })
     .attr('transform', function(d) { return 'translate(' + d.y + ',' + d.x + ')'; });
 
-  var add_half = function(side) {
+  var slices = samp_colours.size;
+  var coloured_samps = Array.from(samp_colours.keys());
+  var add_slice = function(slice_idx, total_slices) {
+    if(!(0 <= slice_idx && slice_idx < total_slices)) {
+      throw "wrong number of slices: " + slice_idx + ", " + total_slices;
+    }
     nodeEnter.append('svg:path')
-      .attr('class', side + '_half')
       .attr('d', function(d) {
         if (NODE_TYPE === 'circle') {
-          if(side === 'left') {
-            return describeArc(0, 0, d.data.radius, 180, 360);
-          } else {
-            return describeArc(0, 0, d.data.radius, 0, 180);
-          }
+          var deg = 360 / total_slices;
+          var start = slice_idx * deg;
+          var end = (slice_idx + 1)*deg;
+          return describeArc(0, 0, d.data.radius, start, end);
         } else {
-          if(side === 'left') {
-            return describeRect(-d.data.radius, -d.data.radius, d.data.radius, 2*d.data.radius);
-          } else {
-            return describeRect(0, -d.data.radius, d.data.radius, 2*d.data.radius);
-          }
+          var total_width = 2*d.data.radius;
+          var slice_width = total_width / total_slices;
+          var x = -d.data.radius + (slice_idx * slice_width);
+          return describeRect(x, -d.data.radius, slice_width, 2*d.data.radius);
         }
       }).attr('fill', function(d) {
-        var base_colour = (side == 'left') ? left_colour : right_colour;
-        return Util.rgba2hex(base_colour, d.data.opacities[side], bg_colour);
+        var samp_name = coloured_samps[slice_idx];
+        var samp_idx = sampnames.indexOf(samp_name);
+        return Util.rgba2hex(samp_colours.get(samp_name), d.data.phi[samp_idx], bg_colour);
       });
   };
 
@@ -148,10 +150,14 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops, left_colo
       .attr('x', function(d) { return -d.data.radius; })
       .attr('y', function(d) { return -d.data.radius; })
       .attr('width', function(d) { return 2*d.data.radius; })
-      .attr('height', function(d) { return 2 * d.data.radius; });
+      .attr('height', function(d) { return 2*d.data.radius; });
   }
-  add_half('left');
-  add_half('right');
+  for(var idx = 0; idx < slices; idx++) {
+    /*if(NODE_TYPE === 'circle') {
+      idx = slices - idx - 1;
+    }*/
+    add_slice(idx, slices);
+  }
   /*nodeEnter.append('svg:path')
     .attr('class', 'divider')
     .attr('stroke', '#aaa')
@@ -180,20 +186,11 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops, left_colo
     }));
 }
 
-TreePlotter.prototype._generate_tree_struct = function(parents, phi, root_id, sampnames, left_sample, right_sample) {
-  var left_index = sampnames.indexOf(left_sample);
-  var right_index = sampnames.indexOf(right_sample);
-  if(left_index === -1 || right_index === -1) {
-    throw "Can't find " + left_sample + " or " + right_sample + " samples in " + sampnames;
-  }
-
+TreePlotter.prototype._generate_tree_struct = function(parents, phi, root_id) {
   var _add_node = function(node_id, struct) {
     struct.name = node_id;
     struct.radius = Math.sqrt(2000 / Math.PI);
-    struct.opacities = {
-      'left': phi[node_id][left_index],
-      'right': phi[node_id][right_index],
-    };
+    struct.phi = phi[node_id];
 
     var children = [];
     for(var idx = 0; idx < parents.length; idx++) {
@@ -215,25 +212,23 @@ TreePlotter.prototype._generate_tree_struct = function(parents, phi, root_id, sa
   return root;
 }
 
-TreePlotter.prototype.plot = function(root, parents, phi, sampnames, container) {
+TreePlotter.prototype.plot = function(root, parents, phi, sampnames, samp_colours, container) {
   var K = phi.length;
   container = d3.select(container).append('div');
-
-  let params = (new URL(document.location)).searchParams;
-  var left_sample = params.has('leftsamp') ? params.get('leftsamp') : sampnames[0];
-  var right_sample = params.has('rightsamp') ? params.get('rightsamp') : sampnames[0];
-
   var bg_colour = '#ffffff';
-  var default_colours = ['#428bca', '#cc4444'];
-  var left_colour = params.has('leftcolour') ? params.get('leftcolour') : default_colours[0];
-  var right_colour = params.has('rightcolour') ? params.get('rightcolour') : default_colours[1];
 
-  if(left_sample === right_sample) {
-    right_colour = left_colour;
+  if(samp_colours === null) {
+    samp_colours = new Map([[samp_names[0], '#428bca']]);
+  } else {
+    // Maps remember their insertion order, which is important to allow the
+    // user to control the order in which samples are coloured. We expect that,
+    // before the Map is created, `samp_colours` is an array of two-element
+    // arrays consisting of [key, value] pairs.
+    samp_colours = new Map(samp_colours);
   }
 
-  var root = this._generate_tree_struct(parents, phi, root, sampnames, left_sample, right_sample);
-  this._draw_tree(root, container, K, left_colour, right_colour, bg_colour);
+  var root = this._generate_tree_struct(parents, phi, root);
+  this._draw_tree(root, container, K, sampnames, samp_colours, bg_colour);
   resize_svg(container.selectAll('svg'));
 }
 

@@ -15,9 +15,10 @@ import util
 import plotutil
 
 def write_header(runid, outf):
-  title = 'Posterior summary'
   if runid is not None:
-    title += ' for %s' % runid
+    title = '%s posterior summary' % runid
+  else:
+    title = 'Posterior summary'
 
   # TODO: try the ELK layout algorithm instead of Klay. Currently,
   # cytoscape.js-elk is a little outdated, and seems primed for an upgrade via
@@ -79,9 +80,10 @@ def summarize(results, params, supervars, outf):
   structs = [_make_struct(tidx) for tidx in range(min(N, limit))]
   json_trees = {
     'structs': structs,
+    'samp_colours': params.get('samp_colours', None),
   }
 
-  print("<script type=\"text/javascript\">var tree_json = '%s'; var results = JSON.parse(tree_json);</script>" % json.dumps(structs), file=outf)
+  print("<script type=\"text/javascript\">var tree_json = '%s'; var results = JSON.parse(tree_json);</script>" % json.dumps(json_trees), file=outf)
   print('<h2>Trees</h2>', file=outf)
   print('<ul><li>Number of unique trees: %s</li></ul>' % N, file=outf)
   print('<table id="trees" class="table table-striped"><thead><tr><th>Index</th><th>Posterior</th><th>nLgLh</th><th>Count</th><th>Structure</th></tr></thead><tbody class="container"></tbody></table>', file=outf)
@@ -106,8 +108,8 @@ def _make_congraph(results):
 
 def _plot_congraph(congraph, outf):
   print('''
-
   <h2>Consensus graph</h2>
+  <h5>Minimum spanning-tree threshold: <span id="spanning_threshold"></span></h5>
   <form>
     <div class="row">
       <div class="col">

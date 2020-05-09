@@ -1,12 +1,12 @@
 function PosteriorSumm() {
 }
 
-PosteriorSumm.prototype.plot = function(structs, container) {
-  if(structs.length === 0) {
+PosteriorSumm.prototype.plot = function(results, container) {
+  if(results.structs.length === 0) {
     return;
   }
 
-  structs.forEach(function(struct, idx) {
+  results.structs.forEach(function(struct, idx) {
     var row = d3.select(container).append('tr');
     var struct_id = 'structure_' + idx;
     var tree_container = '#' + struct_id;
@@ -18,7 +18,14 @@ PosteriorSumm.prototype.plot = function(structs, container) {
     row.append('td').attr('id', struct_id);
 
     var root = 0;
-    (new TreePlotter()).plot(root, struct.parents, struct.phi, struct.samples, tree_container);
+    (new TreePlotter()).plot(
+      root,
+      struct.parents,
+      struct.phi,
+      struct.samples,
+      results.samp_colours,
+      tree_container,
+    );
     // Resize tree to fit in table.
     d3.select(tree_container)
       .select('svg')
@@ -47,10 +54,13 @@ function CongraphPlotter() {
 CongraphPlotter.prototype.plot = function(cgraph, container, threshold_display) {
   const self = this;
   const min_threshold = 0.01;
-  const good_threshold = this._find_threshold(cgraph);
-  if(good_threshold < min_threshold) {
-    throw "good_threshold < min_threshold, implying some parts of the graph will always be disconnected";
+  const default_threshold = 0.05;
+
+  const spanning_threshold = this._find_min_spanning_threshold(cgraph);
+  if(spanning_threshold < min_threshold) {
+    throw "spanning_threshold < min_threshold, implying some parts of the graph will always be disconnected";
   }
+  d3.select('#spanning_threshold').text(Math.round(100*spanning_threshold) + '%');
 
   var [nodes, edges] = this._make_graph(cgraph, min_threshold);
   this._draw(nodes, edges, container);
@@ -58,12 +68,12 @@ CongraphPlotter.prototype.plot = function(cgraph, container, threshold_display) 
   this._cy.ready(() => {
     self._config_layout_chooser('#layout_chooser');
     self._config_edge_weight_display();
-    self._config_threshold_chooser('#threshold_chooser', '#congraph_threshold', min_threshold, good_threshold);
+    self._config_threshold_chooser('#threshold_chooser', '#congraph_threshold', min_threshold, default_threshold);
     self._config_exporters('#export_svg', '#export_png');
   });
 }
 
-CongraphPlotter.prototype._find_threshold = function(cgraph) {
+CongraphPlotter.prototype._find_min_spanning_threshold = function(cgraph) {
   var K = cgraph.length;
   var threshold = 1;
 
@@ -106,7 +116,7 @@ CongraphPlotter.prototype._make_graph = function(cgraph, threshold=0.2) {
   return [nodes, edges];
 }
 
-CongraphPlotter.prototype._config_threshold_chooser = function(chooser, label_elem, min_thresh, good_thresh) {
+CongraphPlotter.prototype._config_threshold_chooser = function(chooser, label_elem, min_thresh, default_thresh) {
   let self = this;
   const all_edges = this._cy.edges();
 
@@ -117,13 +127,13 @@ CongraphPlotter.prototype._config_threshold_chooser = function(chooser, label_el
     bad.remove();
     self._run_layout();
   };
-  _update_thresh(good_thresh);
+  _update_thresh(default_thresh);
 
   d3.select(chooser)
     .attr('min', min_thresh)
     .attr('max', 1.0)
     .attr('step', 0.01)
-    .attr('value', good_thresh)
+    .attr('value', default_thresh)
     .on('change', function(d) {
       const threshold = this.value;
       _update_thresh(threshold);

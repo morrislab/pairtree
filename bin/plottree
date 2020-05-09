@@ -16,10 +16,14 @@ import json
 import util
 import plotutil
 
-def _plot_eta(struct, phi, sampnames, outf):
+def _plot_eta(struct, phi, sampnames, visible_sampidxs, outf):
   # Avoid Plotly dependency unless user wants this plot.
   import plotly.graph_objs as go
   import plotly.io as pio
+
+  if visible_sampidxs is not None:
+    phi = phi[:,visible_sampidxs]
+    sampnames = [sampnames[idx] for idx in visible_sampidxs]
 
   eta = util.calc_eta(struct, phi)
   traces = [go.Bar(
@@ -48,8 +52,13 @@ def _write_tree_json(tree_struct, jsonfn):
   with open(jsonfn, 'w') as F:
     print(json.dumps(tree_struct), file=F)
 
-def write_header(runid, outf):
-  print('<meta charset="utf-8">', file=outf)
+def write_header(runid, tidx, outf):
+  if runid is not None:
+    title = '%s tree' % runid
+  else:
+    title = 'Tree'
+
+  print('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>%s</title>' % title, file=outf)
   print('<script src="https://d3js.org/d3.v5.min.js"></script>', file=outf)
   for jsfn in ('highlight_table_labels.js', 'tree_plotter.js'):
     print('<script type="text/javascript">%s</script>' % plotutil.read_file(jsfn), file=outf)
@@ -57,22 +66,58 @@ def write_header(runid, outf):
   for cssfn in ('tree.css', 'matrix.css'):
     print('<style type="text/css">%s</style>' % plotutil.read_file(cssfn), file=outf)
   print('<style type="text/css">.container { margin: 30px; } td, th, table { padding: 5px; margin: 0; border-collapse: collapse; font-weight: normal; } span { visibility: hidden; } td:hover > span { visibility: visible; } .highlighted { background-color: black !important; color: white; }</style>', file=outf)
+  print('</head><body><main>', file=outf)
   if runid is not None:
     print('<h1>%s</h1>' % runid, file=outf)
 
-def _write_tree_html(tree_struct, plot_phi, plot_phi_hat, plot_phi_error, plot_phi_interleaved, outf):
-  print("<script type=\"text/javascript\">var tree_json = '%s'; var results = JSON.parse(tree_json);</script>" % json.dumps(tree_struct), file=outf)
+def write_footer(outf):
+  print('</main></body></html>', file=outf)
+
+def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, plot_phi, plot_phi_hat, plot_phi_error, plot_phi_interleaved, outf):
+  tree_data['visible_sampidxs'] = visible_sampidxs
+  tree_data['samp_colours'] = samp_colours
+
+  print('''
+  <script type="text/javascript">
+  var tree_json = '%s';
+  var results = JSON.parse(tree_json);
+  </script>''' % json.dumps(tree_data), file=outf)
 
   print('''
   <div id="trees" class="container"><h2>Tree</h2></div>
   %s
-  ''' % plotutil.js_on_load('''var container = '#trees'; d3.select(container).append('h3').text('nlglh=' + results.nlglh.toFixed(3) + ' prob=' + results.prob.toFixed(3)); (new TreePlotter()).plot(0, results.parents, results.phi,  results.samples, container);'''), file=outf)
+  ''' % plotutil.js_on_load('''
+    var container = '#trees';
+    d3.select(container).append('h3').text('tidx=' + %s + ' nlglh=' + results.nlglh.toFixed(3) + ' prob=' + results.prob.toFixed(3));
+    if(results.samp_colours) {
+      d3.select(container).append('h6').text('Sample colours:');
+      var colour_list = d3.select(container).append('ul');
+      results.samp_colours.forEach(function(pair) { colour_list.append('li').style('color', pair[1]).text(pair[0]); });
+    }
+    (new TreePlotter()).plot(
+      0,
+      results.parents,
+      results.phi,
+      results.samples,
+      results.samp_colours,
+      container
+    );
+  ''' % tidx), file=outf)
 
   if plot_phi:
     print('''
     <div id="phi_matrix" class="container"><h2>Tree-constrained lineage frequencies</h2></div>
     %s
-    ''' % plotutil.js_on_load('''(new PhiMatrix()).plot(results.phi, results.samples, '#phi_matrix');'''), file=outf)
+    ''' % plotutil.js_on_load('''
+      if(results.visible_sampidxs !== null) {
+        results.visible_phi = results.phi.map(function(P) { return results.visible_sampidxs.map(function(idx) { return P[idx]; }); });
+        results.visible_samps = results.visible_sampidxs.map(function(idx) { return results.samples[idx]; });
+      } else {
+        results.visible_phi = results.phi;
+        results.visible_samps = results.samples;
+      }
+      (new PhiMatrix()).plot(results.visible_phi, results.visible_samps, '#phi_matrix');
+    '''), file=outf)
 
   if plot_phi_hat:
     print('''
@@ -207,8 +252,7 @@ def main():
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.params_fn)
 
-  tidx = args.tree_index
-  data = {K: results.get(K)[tidx] for K in (
+  data = {K: results.get(K)[args.tree_index] for K in (
     'struct',
     'count',
     'llh',
@@ -222,11 +266,22 @@ def main():
   if args.reorder_subclones:
     data = _reorder_subclones(data)
 
+  if 'hidden_samples' in params:
+    hidden = set(params['hidden_samples'])
+    assert hidden.issubset(set(data['samples'])) and len(hidden) < len(data['samples'])
+    visible_sampidxs = [idx for idx, samp in enumerate(data['samples']) if samp not in hidden]
+  else:
+    visible_sampidxs = None
+
+  samp_colours = params.get('samp_colours', None)
+  if samp_colours is not None:
+    assert set([S[0] for S in samp_colours]).issubset(data['samples'])
+
   supervars = clustermaker.make_cluster_supervars(data['clusters'], variants)
   supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
 
   with open(args.html_out_fn, 'w') as outf:
-    write_header(args.runid, outf)
+    write_header(args.runid, args.tree_index, outf)
 
     if 'tree' in plot_choices:
       tree_struct = util.make_tree_struct(
@@ -240,6 +295,9 @@ def main():
       )
       _write_tree_html(
         tree_struct,
+        args.tree_index,
+        visible_sampidxs,
+        samp_colours,
         'phi' in plot_choices,
         'phi_hat' in plot_choices,
         'phi_error' in plot_choices,
@@ -247,10 +305,10 @@ def main():
         outf,
       )
       if args.tree_json_fn is not None:
-        _write_tree_json(tree_struct, args.tree_json_fn)
+        _write_tree_json(full_tree_struct, args.tree_json_fn)
 
     if 'eta' in plot_choices:
-      _plot_eta(data['struct'], data['phi'], data['samples'], outf)
+      _plot_eta(data['struct'], data['phi'], data['samples'], visible_sampidxs, outf)
 
     if 'vaf_matrix' in plot_choices:
       vaf_plotter.plot_vaf_matrix(
@@ -270,6 +328,8 @@ def main():
       relation_plotter.plot_separate_relations(data['clustrel_posterior'], outf)
     if 'cluster_stats' in plot_choices:
       write_cluster_stats(data['clusters'], data['garbage'], supervars, variants, outf)
+
+    write_footer(outf)
 
 if __name__ == '__main__':
   main()
