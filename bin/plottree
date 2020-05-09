@@ -16,7 +16,14 @@ import json
 import util
 import plotutil
 
-def _plot_eta(struct, phi, sampnames, visible_sampidxs, outf):
+def _choose_colours(N):
+  # Taken from d3's `Dark2` scheme (https://github.com/d3/d3-scale-chromatic/blob/master/src/categorical/Dark2.js).
+  colours = ('#1b9e77', '#d95f02', '#7570b3', '#e7298a', '#66a61e', '#e6ab02', '#a6761d', '#666666')
+  # Add 1 to ensure consistency with my JS code, which does the same.
+  chosen = [colours[(idx + 1) % len(colours)] for idx in range(N)]
+  return chosen
+
+def _plot_eta(struct, phi, sampnames, visible_sampidxs, outf, use_custom_colours=False):
   # Avoid Plotly dependency unless user wants this plot.
   import plotly.graph_objs as go
   import plotly.io as pio
@@ -24,9 +31,10 @@ def _plot_eta(struct, phi, sampnames, visible_sampidxs, outf):
   if visible_sampidxs is not None:
     phi = phi[:,visible_sampidxs]
     sampnames = [sampnames[idx] for idx in visible_sampidxs]
-
   eta = util.calc_eta(struct, phi)
-  traces = [go.Bar(
+
+  traces = [dict(
+    type = 'bar',
     name = 'Pop. %s' % cidx,
     x = sampnames,
     y = row,
@@ -34,6 +42,11 @@ def _plot_eta(struct, phi, sampnames, visible_sampidxs, outf):
     hoverinfo = 'x+text',
     width = 0.9,
   ) for cidx, row in enumerate(eta)]
+  if use_custom_colours:
+    colours = _choose_colours(len(eta))
+    for idx, trace in enumerate(traces):
+      trace['maker_color'] = colours[idx]
+
   layout = go.Layout(
     barmode = 'stack',
     bargap = 0.1,
