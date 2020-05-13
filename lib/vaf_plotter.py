@@ -66,7 +66,7 @@ def make_phi_pseudovars(phi):
   return V
 
 def _make_toggle(cls, label, active=True):
-  return '<button type="button" class="btn btn-primary %s toggle_%s shadow-none" data-toggle="button" aria-pressed="%s" autocomplete="off">%s</button>' % (
+  return '<button type="button" class="btn btn-primary %s toggle_%s shadow-none" data-toggle="button" aria-pressed="%s">%s</button>' % (
     'active' if active else '',
     cls,
     'true' if active else 'false',
@@ -117,7 +117,7 @@ def print_vaftable_row(V, cls, bgcolour, should_correct_vaf, outf, visible=True)
   ), file=outf)
 
 def print_vaftable_footer(outf):
-  print('</div></tbody></table>', file=outf)
+  print('</tbody></table></div>', file=outf)
 
 def print_vafs(clustered_vars, supervars, garbage_variants, phi, sampnames, should_correct_vaf, outf):
   nclusters = len(clustered_vars)

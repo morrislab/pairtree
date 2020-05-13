@@ -124,7 +124,7 @@ def _plot_congraph(congraph, outf):
       </div>
 
       <div class="col">
-        <label for="exporters">Export graph</label>
+        <label>Export graph</label>
         <div id="exporters">
           <button id="export_svg" type="button" class="btn btn-primary">Export SVG</button>
           <button id="export_png" type="button" class="btn btn-primary">Export PNG</button>

@@ -58,7 +58,7 @@ def _plot_eta(struct, phi, sampnames, visible_sampidxs, outf, use_custom_colours
     },
   )
   fig = go.Figure(data=traces, layout=layout)
-  plot_html = pio.to_html(fig, include_plotlyjs='cdn')
+  plot_html = pio.to_html(fig, include_plotlyjs='cdn', full_html=False)
   print('<h2>Population frequencies</h2>%s' % plot_html, file=outf)
 
 def _write_tree_json(tree_struct, jsonfn):
