@@ -60,6 +60,7 @@ def _make_coclust_logprior(prior, S, scale_prior_with_samps=True):
   return logprior
 
 def _normalize_logconc(logconc, S):
+  # Convert from base 10 to base e.
   logconc /= np.log10(np.e)
   logconc *= S
   logconc = np.maximum(-600, logconc)
@@ -187,6 +188,11 @@ def main():
   parser.add_argument('in_params_fn')
   parser.add_argument('out_params_fn')
   args = parser.parse_args()
+
+  # NB: in my current clustering, `pairwise` inits with every variant in a
+  # separate cluster, while `linfreq` inits with every variant in a single
+  # cluster. I should maybe make the initializations the same, or do
+  # experiments to test how sensitive results are to the initialization.
 
   if args.seed is not None:
     seed = args.seed
