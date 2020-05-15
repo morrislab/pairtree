@@ -196,7 +196,9 @@ def _reorder_subclones(data):
   K = len(data['struct']) + 1
   root = 0
 
-  def _reorder(old_idx):
+  nodes = [root]
+  while len(nodes) > 0:
+    old_idx = nodes.pop(0)
     assert old_idx not in old_to_new
     new_idx = len(new_to_old)
     assert new_idx not in new_to_old
@@ -205,10 +207,7 @@ def _reorder_subclones(data):
 
     children = np.flatnonzero(data['struct'] == old_idx) + 1
     children = sorted(children, key = lambda I: -np.mean(data['phi'][I]))
-    for C in children:
-      _reorder(C)
-
-  _reorder(root)
+    nodes += children
   for D in (old_to_new, new_to_old):
     assert D[root] == root
     assert set(D.keys()) == set(D.values()) == set(range(K))
