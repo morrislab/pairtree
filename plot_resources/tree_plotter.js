@@ -218,7 +218,7 @@ TreePlotter.prototype.plot = function(root, parents, phi, sampnames, samp_colour
   var bg_colour = '#ffffff';
 
   if(samp_colours === null) {
-    samp_colours = new Map([[samp_names[0], '#428bca']]);
+    samp_colours = new Map([[sampnames[0], '#428bca']]);
   } else {
     // Maps remember their insertion order, which is important to allow the
     // user to control the order in which samples are coloured. We expect that,
