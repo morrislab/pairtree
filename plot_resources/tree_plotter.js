@@ -159,7 +159,7 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops, sampnames
           return describeRect(x, -d.data.radius, slice_width, 2*d.data.radius);
         }
       }).attr('fill', function(d, i) {
-        return choose_colour(i, slice_idx, d.data.phi);
+        return choose_colour(d.data.name, slice_idx, d.data.phi);
       });
   };
   for(var idx = 0; idx < slices; idx++) {

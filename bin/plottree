@@ -192,7 +192,7 @@ def _choose_plots(to_plot, to_omit, all_choices):
 
   return plot_choices
 
-def _reorder_subclones(data):
+def _reorder_subclones(data, params):
   old_to_new = {}
   new_to_old = {}
   K = len(data['struct']) + 1
@@ -225,7 +225,11 @@ def _reorder_subclones(data):
   new_svids = ['S%s' % old_to_new[int(svid[1:])] for svid in old_svids]
   new_data['clustrel_posterior'] = new_data['clustrel_posterior']._replace(vids = new_svids)
 
-  return new_data
+  new_params = dict(params)
+  if 'pop_colours' in new_params:
+    new_params['pop_colours'] = [new_params['pop_colours'][new_to_old[idx]] for idx in range(K)]
+
+  return (new_data, new_params)
 
 def main():
   all_plot_choices = set((
@@ -278,7 +282,7 @@ def main():
   data['samples'] = results.get('sampnames')
   data['clustrel_posterior'] = results.get_mutrel('clustrel_posterior')
   if args.reorder_subclones:
-    data = _reorder_subclones(data)
+    data, params = _reorder_subclones(data, params)
 
   if 'hidden_samples' in params:
     hidden = set(params['hidden_samples'])
