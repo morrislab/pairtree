@@ -152,7 +152,7 @@ def cluster(variants, raw_clusters, supervars, superclusters, clustrel_posterior
       log_clust_probs,
       log_notclust_probs,
       logconc,
-      check_full_llh = True,
+      check_full_llh = False,
     )
     llh = _calc_llh(Z, log_clust_probs, log_notclust_probs, logconc)
     clusterings.append(Z)
