@@ -86,9 +86,10 @@ def write_header(runid, tidx, outf):
 def write_footer(outf):
   print('</main></body></html>', file=outf)
 
-def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, plot_phi, plot_phi_hat, plot_phi_error, plot_phi_interleaved, outf):
+def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colours, plot_phi, plot_phi_hat, plot_phi_error, plot_phi_interleaved, outf):
   tree_data['visible_sampidxs'] = visible_sampidxs
   tree_data['samp_colours'] = samp_colours
+  tree_data['pop_colours'] = pop_colours
 
   print('''
   <script type="text/javascript">
@@ -113,6 +114,7 @@ def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, plot_phi, 
       results.phi,
       results.samples,
       results.samp_colours,
+      results.pop_colours,
       container
     );
   ''' % tidx), file=outf)
@@ -286,8 +288,11 @@ def main():
     visible_sampidxs = None
 
   samp_colours = params.get('samp_colours', None)
+  pop_colours = params.get('pop_colours', None)
   if samp_colours is not None:
     assert set([S[0] for S in samp_colours]).issubset(data['samples'])
+  if pop_colours is not None:
+    assert len(pop_colours) == len(data['struct']) + 1
 
   supervars = clustermaker.make_cluster_supervars(data['clusters'], variants)
   supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
@@ -310,6 +315,7 @@ def main():
         args.tree_index,
         visible_sampidxs,
         samp_colours,
+        pop_colours,
         'phi' in plot_choices,
         'phi_hat' in plot_choices,
         'phi_error' in plot_choices,

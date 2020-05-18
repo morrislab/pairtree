@@ -70,7 +70,7 @@ TreePlotter.prototype._label_node = function(node_id) {
   return letters[node_id - 1];
 }
 
-TreePlotter.prototype._draw_tree = function(root, container, num_pops, sampnames, samp_colours, bg_colour) {
+TreePlotter.prototype._draw_tree = function(root, container, num_pops, sampnames, samp_colours, pop_colours, bg_colour) {
   // horiz_padding should be set to the maximum radius of a node, so a node
   // drawn on a boundry won't go over the canvas edge. Since max_area = 8000,
   // we have horiz_padding = sqrt(8000 / pi) =~ 51.
@@ -114,8 +114,33 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops, sampnames
   nodeEnter.attr('class', 'population')
     .attr('transform', function(d) { return 'translate(' + d.y + ',' + d.x + ')'; });
 
-  var slices = samp_colours.size;
-  var coloured_samps = Array.from(samp_colours.keys());
+  if(NODE_TYPE === 'circle') {
+    nodeEnter.append('svg:circle')
+      .attr('class', 'outline')
+      .attr('r', function(d) { return d.data.radius; });
+  } else {
+    nodeEnter.append('svg:rect')
+      .attr('class', 'outline')
+      .attr('x', function(d) { return -d.data.radius; })
+      .attr('y', function(d) { return -d.data.radius; })
+      .attr('width', function(d) { return 2*d.data.radius; })
+      .attr('height', function(d) { return 2*d.data.radius; });
+  }
+
+  var choose_colour = function(node_idx, slice_idx, phi) {
+    if(samp_colours !== null) {
+      let [samp_name, base_colour] = samp_colours[slice_idx];
+      let samp_idx = sampnames.indexOf(samp_name);
+      let opacity = phi[samp_idx];
+      return Util.blend_colours(base_colour, opacity, bg_colour);
+    } else if(pop_colours !== null) {
+      return pop_colours[node_idx];
+    } else {
+      return '#428bca';
+    }
+  };
+
+  var slices = (samp_colours === null) ? 1 : samp_colours.length;
   var add_slice = function(slice_idx, total_slices) {
     if(!(0 <= slice_idx && slice_idx < total_slices)) {
       throw "wrong number of slices: " + slice_idx + ", " + total_slices;
@@ -133,29 +158,11 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops, sampnames
           var x = -d.data.radius + (slice_idx * slice_width);
           return describeRect(x, -d.data.radius, slice_width, 2*d.data.radius);
         }
-      }).attr('fill', function(d) {
-        var samp_name = coloured_samps[slice_idx];
-        var samp_idx = sampnames.indexOf(samp_name);
-        return Util.rgba2hex(samp_colours.get(samp_name), d.data.phi[samp_idx], bg_colour);
+      }).attr('fill', function(d, i) {
+        return choose_colour(i, slice_idx, d.data.phi);
       });
   };
-
-  if(NODE_TYPE === 'circle') {
-    nodeEnter.append('svg:circle')
-      .attr('class', 'outline')
-      .attr('r', function(d) { return d.data.radius; });
-  } else {
-    nodeEnter.append('svg:rect')
-      .attr('class', 'outline')
-      .attr('x', function(d) { return -d.data.radius; })
-      .attr('y', function(d) { return -d.data.radius; })
-      .attr('width', function(d) { return 2*d.data.radius; })
-      .attr('height', function(d) { return 2*d.data.radius; });
-  }
   for(var idx = 0; idx < slices; idx++) {
-    /*if(NODE_TYPE === 'circle') {
-      idx = slices - idx - 1;
-    }*/
     add_slice(idx, slices);
   }
   /*nodeEnter.append('svg:path')
@@ -212,23 +219,13 @@ TreePlotter.prototype._generate_tree_struct = function(parents, phi, root_id) {
   return root;
 }
 
-TreePlotter.prototype.plot = function(root, parents, phi, sampnames, samp_colours, container) {
+TreePlotter.prototype.plot = function(root, parents, phi, sampnames, samp_colours, pop_colours, container) {
   var K = phi.length;
   container = d3.select(container).append('div');
   var bg_colour = '#ffffff';
 
-  if(samp_colours === null) {
-    samp_colours = new Map([[sampnames[0], '#428bca']]);
-  } else {
-    // Maps remember their insertion order, which is important to allow the
-    // user to control the order in which samples are coloured. We expect that,
-    // before the Map is created, `samp_colours` is an array of two-element
-    // arrays consisting of [key, value] pairs.
-    samp_colours = new Map(samp_colours);
-  }
-
   var root = this._generate_tree_struct(parents, phi, root);
-  this._draw_tree(root, container, K, sampnames, samp_colours, bg_colour);
+  this._draw_tree(root, container, K, sampnames, samp_colours, pop_colours, bg_colour);
   resize_svg(container.selectAll('svg'));
 }
 
@@ -250,7 +247,7 @@ Util.hex2rgb = function(colour) {
   };
 }
 
-Util.rgba2hex = function(base_colour, alpha, bgcolour) {
+Util.blend_colours = function(base_colour, alpha, bgcolour) {
   base_colour = Util.hex2rgb(base_colour);
   bgcolour = Util.hex2rgb(bgcolour);
 
