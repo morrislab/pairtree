@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 import argparse
+import random
+import numpy as np
+
 import os
 import sys
-
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
+
 import common
 import resultserializer
 import clustermaker
 import inputparser
-import numpy as np
 
 import vaf_plotter
 import relation_plotter
@@ -17,13 +19,13 @@ import util
 import plotutil
 
 def _choose_colours(N):
-  # Taken from d3's `Dark2` scheme (https://github.com/d3/d3-scale-chromatic/blob/master/src/categorical/Dark2.js).
-  colours = ('#1b9e77', '#d95f02', '#7570b3', '#e7298a', '#66a61e', '#e6ab02', '#a6761d', '#666666')
-  # Add 1 to ensure consistency with my JS code, which does the same.
-  chosen = [colours[(idx + 1) % len(colours)] for idx in range(N)]
+  import plotly.colors
+  colours = plotly.colors.qualitative.Dark24
+  chosen = [colours[idx % len(colours)] for idx in range(N)]
+  random.shuffle(chosen)
   return chosen
 
-def _plot_eta(struct, phi, sampnames, visible_sampidxs, outf, use_custom_colours=False):
+def _plot_eta(struct, phi, sampnames, visible_sampidxs, outf, colour_uniquely=False):
   # Avoid Plotly dependency unless user wants this plot.
   import plotly.graph_objs as go
   import plotly.io as pio
@@ -42,10 +44,10 @@ def _plot_eta(struct, phi, sampnames, visible_sampidxs, outf, use_custom_colours
     hoverinfo = 'x+text',
     width = 0.9,
   ) for cidx, row in enumerate(eta)]
-  if use_custom_colours:
+  if colour_uniquely:
     colours = _choose_colours(len(eta))
     for idx, trace in enumerate(traces):
-      trace['maker_color'] = colours[idx]
+      trace['marker_color'] = colours[idx]
 
   layout = go.Layout(
     barmode = 'stack',
@@ -248,6 +250,7 @@ def main():
     description='LOL HI THERE',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('--seed', type=int)
   parser.add_argument('--tree-index', type=int, default=0)
   parser.add_argument('--plot', dest='plot_choices', type=lambda s: set(s.split(',')),
     help='Things to plot; by default, plot everything')
@@ -258,11 +261,17 @@ def main():
     help='Reorder subclones according to depth-first search through tree structure')
   parser.add_argument('--tree-json', dest='tree_json_fn',
     help='Additional external file in which to store JSON, which is already stored statically in the HTML file')
+  parser.add_argument('--colour-eta-uniquely', action='store_true',
+    help='Choose unique colours for each population in eta plot')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
   parser.add_argument('results_fn')
   parser.add_argument('html_out_fn')
   args = parser.parse_args()
+
+  if args.seed is not None:
+    random.seed(args.seed)
+    np.random.seed(args.seed)
 
   plot_choices = _choose_plots(args.plot_choices, args.omit_plots, all_plot_choices)
 
@@ -330,7 +339,14 @@ def main():
         _write_tree_json(full_tree_struct, args.tree_json_fn)
 
     if 'eta' in plot_choices:
-      _plot_eta(data['struct'], data['phi'], data['samples'], visible_sampidxs, outf)
+      _plot_eta(
+        data['struct'],
+        data['phi'],
+        data['samples'],
+        visible_sampidxs,
+        outf,
+        colour_uniquely = args.colour_eta_uniquely,
+      )
 
     if 'vaf_matrix' in plot_choices:
       vaf_plotter.plot_vaf_matrix(
