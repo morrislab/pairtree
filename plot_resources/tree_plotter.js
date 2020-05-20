@@ -149,6 +149,8 @@ TreePlotter.prototype._draw_tree = function(root, container, num_pops, sampnames
       .attr('d', function(d) {
         if (NODE_TYPE === 'circle') {
           var deg = 360 / total_slices;
+          // Without this, Chrome will draw nothing when there's only a single slice.
+          deg = Math.min(deg, 359.9);
           var start = slice_idx * deg;
           var end = (slice_idx + 1)*deg;
           return describeArc(0, 0, d.data.radius, start, end);
