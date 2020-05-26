@@ -25,44 +25,6 @@ def _choose_colours(N):
   random.shuffle(chosen)
   return chosen
 
-def _plot_eta(struct, phi, sampnames, visible_sampidxs, outf, colour_uniquely=False):
-  # Avoid Plotly dependency unless user wants this plot.
-  import plotly.graph_objs as go
-  import plotly.io as pio
-
-  if visible_sampidxs is not None:
-    phi = phi[:,visible_sampidxs]
-    sampnames = [sampnames[idx] for idx in visible_sampidxs]
-  eta = util.calc_eta(struct, phi)
-
-  traces = [dict(
-    type = 'bar',
-    name = 'Pop. %s' % cidx,
-    x = sampnames,
-    y = row,
-    text = ['Population %s: %.0f%%' % (cidx, 100*E) for E in row],
-    hoverinfo = 'x+text',
-    width = 0.9,
-  ) for cidx, row in enumerate(eta)]
-  if colour_uniquely:
-    colours = _choose_colours(len(eta))
-    for idx, trace in enumerate(traces):
-      trace['marker_color'] = colours[idx]
-
-  layout = go.Layout(
-    barmode = 'stack',
-    bargap = 0.1,
-    template = 'plotly_white',
-    xaxis = {'title': 'Sample'},
-    yaxis = {
-      'title': 'Population frequency',
-      'tickformat': ',.0%',
-    },
-  )
-  fig = go.Figure(data=traces, layout=layout)
-  plot_html = pio.to_html(fig, include_plotlyjs='cdn', full_html=False)
-  print('<h2>Population frequencies</h2>%s' % plot_html, file=outf)
-
 def _write_tree_json(tree_struct, jsonfn):
   with open(jsonfn, 'w') as F:
     print(json.dumps(tree_struct), file=F)
@@ -75,7 +37,7 @@ def write_header(runid, tidx, outf):
 
   print('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>%s</title>' % title, file=outf)
   print('<script src="https://d3js.org/d3.v5.min.js"></script>', file=outf)
-  for jsfn in ('highlight_table_labels.js', 'tree_plotter.js'):
+  for jsfn in ('util.js', 'highlight_table_labels.js', 'phi_plotter.js', 'eta_plotter.js', 'vaf_matrix.js', 'tree_plotter.js'):
     print('<script type="text/javascript">%s</script>' % plotutil.read_file(jsfn), file=outf)
   print('<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">', file=outf)
   for cssfn in ('tree.css', 'matrix.css'):
@@ -88,7 +50,7 @@ def write_header(runid, tidx, outf):
 def write_footer(outf):
   print('</main></body></html>', file=outf)
 
-def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colours, plot_phi, plot_phi_hat, plot_phi_error, plot_phi_interleaved, outf):
+def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colours, plot_eta, plot_phi, plot_phi_hat, plot_phi_error, plot_phi_interleaved, outf):
   tree_data['visible_sampidxs'] = visible_sampidxs
   tree_data['samp_colours'] = samp_colours
   tree_data['pop_colours'] = pop_colours
@@ -97,6 +59,16 @@ def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colour
   <script type="text/javascript">
   var tree_json = '%s';
   var results = JSON.parse(tree_json);
+
+  if(results.visible_sampidxs !== null) {
+    results.visible_eta = results.eta.map(function(E) { return results.visible_sampidxs.map(function(idx) { return E[idx]; }); });
+    results.visible_phi = results.phi.map(function(P) { return results.visible_sampidxs.map(function(idx) { return P[idx]; }); });
+    results.visible_samps = results.visible_sampidxs.map(function(idx) { return results.samples[idx]; });
+  } else {
+    results.visible_eta = results.eta;
+    results.visible_phi = results.phi;
+    results.visible_samps = results.samples;
+  }
   </script>''' % json.dumps(tree_data), file=outf)
 
   print('''
@@ -121,18 +93,19 @@ def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colour
     );
   ''' % tidx), file=outf)
 
+  if plot_eta:
+    print('''
+    <div id="eta_matrix" class="container"><h2>Population frequencies</h2></div>
+    %s
+    ''' % plotutil.js_on_load('''
+    (new EtaPlotter()).plot(results.visible_eta, results.visible_samps, '#eta_matrix', 0);
+    '''), file=outf)
+
   if plot_phi:
     print('''
     <div id="phi_matrix" class="container"><h2>Tree-constrained lineage frequencies</h2></div>
     %s
     ''' % plotutil.js_on_load('''
-      if(results.visible_sampidxs !== null) {
-        results.visible_phi = results.phi.map(function(P) { return results.visible_sampidxs.map(function(idx) { return P[idx]; }); });
-        results.visible_samps = results.visible_sampidxs.map(function(idx) { return results.samples[idx]; });
-      } else {
-        results.visible_phi = results.phi;
-        results.visible_samps = results.samples;
-      }
       (new PhiMatrix()).plot(results.visible_phi, results.visible_samps, '#phi_matrix');
     '''), file=outf)
 
@@ -329,6 +302,7 @@ def main():
         visible_sampidxs,
         samp_colours,
         pop_colours,
+        'eta' in plot_choices,
         'phi' in plot_choices,
         'phi_hat' in plot_choices,
         'phi_error' in plot_choices,
@@ -337,16 +311,6 @@ def main():
       )
       if args.tree_json_fn is not None:
         _write_tree_json(full_tree_struct, args.tree_json_fn)
-
-    if 'eta' in plot_choices:
-      _plot_eta(
-        data['struct'],
-        data['phi'],
-        data['samples'],
-        visible_sampidxs,
-        outf,
-        colour_uniquely = args.colour_eta_uniquely,
-      )
 
     if 'vaf_matrix' in plot_choices:
       vaf_plotter.plot_vaf_matrix(

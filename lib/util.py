@@ -125,9 +125,11 @@ def calc_nlglh(llh, K, S):
 def make_tree_struct(struct, count, llh, prob, phi, variants, sampnames):
   K, S = phi.shape
   phi_hat = _calc_phi_hat(variants)
+  eta = calc_eta(struct, phi)
   tree = {
     'phi': phi.tolist(),
     'phi_hat': phi_hat.tolist(),
+    'eta': eta.tolist(),
     'llh': float(llh),
     'nlglh': float(calc_nlglh(llh, K, S)),
     'prob': float(prob),
