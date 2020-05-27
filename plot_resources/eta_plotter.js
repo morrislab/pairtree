@@ -1,6 +1,6 @@
 function EtaPlotter() {
-  this._bar_width = 50;
-  this._bar_height = 500;
+  this._col_width = 50;
+  this._col_height = 500;
   this._legend_spacing = 60;
   this._font_size = '16px';
   this._legend_font_size = '14px';
@@ -34,7 +34,7 @@ EtaPlotter.prototype._calc_cum = function(mat) {
   return cum;
 }
 
-EtaPlotter.prototype._plot_etas = function(svg, eta, samp_labels, col_spacing, pop_colours, col_label_height) {
+EtaPlotter.prototype._plot_etas = function(svg, eta, samp_labels, col_widths, col_spacing, pop_colours, col_label_height) {
   let self = this;
   let K = eta.length;
   let S = eta[0].length;
@@ -50,13 +50,17 @@ EtaPlotter.prototype._plot_etas = function(svg, eta, samp_labels, col_spacing, p
   for(var idx = 1; idx < cum_col_spacing.length; idx++) {
     cum_col_spacing[idx] += cum_col_spacing[idx - 1];
   }
+  let cum_col_widths = [0].concat(col_widths);
+  for(var idx = 1; idx < cum_col_widths.length; idx++) {
+    cum_col_widths[idx] += cum_col_widths[idx - 1];
+  }
 
   let cl = svg.append('svg:g')
-    .attr('transform', 'translate(' + (0.5 * self._bar_width) + ',' + (col_label_height - self._label_padding) + ')')
+    .attr('transform', 'translate(0,' + (col_label_height - self._label_padding) + ')')
     .selectAll('text')
     .data(samp_labels)
     .join('svg:text')
-    .attr('transform', function(d, i) { return 'translate(' + (i*self._bar_width + cum_col_spacing[i]) + ',0) rotate(270)'; })
+    .attr('transform', function(d, i) { return 'translate(' + (0.5*col_widths[i] + cum_col_widths[i] + cum_col_spacing[i]) + ',0) rotate(270)'; })
     .attr('x', 0)
     .attr('y', 0)
     .attr('font-size', this._font_size)
@@ -68,16 +72,16 @@ EtaPlotter.prototype._plot_etas = function(svg, eta, samp_labels, col_spacing, p
     .join('svg:g')
     .attr('class', 'col')
     .attr('transform', function(d, i) {
-      return 'translate(' + (i*self._bar_width + cum_col_spacing[i]) + ',' + col_label_height + ')';
+      return 'translate(' + (cum_col_widths[i] + cum_col_spacing[i]) + ',' + col_label_height + ')';
     });
 
   cols.selectAll('rect')
     .data(function(sidx) { return K_range.map(function(k) { return {k: k, s: sidx}; }); })
     .join('svg:rect')
-    .attr('width', self._bar_width)
-    .attr('height', function(d) { return eta[d.k][d.s] * self._bar_height; })
+    .attr('width', d => col_widths[d.s])
+    .attr('height', function(d) { return eta[d.k][d.s] * self._col_height; })
     .attr('x', 0)
-    .attr('y', function(d, i) { return eta_cum[d.k][d.s] * self._bar_height; })
+    .attr('y', function(d, i) { return eta_cum[d.k][d.s] * self._col_height; })
     .attr('fill-opacity', function(d) { return 1.0; })
     .attr('fill', function(d, i) { return pop_colours[i]; });
 }
@@ -141,16 +145,19 @@ EtaPlotter.prototype.plot = function(eta, samp_labels, container, remove_small_p
   let pop_colours = ColourAssigner.assign_colours(K);
   let pop_label_width = this._calc_label_width(pop_labels);
   let col_label_height = this._calc_label_width(samp_labels);
+
   let col_spacing = S_range.slice(0, -1).map(s => self._col_space);
   let total_col_spacing = col_spacing.reduce((sum, cur) => sum + cur, 0);
+  let col_widths = S_range.map(s => self._col_width);
+  let total_col_widths = col_widths.reduce((sum, cur) => sum + cur, 0);
 
-  let legend_x_offset = S*this._bar_width + this._legend_splotch_spacing + total_col_spacing;
+  let legend_x_offset = total_col_widths + this._legend_splotch_spacing + total_col_spacing;
   let legend_y_offset = col_label_height + 0.5*this._legend_splotch_size;
   let legend_width = this._legend_splotch_size + this._legend_splotch_padding + pop_label_width;
 
   let canvas_width = legend_x_offset + legend_width;
   let canvas_height = Math.max(
-    col_label_height + this._label_padding + this._bar_height,
+    col_label_height + this._label_padding + this._col_height,
     legend_y_offset + K*this._legend_splotch_size,
   );
   let svg = d3.select(container).append('svg:svg')
@@ -161,6 +168,7 @@ EtaPlotter.prototype.plot = function(eta, samp_labels, container, remove_small_p
     svg,
     eta,
     samp_labels,
+    col_widths,
     col_spacing,
     pop_colours,
     col_label_height

@@ -1,7 +1,8 @@
 import os
 
-def read_file(fn):
-  basedir = os.path.join(os.path.dirname(__file__), '..', 'plot_resources')
+def read_file(fn, basedir=None):
+  if not basedir:
+    basedir = os.path.join(os.path.dirname(__file__), '..', 'plot_resources')
   with open(os.path.join(basedir, fn)) as F:
     return F.read()
 
