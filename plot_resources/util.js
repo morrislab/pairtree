@@ -32,8 +32,13 @@ Util.blend_colours = function(base_colour, alpha, bgcolour) {
 function ColourAssigner() {
 }
 
-ColourAssigner.assign_colours = function(num_colours) {
-  var scale = d3.schemeTableau10;
+ColourAssigner._assign_from_palette = function(num_colours, scale_name) {
+  let scales = {
+    tableau10: d3.schemeTableau10,
+    dark24: ['#2E91E5', '#E15F99', '#1CA71C', '#FB0D0D', '#DA16FF', '#222A2A', '#B68100', '#750D86', '#EB663B', '#511CFB', '#00A08B', '#FB00D1', '#FC0080', '#B2828D', '#6C7C32', '#778AAE', '#862A16', '#A777F1', '#620042', '#1616A7', '#DA60CA', '#6C4516', '#0D2A63', '#AF0038'],
+    alphabet: ['#2E91E5', '#E15F99', '#1CA71C', '#FB0D0D', '#DA16FF', '#222A2A', '#B68100', '#750D86', '#EB663B', '#511CFB', '#00A08B', '#FB00D1', '#FC0080', '#B2828D', '#6C7C32', '#778AAE', '#862A16', '#A777F1', '#620042', '#1616A7', '#DA60CA', '#6C4516', '#0D2A63', '#AF0038'],
+  };
+  let scale = scale_name ? scales[scale_name] : scales.tableau10;
 
   var colours = [];
   // Start at cidx=1 rather than cidx=0 to keep colouring of phi matrix
@@ -45,6 +50,32 @@ ColourAssigner.assign_colours = function(num_colours) {
     colours.push(scale[cidx]);
   }
   return colours;
+}
+
+ColourAssigner._assign_from_husl = function(N) {
+  let colours = [];
+  let first_hue = 0.01;
+  for(let idx = 0; idx < N; idx++) {
+    let hue = 360*(first_hue + ((idx+1)/N)*(1 - first_hue));
+    colours.push(hsluv.hsluvToHex([hue, 90, 55]));
+  }
+  shuffle(colours);
+  return colours;
+}
+
+ColourAssigner.assign_colours = function(N, use_husl=false) {
+  if(use_husl) {
+    return ColourAssigner._assign_from_husl(N);
+  } else {
+    return ColourAssigner._assign_from_palette(N);
+  }
+}
+
+function shuffle(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
 }
 
 function resize_svg(elems) {
