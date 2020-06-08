@@ -15,22 +15,34 @@ AXIS_TITLES = {}
 
 def _make_axis_titles():
   AXIS_TITLES['mutphi'] = {
-    'all_scores': 'Lineage frequency error<br>(bits / mutation / tissue sample)',
-    'error_rate': 'Median lineage frequency error<br>(bits / mutation / tissue sample)',
-    'single_vs_others': 'Lineage frequency error<br>(bits / mutation / tissue sample)<br>relative to %s',
+    'all_scores': 'VAF reconstruction loss<br>(bits / mutation / tissue sample)',
+    'S_comparison': 'Median VAF reconstruction loss<br>(bits / mutation / tissue sample)',
+    'single_vs_others': 'VAF reconstruction loss<br>(bits / mutation / tissue sample)<br>relative to %s',
   }
 
   AXIS_TITLES['mutrel'] = {
-    'all_scores': 'Pairwise relation error<br>(bits / mutation pair)',
-    'error_rate': 'Median pairwise relation error<br>(bits / mutation pair)',
-    'single_vs_others': 'Pairwise relation error<br>(bits / mutation pair)r<br>relative to %s',
+    'all_scores': 'Relationship reconstruction error<br>(bits / mutation pair)',
+    'S_comparison': 'Median relationship reconstruction error<br>(bits / mutation pair)',
+    'single_vs_others': 'Relationship reconstruction loss<br>(bits / mutation pair)r<br>relative to %s',
+  }
+
+  AXIS_TITLES['walltime'] = {
+    'all_scores': 'Wall-clock time (seconds)',
+    'S_comparison': 'Median wall-clock time (seconds)',
+    'single_vs_others': 'Extra wall-clock time (seconds)<br>relative to %s',
+  }
+
+  AXIS_TITLES['cputime'] = {
+    'all_scores': 'CPU time (seconds)',
+    'S_comparison': 'Median CPU time (seconds)',
+    'single_vs_others': 'Extra CPU time (seconds)<br>relative to %s',
   }
 
   for lpdist in ('l1', 'l2'):
     AXIS_TITLES[f'mutdist{lpdist}'] = {
-      'all_scores': f'Lineage frequency error<br>({lpdist.upper()} distance / mutation / tissue sample)',
-      'error_rate': f'Median lineage frequency error<br>{lpdist.upper()} distance / mutation / tissue sample)',
-      'single_vs_others': f'Lineage frequency error<br>({lpdist.upper()} distance / mutation / tissue sample)<br>relative to %s',
+      'all_scores': f'Relationship reconstruction error<br>({lpdist.upper()} distance / mutation / tissue sample)',
+      'S_comparison': f'Median relationship reconstruction error<br>{lpdist.upper()} distance / mutation / tissue sample)',
+      'single_vs_others': f'Relationship reconstruction error<br>({lpdist.upper()} distance / mutation / tissue sample)<br>relative to %s',
     }
 
 def _plot_single_vs_others(results, single, methods, method_colours, score_type):
@@ -218,7 +230,7 @@ def _plot_success_rates(results, methods, method_colours, K_vals, S_vals):
   )
   return fig
 
-def _plot_error_rate(results, methods, method_colours, K_vals, S_vals, score_type):
+def _plot_S_comparison(results, methods, method_colours, K_vals, S_vals, score_type):
   M_sorted = plotter.sort_methods(methods)
   M_happy = {M: plotter.HAPPY_METHOD_NAMES.get(M, M) for M in M_sorted}
   fig = plotly.subplots.make_subplots(
@@ -265,7 +277,7 @@ def _plot_error_rate(results, methods, method_colours, K_vals, S_vals, score_typ
     type = 'category',
   )
   fig.update_yaxes(
-    title = AXIS_TITLES[score_type]['error_rate'],
+    title = AXIS_TITLES[score_type]['S_comparison'],
     col = 1,
   )
   return fig
@@ -307,7 +319,7 @@ def main():
       (3, 10),
       (1, 3, 10),
     ),
-    'error_rate': _plot_error_rate(
+    'S_comparison': _plot_S_comparison(
       results,
       methods - set(('mle_unconstrained', 'citup', 'pastri')),
       method_colours,
@@ -321,7 +333,7 @@ def main():
     'success_rate': (400, 485),
   }
   export_dims['scores'] = (700, 850)
-  export_dims['error_rate'] = (500, 485)
+  export_dims['S_comparison'] = (500, 485)
 
   for M in plotter.sort_methods(methods):
     if M == 'mle_unconstrained':

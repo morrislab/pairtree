@@ -42,9 +42,7 @@ def main():
   methods = methods_A
 
   for M in methods:
-    complete_A = np.asarray(results_A[M], dtype=np.float) == float(MISSING)
-    complete_B = np.asarray(results_B[M], dtype=np.float) == float(MISSING)
-    mask = np.logical_and(complete_A, np.logical_not(complete_B))
+    mask = np.asarray(results_B[M], dtype=np.float) == float(MISSING)
     removing = np.sum(mask)
     if removing > 0:
       print('Removing %s values for %s from %s' % (removing, M, args.score_fn_A))

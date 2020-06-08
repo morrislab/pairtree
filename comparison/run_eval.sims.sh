@@ -79,7 +79,7 @@ function make_results_paths {
   paths+="pwgs_supervars=${BATCH}.pwgs.supervars/$runid/$runid.$result_type.npz "
   paths+="pastri=${BATCH}.pastri/$runid/$runid.$result_type.npz "
   if [[ $result_type == mutrel ]]; then
-    paths+="pairtree_clustrel=${BATCH}.pairtree.projection/${runid}/${runid}.clustrel_mutrel.npz "
+    paths+="pairtree_clustrel=${BATCH}.pairtree.clustrel/${runid}/${runid}.clustrel_mutrel.npz "
   fi
   paths+="pairtree=${BATCH}.pairtree.projection/${runid}/${runid}.${result_type}.npz "
   paths+="lichee=${BATCH}.lichee/$runid/$runid.$result_type.npz "
@@ -172,11 +172,12 @@ function eval_runtime {
     for timetype in cpu wall; do
       cmd="python3 $SCRIPTDIR/eval_runtime.py "
       cmd+="--time-type $timetype "
-      cmd+="citup=$RESULTSDIR/sims.citup.rawvars.qip/$runid/$runid.time "
-      cmd+="lichee=$RESULTSDIR/sims.lichee/$runid/$runid.time "
-      cmd+="pairtree=$RESULTSDIR/sims.pairtree/$runid/$runid.time "
-      cmd+="pastri=$RESULTSDIR/sims.pastri.informative/$runid/$runid.time "
-      cmd+="pwgs_supervars=$RESULTSDIR/sims.pwgs.supervars/$runid/$runid.time "
+      cmd+="citup=$RESULTSDIR/${BATCH}.citup.rawvars.qip/$runid/$runid.time "
+      cmd+="lichee=$RESULTSDIR/${BATCH}.lichee/$runid/$runid.time "
+      cmd+="pairtree=$RESULTSDIR/${BATCH}.pairtree.projection/$runid/$runid.time "
+      cmd+="pairtree_clustrel=$RESULTSDIR/${BATCH}.pairtree.clustrel/$runid/$runid.time "
+      cmd+="pastri=$RESULTSDIR/${BATCH}.pastri/$runid/$runid.time "
+      cmd+="pwgs_supervars=$RESULTSDIR/${BATCH}.pwgs.supervars/$runid/$runid.time "
       cmd+="> $SCORESDIR/$BATCH/$runid.${timetype}time.txt "
       echo $cmd
     done
@@ -286,7 +287,7 @@ function plot_results_sims {
     basefn="$SCORESDIR/$BATCH"
 
     for score_type in mutphi mutrel mutdistl1 mutdistl2; do
-      plot_sims  $score_type ${basefn}.${score_type}.txt ${basefn}.lol.${score_type}.html
+      plot_sims  $score_type ${basefn}.${score_type}.txt ${basefn}.${score_type}.html
 
       for method in pairtree pairtree_clustrel lichee pwgs_supervars citup pastri; do
         [[ $method == pairtree_clustrel && $score_type != mutrel ]] && continue
@@ -301,26 +302,27 @@ function plot_results_sims {
 function remove_missing {
   basefn=$SCORESDIR/$BATCH
   for ttype in cputime walltime; do
-    cmd="python3 $SCRIPTDIR/intersect_scores.py "
+    # For each method, given result files A and B, set results in B to missing
+    # if they're also missing in A.
+    # (This is set subtraction, not intersection, but whatever.)
+    cmd="python3 $SCRIPTDIR/set_subtract_scores.py "
     cmd+="$basefn.$ttype.txt "
-    cmd+="$basefn.mutphi.txt "
+    cmd+="$basefn.mutrel.txt "
     echo $cmd
   done | bash
 }
 
 function plot_runtime {
-  eval_runtime | para
-  compile_runtime
-  remove_missing
-  partition_by_K cputime
-  partition_by_K walltime
-  for ksize in bigK smallK; do
-    for ttype in cputime walltime; do
-      basefn="$SCORESDIR/$BATCH.$ttype.$ksize"
-      # I removed the `plot_all_methods` function because I hate this code.
-      # I'll need to change this.
-      plot_all_methods $ttype violin $basefn.{txt,html}
-    done
+  #eval_runtime | para
+  #compile_runtime
+  #remove_missing
+  for ttype in cputime walltime; do
+    basefn="$SCORESDIR/$BATCH.$ttype"
+    cmd="python3 $SCRIPTDIR/plotter/plot_sims.py "
+    cmd+=" --template seaborn"
+    cmd+=" --score-type $ttype"
+    cmd+=" $basefn.{txt,html}"
+    echo $cmd
   done | para
 }
 
@@ -333,7 +335,7 @@ function main {
   #make_sims_truth
   #make_mle_mutphis
   plot_results_sims
-  #plot_runtime
+  plot_runtime
 }
 
 main
