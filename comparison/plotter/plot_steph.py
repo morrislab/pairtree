@@ -40,7 +40,7 @@ def _plot_single_vs_others(results, single, methods, method_colours):
     'data': traces,
     'layout': {
       'yaxis': {
-        'title': 'Lineage frequency error relative to %s<br>(bits / mutation / tissue sample)' % plotter.HAPPY_METHOD_NAMES.get(M, M),
+        'title': 'VAF reconstruction loss relative to %s<br>(bits / mutation / tissue sample)' % plotter.HAPPY_METHOD_NAMES.get(M, M),
         'zeroline': True,
         'zerolinewidth': 2,
         'zerolinecolor': 'rgba(0,0,0,0.5)',
@@ -92,7 +92,7 @@ def _plot_scores(results, methods, method_colours):
         zerolinewidth = 2,
         zerolinecolor = 'rgba(0,0,0,0.5)',
         range = (-0.15*max_x, 1.05*max_x),
-        title_text = 'Lineage frequency error<br>(bits / mutation / tissue sample)',
+        title_text = 'VAF reconstruction loss<br>(bits / mutation / tissue sample)',
       ),
       'showlegend': False,
     },
