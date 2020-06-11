@@ -45,7 +45,7 @@ EtaPlotter.prototype._calc_cum = function(A) {
   return cum;
 }
 
-EtaPlotter.prototype._plot_etas = function(svg, eta, samp_labels, col_widths, col_spacing, pop_colours, col_label_height, y_offset) {
+EtaPlotter.prototype._plot_etas = function(svg, eta, pop_labels, samp_labels, col_widths, col_spacing, pop_colours, col_label_height, y_offset) {
   let self = this;
   let K = eta.length;
   let S = eta[0].length;
@@ -58,6 +58,17 @@ EtaPlotter.prototype._plot_etas = function(svg, eta, samp_labels, col_widths, co
   if(samp_labels.length !== S) {
     throw "Wrong number of samp labels";
   }
+
+  // Setting `pointer-events` to `none` is *critical*. Without this, mousemove
+  // and other mouse events will be delivered to the tooltip element, rather
+  // than the underlying SVG's rect elements, such that the tooltip will often
+  // never display, since its opacity is never changed from 0.
+  let tooltip = d3.select('body').append('div')
+    .attr('class', 'tooltip bs-tooltip-right')
+    .style('pointer-events', 'none')
+    .attr('role', 'tooltip')
+    .style('opacity', 0);
+  let tooltip_inner = tooltip.append('div').attr('class', 'tooltip-inner');
 
   let cl = svg.append('svg:g')
     .attr('class', 'col_labels')
@@ -91,7 +102,13 @@ EtaPlotter.prototype._plot_etas = function(svg, eta, samp_labels, col_widths, co
     .attr('x', 0)
     .attr('y', function(d, i) { return eta_cum[d.k][d.s] * self._col_height; })
     .attr('fill-opacity', function(d) { return 1.0; })
-    .attr('fill', function(d, i) { return pop_colours[i]; });
+    .attr('fill', function(d, i) { return pop_colours[i]; })
+    .on('mousemove', function(d, i) {
+      tooltip.style('opacity', 0.9).style('top', (d3.event.pageY - 10) + 'px').style('left', (d3.event.pageX + 10) + 'px');
+      tooltip_inner.text(pop_labels[i] + ': ' + Math.round(100*eta[d.k][d.s]) + '%')
+    }).on('mouseout', function(d) {
+      tooltip.style('opacity', 0);
+    });
 }
 
 EtaPlotter.prototype._add_pop_legend = function(svg, pop_labels, pop_colours, x_offset, y_offset) {
@@ -300,6 +317,7 @@ EtaPlotter.prototype.plot = function(eta, samp_labels, container, remove_small_p
   this._plot_etas(
     svg,
     eta,
+    pop_labels,
     samp_labels,
     col_widths,
     col_spacing,
