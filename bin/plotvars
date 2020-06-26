@@ -15,13 +15,18 @@ import relation_plotter
 import plotutil
 
 def write_header(outf):
-  print('<meta charset="utf-8">', file=outf)
-  for jsfn in ('highlight_table_labels.js', 'tree_plotter.js'):
-    print('<script type="text/javascript">%s</script>' % plotutil.read_file(jsfn), file=outf)
+  print('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Clusters</title>', file=outf)
+  print('<script src="https://d3js.org/d3.v5.min.js"></script>', file=outf)
+  for jsfn in ('util.js', 'highlight_table_labels.js', 'vaf_matrix.js'):
+    print('<script>%s</script>' % plotutil.read_file(jsfn), file=outf)
   print('<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">', file=outf)
   for cssfn in ('matrix.css',):
     print('<style type="text/css">%s</style>' % plotutil.read_file(cssfn), file=outf)
   print('<style type="text/css">.container { margin: 30px; } td, th, table { padding: 5px; margin: 0; border-collapse: collapse; font-weight: normal; } span { visibility: hidden; } td:hover > span { visibility: visible; } .highlighted { background-color: black !important; color: white; }</style>', file=outf)
+  print('</head><body><main>', file=outf)
+
+def write_footer(outf):
+  print('</main></body></html>', file=outf)
 
 def main():
   parser = argparse.ArgumentParser(
@@ -69,6 +74,8 @@ def main():
     if args.plot_relations:
       relation_plotter.plot_ml_relations(clustrel_posterior, outf)
       relation_plotter.plot_separate_relations(clustrel_posterior, outf)
+
+    write_footer(outf)
 
 if __name__ == '__main__':
   main()
