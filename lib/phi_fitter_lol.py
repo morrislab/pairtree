@@ -95,6 +95,10 @@ def _calc_grad(var_reads, ref_reads, omega, A, Z, psi):
   M, K = A.shape
   eta = softmax(psi)   # Kx1
   phi = np.dot(Z, eta) # Kx1
+  assert np.all(phi > 0)
+  # Prevent division by zero when `omega = 1`, in `(1 - phi_muts*omega)`.
+  # Also, because of numerical weirdness, phi_muts can be very slightly over 1.
+  phi = np.minimum(1 - _EPS, phi)
 
   delta = 1e-20
   phi[util.isclose(phi, 0)] += delta
