@@ -53,7 +53,7 @@ def write_header(runid, outf):
     'https://cdn.jsdelivr.net/npm/file-saver@2.0.2/dist/FileSaver.min.js',
   ):
     print('<script type="text/javascript" src="%s"></script>' % jsurl, file=outf)
-  for jsfn in ('tree_plotter.js', 'posterior_summ.js'):
+  for jsfn in ('tree_plotter.js', 'posterior_summ.js', 'util.js'):
     print('<script type="text/javascript">%s</script>' % plotutil.read_file(jsfn), file=outf)
   print('<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">', file=outf)
   print('<style type="text/css">%s</style>' % plotutil.read_file('tree.css'), file=outf)

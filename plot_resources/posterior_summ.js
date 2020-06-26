@@ -24,6 +24,7 @@ PosteriorSumm.prototype.plot = function(results, container) {
       struct.phi,
       struct.samples,
       results.samp_colours,
+      null,
       tree_container,
     );
     // Resize tree to fit in table.
