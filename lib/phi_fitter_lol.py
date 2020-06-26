@@ -93,28 +93,33 @@ def _calc_grad(var_reads, ref_reads, omega, A, Z, psi):
   psi = np.minimum(300, psi)
 
   M, K = A.shape
-  eta = softmax(psi)   # Kx1
+  eta = util.softmax(psi)   # Kx1
   phi = np.dot(Z, eta) # Kx1
-  assert np.all(phi > 0)
+
   # Prevent division by zero when `omega = 1`, in `(1 - phi_muts*omega)`.
   # Also, because of numerical weirdness, phi_muts can be very slightly over 1.
-  phi = np.minimum(1 - _EPS, phi)
-
-  delta = 1e-20
-  phi[util.isclose(phi, 0)] += delta
-  phi[util.isclose(phi, 1)] -= delta
-
+  #
+  # Setting delta to 1e-20 resulted in phi being exactly 1 sometimes. That's ... concerning.
+  # Having it as 1e-10 is fine, though.
+  # Observe the weirdness:
+  #     In [3]: 1 - 1e-20 == 1
+  #     Out[3]: True
+  delta = 1e-10
+  phi = np.minimum(1 - delta, phi)
+  phi = np.maximum(delta,     phi)
   phi_muts = np.dot(A, phi) # Mx1
+  assert np.all(phi_muts > 0) and np.all(phi_muts < 1)
+
   dlogpx_dphi_muts = (var_reads / phi_muts) - (omega*ref_reads)/(1 - phi_muts*omega) # Mx1
   dlogpx_dphi = np.dot(A.T, dlogpx_dphi_muts) # Kx1
   assert dlogpx_dphi.shape == (K,)
 
   psi_tiled = _tile_rows(psi, K)
   assert psi_tiled.shape == (K, K)
-  # psi_sums[i,j] = psi[i] + psi[j]
+  # Note: psi_sums[i,j] = psi[i] + psi[j]
   psi_sums = psi_tiled + psi_tiled.T
   logsumexp_psi = logsumexp(psi)
-  # deta_dpsi[i,j] = deta[i] / dpsi[j]
+  # Note: deta_dpsi[i,j] = deta[i] / dpsi[j]
   deta_dpsi = -np.exp(psi_sums - 2*logsumexp_psi) # KxK
   np.fill_diagonal(deta_dpsi, (np.exp(psi + logsumexp_psi) - np.exp(2*psi)) / np.exp(2*logsumexp_psi))
   assert deta_dpsi.shape == (K, K)
@@ -164,18 +169,6 @@ def logsumexp(V):
   return log_sum
 
 @njit
-def softmax(V):
-  log_softmax = V - logsumexp(V)
-  smax = np.exp(log_softmax)
-  # The vector sum will be close to 1 at this point, but not close enough to
-  # make np.random.choice happy -- sometimes it will issue the error
-  # "probabilities do not sum to 1" from mtrand.RandomState.choice.
-  # To fix this, renormalize the vector.
-  smax /= np.sum(smax)
-  #assert np.isclose(np.sum(smax), 1)
-  return smax
-
-@njit
 def _fit_eta_S(eta_S, var_reads_S, ref_reads_S, omega_S, A, Z, method, iterations):
   psi_S = np.log(eta_S)
 
@@ -193,7 +186,7 @@ def _fit_eta_S(eta_S, var_reads_S, ref_reads_S, omega_S, A, Z, method, iteration
   else:
     raise Exception('Unknown psi fitter')
 
-  eta_S = softmax(psi_S)
+  eta_S = util.softmax(psi_S)
   return eta_S
 
 @njit
@@ -202,7 +195,7 @@ def _calc_llh(var_reads, ref_reads, omega, A, Z, psi):
   assert Z.shape == (K,K)
   assert var_reads.shape == ref_reads.shape == omega.shape
 
-  eta = softmax(psi)
+  eta = util.softmax(psi)
   phi = np.dot(Z, eta) # Kx1
   var_phis = np.dot(A, phi)
   logp = binom.logpmf(var_reads, ref_reads + var_reads, var_phis * omega)
