@@ -36,10 +36,10 @@ PhiMatrix.prototype.plot = function(phi, sampnames, container, convert_to_ccf, o
   }
 }
 
-function PhiErrorMatrix() {
+function ErrorCalculator() {
 }
 
-PhiErrorMatrix.prototype.calc_error = function(phi, phi_hat) {
+ErrorCalculator.calc_error = function(phi, phi_hat) {
   var error = [];
   for(var i = 0; i < phi.length; i++) {
     error.push([]);
@@ -50,7 +50,7 @@ PhiErrorMatrix.prototype.calc_error = function(phi, phi_hat) {
   return error;
 }
 
-PhiErrorMatrix.prototype._calc_total_error = function(error) {
+ErrorCalculator.calc_total_error = function(error) {
   var total = 0;
   for(var i = 0; i < error.length; i++) {
     for(var j = 0; j < error[i].length; j++) {
@@ -60,19 +60,15 @@ PhiErrorMatrix.prototype._calc_total_error = function(error) {
   return total;
 }
 
-PhiErrorMatrix.prototype.plot = function(phi, phi_hat, sampnames, container) {
-  var error = this.calc_error(phi, phi_hat);
-  d3.select(container).append('h3').text('Total error: ' + this._calc_total_error(error).toFixed(2));
-  (new PhiMatrix()).plot(error, sampnames, container);
-}
-
 function PhiInterleavedMatrix() {
 }
 
-PhiInterleavedMatrix.prototype.plot = function(phi, phi_hat, sampnames, container) {
-  var error = (new PhiErrorMatrix()).calc_error(phi, phi_hat);
-  var pop_colours = ColourAssigner.assign_colours(phi.length);
+PhiInterleavedMatrix.prototype.plot = function(phi, phi_hat, sampnames, container, orientation) {
+  var error = ErrorCalculator.calc_error(phi, phi_hat);
+  var total_error = ErrorCalculator.calc_total_error(error);
+  d3.select(container).append('h3').text('Total error: ' + total_error.toFixed(2));
 
+  var pop_colours = ColourAssigner.assign_colours(phi.length);
   var interleaved = [];
   var row_labels = [];
   var row_colours = [];
@@ -91,7 +87,12 @@ PhiInterleavedMatrix.prototype.plot = function(phi, phi_hat, sampnames, containe
   }
 
   var sampcolours = null;
-  (new MatrixBar()).plot(interleaved, row_labels, row_colours, sampnames, sampcolours, container);
+  if(orientation === 'samples_as_rows') {
+    let interleaved_T = Util.transpose(interleaved);
+    (new MatrixBar()).plot(interleaved_T, sampnames, sampcolours, row_labels, row_colours, container);
+  } else {
+    (new MatrixBar()).plot(interleaved, row_labels, row_colours, sampnames, sampcolours, container);
+  }
 }
 
 function MatrixBar() {

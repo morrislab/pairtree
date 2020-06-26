@@ -53,7 +53,7 @@ def write_header(runid, tidx, outf):
 def write_footer(outf):
   print('</main></body></html>', file=outf)
 
-def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colours, plot_eta, plot_diversity_indices, plot_phi, plot_phi_hat, plot_phi_error, plot_phi_interleaved, phi_orientation, outf):
+def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colours, plot_eta, plot_diversity_indices, plot_phi, plot_phi_interleaved, phi_orientation, outf):
   tree_data['visible_sampidxs'] = visible_sampidxs
   tree_data['samp_colours'] = samp_colours
   tree_data['pop_colours'] = pop_colours
@@ -124,23 +124,11 @@ def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colour
       (new PhiMatrix()).plot(results.visible_phi, results.visible_samps, '#phi_matrix', false, '%s');
     ''' % phi_orientation), file=outf)
 
-  if plot_phi_hat:
-    print('''
-    <div id="phi_hat_matrix" class="container"><h2>Data-implied lineage frequencies</h2></div>
-    %s
-    ''' % plotutil.js_on_load('''(new PhiMatrix().plot(results.phi_hat, results.samples, '#phi_hat_matrix'));'''), file=outf)
-
-  if plot_phi_error:
-    print('''
-    <div id="phi_error_matrix" class="container"><h2>Lineage frequency error</h2></div>
-    %s
-    ''' % plotutil.js_on_load('''(new PhiErrorMatrix()).plot(results.phi, results.phi_hat, results.samples, '#phi_error_matrix');'''), file=outf)
-
   if plot_phi_interleaved:
     print('''
     <div id="phi_interleaved_matrix" class="container"><h2>Interleaved lineage frequencies</h2></div>
     %s
-    ''' % plotutil.js_on_load('''(new PhiInterleavedMatrix()).plot(results.phi, results.phi_hat, results.samples, '#phi_interleaved_matrix');'''), file=outf)
+    ''' % plotutil.js_on_load('''(new PhiInterleavedMatrix()).plot(results.phi, results.phi_hat, results.samples, '#phi_interleaved_matrix', '%s');''' % phi_orientation), file=outf)
 
 def write_cluster_stats(clusters, garbage, supervars, variants, outf):
   cluster_dev = []
@@ -177,7 +165,7 @@ def _choose_plots(to_plot, to_omit, all_choices):
   # tree, so that the relevant data structures are generated below. This is
   # silly, so I should fix it eventually -- we should be able to plot just
   # the phis if we want.
-  if len(set(('phi', 'phi_hat', 'phi_error', 'phi_interleaved', 'eta', 'diversity_indices')) & plot_choices) > 0:
+  if len(set(('phi', 'phi_interleaved', 'eta', 'diversity_indices')) & plot_choices) > 0:
     plot_choices.add('tree')
 
   return plot_choices
@@ -351,8 +339,6 @@ def main():
         'eta' in plot_choices,
         'diversity_indices' in plot_choices,
         'phi' in plot_choices,
-        'phi_hat' in plot_choices,
-        'phi_error' in plot_choices,
         'phi_interleaved' in plot_choices,
         args.phi_orientation,
         outf,
