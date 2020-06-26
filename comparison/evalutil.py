@@ -112,19 +112,6 @@ def make_mutrel_from_trees_and_single_clustering(structs, llhs, counts, clusteri
   mrel = make_mutrel_from_clustrel(clustrel, clustering)
   return mrel
 
-def make_membership_mat(clusters):
-  vids = common.sort_vids([vid for C in clusters for vid in C])
-  vidmap = {vid: vidx for vidx, vid in enumerate(vids)}
-  N = len(vids)
-  K = len(clusters)
-
-  # membership[i,j] = 1 iff mutation `i` is in cluster `j`
-  membership = np.zeros((N, K))
-  for cidx, C in enumerate(clusters):
-    members = [vidmap[vid] for vid in C]
-    membership[members,cidx] = 1
-  return (vids, membership)
-
 def make_mutrel_from_cluster_adj(cluster_adj, clusters):
   '''
   * `M` = # of mutations
@@ -181,7 +168,7 @@ def make_mutrel_from_clustrel(clustrel, clusters, check_sanity=True):
   K = len(clusters)
   assert clustrel.rels.shape == (K, K, NUM_MODELS)
 
-  vids, membership = make_membership_mat(clusters)
+  vids, membership = util.make_membership_mat(clusters)
   # K: number of non-empty clusters
   M = len(membership)
   assert len(vids) == M

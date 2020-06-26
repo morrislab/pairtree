@@ -9,9 +9,9 @@ function EtaPlotter() {
   this._legend_padding = 5;
   this._legend_splotch_spacing = 20;
   this._col_space = 10;
-  this._pop_entropy_height = 50;
-  this._pop_entropy_spacing = 15;
-  this._pop_entropy_legend_width = this._legend_splotch_size;
+  this._diversity_idx_height = 50;
+  this._diversity_idx_spacing = 15;
+  this._diversity_idx_legend_width = this._legend_splotch_size;
 }
 
 EtaPlotter.prototype._calc_label_width = function(labels) {
@@ -155,32 +155,33 @@ EtaPlotter.prototype._remove_small_pops = function(eta, pop_labels, threshold) {
   }
 }
 
-EtaPlotter.prototype._plot_pop_entropy = function(svg, eta, y_offset, col_widths, col_spacing, colour) {
+EtaPlotter.prototype._plot_diversity_indices = function(svg, cdi, cmdi, y_offset, col_widths, col_spacing, colour) {
   let self = this;
-  let [entropy, max_samp_entropy, max_entropy] = this._calc_pop_entropy(eta);
   let cum_col_width = this._calc_cum(col_widths);
   let cum_col_spacing = this._calc_cum(col_spacing);
 
   let container = svg.append('svg:g')
-    .attr('class', 'pop_entropy_bars')
+    .attr('class', 'diversity_idx_bars')
     .attr('transform', 'translate(0,' + y_offset + ')');
 
-  let ents = new Map([
-    ['ent1', entropy.map(ent => ent / max_entropy)],
-    ['ent2', entropy.map(ent => ent / max_samp_entropy)],
+  let max_cdi = Math.max(...cdi);
+  let max_cmdi = Math.max(...cmdi);
+  let div_idxs = new Map([
+    ['cdi', cdi.map(C => C / max_cdi)],
+    ['cmdi', cmdi.map(C => C / max_cmdi)],
   ]);
-  let y_offsets = new Map([['ent1', 0], ['ent2', self._pop_entropy_height + self._pop_entropy_spacing]]);
+  let y_offsets = new Map([['cdi', 0], ['cmdi', self._diversity_idx_height + self._diversity_idx_spacing]]);
 
-  ents.forEach((ent, key) => {
+  div_idxs.forEach((val, key) => {
     container.selectAll('.' + key)
-      .data(ent)
+      .data(val)
       .join('svg:rect')
       .attr('class', key)
       .attr('x', (d, i) => cum_col_width[i] + cum_col_spacing[i])
-      .attr('y', ent => (1 - ent)*self._pop_entropy_height + y_offsets.get(key))
+      .attr('y', V => (1 - V)*self._diversity_idx_height + y_offsets.get(key))
       .attr('width', (d, i) => col_widths[i])
-      .attr('height', ent => ent*self._pop_entropy_height)
-      .attr('fill', ent => colour(ent));
+      .attr('height', V => V*self._diversity_idx_height)
+      .attr('fill', V => colour(V));
   });
 }
 
@@ -195,49 +196,49 @@ EtaPlotter.prototype._ramp = function(colour, n = 256) {
   return canvas;
 }
 
-EtaPlotter.prototype._make_pop_entropy_legend = function(svg, colour, x_offset, y_offset) {
+EtaPlotter.prototype._make_diversity_idx_legend = function(svg, colour, x_offset, y_offset) {
   let scale = d3.scaleSequential([0, 100], colour);
 
   let legend = svg.append('svg:g')
-    .attr('class', 'pop_entropy_legend')
+    .attr('class', 'diversity_idx_legend')
     .attr('transform', 'translate(' + x_offset + ',' + y_offset + ')');
 
   let legend_offsets = new Map([
-    ['ent1', 0],
-    ['ent2', this._pop_entropy_height + this._pop_entropy_spacing]
+    ['cdi', 0],
+    ['cmdi', this._diversity_idx_height + this._diversity_idx_spacing]
   ]);
   let labels = new Map([
-    ['ent1', 'entropy A'],
-    ['ent2', 'entropy B'],
+    ['cdi', 'Clone'],
+    ['cmdi', 'Clone and mutation'],
   ]);
 
   legend_offsets.forEach((Y, key) => {
     legend.append('image')
       .attr('x', 0)
       .attr('y', Y)
-      .attr('width', this._pop_entropy_legend_width)
-      .attr('height', this._pop_entropy_height)
+      .attr('width', this._diversity_idx_legend_width)
+      .attr('height', this._diversity_idx_height)
       .attr('preserveAspectRatio', 'none')
       .attr('xlink:href', this._ramp(scale.interpolator()).toDataURL());
 
     let axis_scale = d3.scaleLinear()
       .domain([0, 1])
-      .range([this._pop_entropy_height, 0]);
+      .range([this._diversity_idx_height, 0]);
     let font_size = 0.9*this._legend_font_size;
 
     let label = legend.append('svg:g');
-    label.append('svg:text').text('Population');
-    label.append('svg:text').text(labels.get(key)).attr('dy', font_size);
+    label.append('svg:text').text(labels.get(key));
+    label.append('svg:text').attr('dy', font_size).text('diversity index');
     label.selectAll('text')
       .attr('x', 0)
       .attr('y', 0)
       .attr('dominant-baseline', 'hanging')
       .attr('font-size', font_size);
-    let label_offset = 0.5*(this._pop_entropy_height - label.node().getBoundingClientRect().height);
-    label.attr('transform', 'translate(' + (this._pop_entropy_legend_width + 2*this._legend_padding) + ',' + (Y + label_offset) + ')');
+    let label_offset = 0.5*(this._diversity_idx_height - label.node().getBoundingClientRect().height);
+    label.attr('transform', 'translate(' + (this._diversity_idx_legend_width + 2*this._legend_padding) + ',' + (Y + label_offset) + ')');
 
     legend.append('g')
-      .attr('transform', 'translate(' + (this._pop_entropy_legend_width + this._legend_padding) + ',' + Y + ')')
+      .attr('transform', 'translate(' + (this._diversity_idx_legend_width + this._legend_padding) + ',' + Y + ')')
       .call(d3.axisRight(axis_scale)
         .ticks(1)
         .tickSize(5)
@@ -257,28 +258,7 @@ EtaPlotter.prototype._renormalize_eta = function(eta) {
   }
 }
 
-EtaPlotter.prototype._calc_pop_entropy = function(eta) {
-  let K = eta.length;
-  let S = eta[0].length;
-  let entropy = [];
-
-  for(let s = 0; s < S; s++) {
-    let entropy_s = 0;
-    for(let k = 0; k < K; k++) {
-      if(eta[k][s] < 1e-30) {
-        continue;
-      }
-      entropy_s += -eta[k][s] * Math.log2(eta[k][s]);
-    }
-    entropy.push(entropy_s);
-  }
-
-  let max_samp_entropy = Math.max(...entropy);
-  let max_entropy = Math.log2(K);
-  return [entropy, max_samp_entropy, max_entropy];
-}
-
-EtaPlotter.prototype.plot = function(eta, samp_labels, container, remove_small_pop_threshold=0.01, remove_pop0=false) {
+EtaPlotter.prototype.plot = function(eta, cdi, cmdi, samp_labels, container, remove_small_pop_threshold=0.01, remove_pop0=false) {
   let self = this;
   let pop_labels =  Array.from(Array(eta.length).keys()).map(idx => 'Pop. ' + idx);
   if(remove_pop0) {
@@ -308,12 +288,12 @@ EtaPlotter.prototype.plot = function(eta, samp_labels, container, remove_small_p
   let total_col_spacing = col_spacing.reduce((sum, cur) => sum + cur, 0);
 
   let legend_x_offset = total_col_widths + this._legend_splotch_spacing + total_col_spacing;
-  let legend_y_offset = col_label_height + 2*this._pop_entropy_height + 2*this._pop_entropy_spacing + 0.5*this._legend_splotch_size;
+  let legend_y_offset = col_label_height + 2*this._diversity_idx_height + 2*this._diversity_idx_spacing + 0.5*this._legend_splotch_size;
   let legend_width = this._legend_splotch_size + this._legend_padding + pop_label_width;
 
   let svg = d3.select(container).append('svg:svg');
 
-  let pop_entropy_colour = d3.interpolateViridis;
+  let diversity_idx_colour = d3.interpolateViridis;
   this._plot_etas(
     svg,
     eta,
@@ -323,15 +303,16 @@ EtaPlotter.prototype.plot = function(eta, samp_labels, container, remove_small_p
     col_spacing,
     pop_colours,
     col_label_height,
-    2*this._pop_entropy_height + 2*this._pop_entropy_spacing + col_label_height,
+    2*this._diversity_idx_height + 2*this._diversity_idx_spacing + col_label_height,
   );
-  this._plot_pop_entropy(
+  this._plot_diversity_indices(
     svg,
-    eta,
+    cdi,
+    cmdi,
     col_label_height,
     col_widths,
     col_spacing,
-    pop_entropy_colour,
+    diversity_idx_colour,
   );
   this._add_pop_legend(
     svg,
@@ -340,9 +321,9 @@ EtaPlotter.prototype.plot = function(eta, samp_labels, container, remove_small_p
     legend_x_offset,
     legend_y_offset
   );
-  this._make_pop_entropy_legend(
+  this._make_diversity_idx_legend(
     svg,
-    pop_entropy_colour,
+    diversity_idx_colour,
     legend_x_offset,
     col_label_height,
   );

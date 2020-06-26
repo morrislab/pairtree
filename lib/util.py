@@ -2,7 +2,9 @@ import numpy as np
 import time
 from numba import njit, vectorize
 from common import Models
+import common
 import math
+import diversity_indices as di
 
 @vectorize
 def lgamma(X):
@@ -124,10 +126,11 @@ def _calc_phi_hat(variants):
 def calc_nlglh(llh, K, S):
   return -llh / (np.log(2) * (K-1) * S)
 
-def make_tree_struct(struct, count, llh, prob, phi, variants, sampnames):
+def make_tree_struct(struct, count, llh, prob, phi, variants, clusters, sampnames):
   K, S = phi.shape
   phi_hat = _calc_phi_hat(variants)
   eta = calc_eta(struct, phi)
+
   tree = {
     'phi': phi.tolist(),
     'phi_hat': phi_hat.tolist(),
@@ -138,6 +141,8 @@ def make_tree_struct(struct, count, llh, prob, phi, variants, sampnames):
     'count': int(count),
     'parents': struct.tolist(),
     'samples': sampnames,
+    'cdi': di.calc_cdi(eta).tolist(),
+    'cmdi': di.calc_cmdi(eta, clusters, struct).tolist(),
   }
   return tree
 
@@ -208,3 +213,16 @@ def calc_eta(struct, phi):
   # Renormalize.
   eta = eta / np.sum(eta, axis=0)
   return eta
+
+def make_membership_mat(clusters):
+  vids = common.sort_vids([vid for C in clusters for vid in C])
+  vidmap = {vid: vidx for vidx, vid in enumerate(vids)}
+  N = len(vids)
+  K = len(clusters)
+
+  # membership[i,j] = 1 iff mutation `i` is in cluster `j`
+  membership = np.zeros((N, K))
+  for cidx, C in enumerate(clusters):
+    members = [vidmap[vid] for vid in C]
+    membership[members,cidx] = 1
+  return (vids, membership)

@@ -2,7 +2,6 @@ import argparse
 import numpy as np
 import pickle
 
-import evalutil
 import mutstat
 
 def main():
@@ -18,7 +17,7 @@ def main():
     simdata = pickle.load(dataf)
 
   clusters = [[]] + simdata['clusters']
-  vids, membership = evalutil.make_membership_mat(clusters)
+  vids, membership = util.make_membership_mat(clusters)
   mphi = np.dot(membership, simdata['phi'])
   baseline = mutstat.Mutstat(stats=mphi, vids=vids, assays=simdata['sampnames'])
   mutstat.write(baseline, args.baseline_mutdist_fn)

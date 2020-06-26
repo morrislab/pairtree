@@ -90,10 +90,7 @@ PhiInterleavedMatrix.prototype.plot = function(phi, phi_hat, sampnames, containe
     row_colours.push('#000000');
   }
 
-  var sampcolours = sampnames.map(function(sampname) {
-    return '#000000';
-  });
-
+  var sampcolours = null;
   (new MatrixBar()).plot(interleaved, row_labels, row_colours, sampnames, sampcolours, container);
 }
 

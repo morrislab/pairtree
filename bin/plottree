@@ -18,6 +18,9 @@ import json
 import util
 import plotutil
 
+import plotly.graph_objs as go
+import plotly.io as pio
+
 def _choose_colours(N):
   import plotly.colors
   colours = plotly.colors.qualitative.Dark24
@@ -50,7 +53,7 @@ def write_header(runid, tidx, outf):
 def write_footer(outf):
   print('</main></body></html>', file=outf)
 
-def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colours, plot_eta, plot_phi, plot_phi_hat, plot_phi_error, plot_phi_interleaved, phi_orientation, outf):
+def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colours, plot_eta, plot_diversity_indices, plot_phi, plot_phi_hat, plot_phi_error, plot_phi_interleaved, phi_orientation, outf):
   tree_data['visible_sampidxs'] = visible_sampidxs
   tree_data['samp_colours'] = samp_colours
   tree_data['pop_colours'] = pop_colours
@@ -62,10 +65,14 @@ def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colour
 
   if(results.visible_sampidxs !== null) {
     results.visible_eta = results.eta.map(function(E) { return results.visible_sampidxs.map(function(idx) { return E[idx]; }); });
+    results.visible_cdi = results.cdi.map(function(E) { return results.visible_sampidxs.map(function(idx) { return E[idx]; }); });
+    results.visible_cmdi = results.cmdi.map(function(E) { return results.visible_sampidxs.map(function(idx) { return E[idx]; }); });
     results.visible_phi = results.phi.map(function(P) { return results.visible_sampidxs.map(function(idx) { return P[idx]; }); });
     results.visible_samps = results.visible_sampidxs.map(function(idx) { return results.samples[idx]; });
   } else {
     results.visible_eta = results.eta;
+    results.visible_cdi = results.cdi;
+    results.visible_cmdi = results.cmdi;
     results.visible_phi = results.phi;
     results.visible_samps = results.samples;
   }
@@ -98,8 +105,16 @@ def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colour
     <div id="eta_matrix" class="container"><h2>Population frequencies</h2></div>
     %s
     ''' % plotutil.js_on_load('''
-    (new EtaPlotter()).plot(results.visible_eta, results.visible_samps, '#eta_matrix', 0, true);
+    (new EtaPlotter()).plot(results.visible_eta, results.visible_cdi, results.visible_cmdi, results.visible_samps, '#eta_matrix', 0, true);
     '''), file=outf)
+
+  if plot_diversity_indices:
+    print('<div id="diversity_indices" class="container"><h2>Diversity indices</h2>', file=outf)
+    _plot_diversity_indices({
+      'cdi': tree_data['cdi'],
+      'cmdi': tree_data['cmdi'],
+    }, tree_data['samples'], outf)
+    print('</div>', file=outf)
 
   if plot_phi:
     print('''
@@ -162,7 +177,7 @@ def _choose_plots(to_plot, to_omit, all_choices):
   # tree, so that the relevant data structures are generated below. This is
   # silly, so I should fix it eventually -- we should be able to plot just
   # the phis if we want.
-  if len(set(('phi', 'phi_hat', 'phi_error', 'phi_interleaved')) & plot_choices) > 0:
+  if len(set(('phi', 'phi_hat', 'phi_error', 'phi_interleaved', 'eta', 'diversity_indices')) & plot_choices) > 0:
     plot_choices.add('tree')
 
   return plot_choices
@@ -206,6 +221,31 @@ def _reorder_subclones(data, params):
 
   return (new_data, new_params)
 
+def _plot_diversity_indices(div_idxs, sampnames, outf):
+  figs = []
+  html = ''
+
+  titles = {
+    'cdi': 'Clone diversity index',
+    'cmdi': 'Clone and mutation diversity index',
+  }
+
+  for name in div_idxs.keys():
+    traces = dict(
+      type = 'bar',
+      name = name,
+      x = sampnames,
+      y = div_idxs[name],
+    )
+    layout = go.Layout(
+      template = 'plotly_white',
+      xaxis = {'title': 'Sample'},
+      yaxis = {'title': f'{titles[name]}<br>(bits)'},
+    )
+    fig = go.Figure(data=traces, layout=layout)
+    html = pio.to_html(fig, include_plotlyjs='cdn', full_html=False)
+    print(html, file=outf)
+
 def main():
   all_plot_choices = set((
     'tree',
@@ -218,6 +258,7 @@ def main():
     'phi_interleaved',
     'cluster_stats',
     'eta',
+    'diversity_indices',
   ))
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
@@ -242,6 +283,8 @@ def main():
   parser.add_argument('results_fn')
   parser.add_argument('html_out_fn')
   args = parser.parse_args()
+
+  np.seterr(divide='raise', invalid='raise', over='raise')
 
   if args.seed is not None:
     random.seed(args.seed)
@@ -295,8 +338,10 @@ def main():
         data['prob'],
         data['phi'],
         supervars,
+        data['clusters'],
         data['samples'],
       )
+
       _write_tree_html(
         tree_struct,
         args.tree_index,
@@ -304,6 +349,7 @@ def main():
         samp_colours,
         pop_colours,
         'eta' in plot_choices,
+        'diversity_indices' in plot_choices,
         'phi' in plot_choices,
         'phi_hat' in plot_choices,
         'phi_error' in plot_choices,
@@ -312,7 +358,7 @@ def main():
         outf,
       )
       if args.tree_json_fn is not None:
-        _write_tree_json(full_tree_struct, args.tree_json_fn)
+        _write_tree_json(tree_struct, args.tree_json_fn)
 
     if 'vaf_matrix' in plot_choices:
       vaf_plotter.plot_vaf_matrix(

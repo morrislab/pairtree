@@ -2,13 +2,13 @@ import argparse
 import numpy as np
 import pickle
 
-import evalutil
 import mutstat
 
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
 import resultserializer
+import util
 
 def main():
   parser = argparse.ArgumentParser(
@@ -23,7 +23,7 @@ def main():
   results = resultserializer.Results(args.results_fn)
 
   clusters = [[]] + results.get('clusters')
-  vids, membership = evalutil.make_membership_mat(clusters)
+  vids, membership = util.make_membership_mat(clusters)
   mphi = np.dot(membership, results.get('phi')[args.tree_index])
 
   baseline = mutstat.Mutstat(stats=mphi, vids=vids, assays=results.get('sampnames'))

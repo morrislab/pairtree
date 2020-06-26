@@ -47,7 +47,7 @@ def calc_mutphi(cluster_phis, llhs, clusterings, ssmsfn, counts):
 
     cluster_phi = evalutil.fix_rounding_errors(cluster_phi)
     assert np.all(0 <= cluster_phi) and np.all(cluster_phi <= 1)
-    V, membership = evalutil.make_membership_mat(clustering)
+    V, membership = util.make_membership_mat(clustering)
     mphi = np.dot(membership, cluster_phi)
 
     if vids is None:
