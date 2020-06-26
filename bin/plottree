@@ -50,7 +50,7 @@ def write_header(runid, tidx, outf):
 def write_footer(outf):
   print('</main></body></html>', file=outf)
 
-def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colours, plot_eta, plot_phi, plot_phi_hat, plot_phi_error, plot_phi_interleaved, outf):
+def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colours, plot_eta, plot_phi, plot_phi_hat, plot_phi_error, plot_phi_interleaved, phi_orientation, outf):
   tree_data['visible_sampidxs'] = visible_sampidxs
   tree_data['samp_colours'] = samp_colours
   tree_data['pop_colours'] = pop_colours
@@ -106,8 +106,8 @@ def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colour
     <div id="phi_matrix" class="container"><h2>Tree-constrained lineage frequencies</h2></div>
     %s
     ''' % plotutil.js_on_load('''
-      (new PhiMatrix()).plot(results.visible_phi, results.visible_samps, '#phi_matrix');
-    '''), file=outf)
+      (new PhiMatrix()).plot(results.visible_phi, results.visible_samps, '#phi_matrix', false, '%s');
+    ''' % phi_orientation), file=outf)
 
   if plot_phi_hat:
     print('''
@@ -236,6 +236,7 @@ def main():
     help='Additional external file in which to store JSON, which is already stored statically in the HTML file')
   parser.add_argument('--colour-eta-uniquely', action='store_true',
     help='Choose unique colours for each population in eta plot')
+  parser.add_argument('--phi-orientation', choices=('samples_as_rows', 'populations_as_rows'), default='populations_as_rows')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
   parser.add_argument('results_fn')
@@ -307,6 +308,7 @@ def main():
         'phi_hat' in plot_choices,
         'phi_error' in plot_choices,
         'phi_interleaved' in plot_choices,
+        args.phi_orientation,
         outf,
       )
       if args.tree_json_fn is not None:

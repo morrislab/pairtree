@@ -19,18 +19,21 @@ PhiMatrix.prototype._calc_ccf = function(phi) {
   return ccf;
 }
 
-PhiMatrix.prototype.plot = function(phi, sampnames, container, convert_to_ccf) {
+PhiMatrix.prototype.plot = function(phi, sampnames, container, convert_to_ccf, orientation) {
   if(convert_to_ccf) {
     phi = this._calc_ccf(phi);
   }
 
   var popnames = phi.map(function(d, i) { return 'Pop. ' + i; });
-  var sampcolours = sampnames.map(function(sampname) {
-    return '#000000';
-  });
   var popcolours = ColourAssigner.assign_colours(phi.length);
+  var sampcolours = null;
 
-  (new MatrixBar()).plot(phi, popnames, popcolours, sampnames, sampcolours, container);
+  if(orientation === 'samples_as_rows') {
+    let phi_T = Util.transpose(phi);
+    (new MatrixBar()).plot(phi_T, sampnames, sampcolours, popnames, popcolours, container);
+  } else {
+    (new MatrixBar()).plot(phi, popnames, popcolours, sampnames, sampcolours, container);
+  }
 }
 
 function PhiErrorMatrix() {
@@ -108,7 +111,7 @@ MatrixBar.prototype._calc_label_width = function(labels) {
   return char_width * max_length;
 }
 
-MatrixBar.prototype.plot = function(mat, row_labels, row_colours, col_labels, col_label_colours, container) {
+MatrixBar.prototype.plot = function(mat, row_labels, row_colours, col_labels, col_colours, container) {
   var num_rows = mat.length;
   var num_cols = mat[0].length;
   var cell_size = 50;
@@ -139,8 +142,10 @@ MatrixBar.prototype.plot = function(mat, row_labels, row_colours, col_labels, co
     .attr('font-size', font_size)
     .attr('font-weight', 'bold')
     .text(function(d, i) { return d; });
-  if(typeof col_label_colours !== 'undefined' && col_label_colours.length === num_cols) {
-    cl.attr('fill', function(d, i) { return col_label_colours[i]; });
+  if(col_colours && col_colours.length === num_cols) {
+    cl.attr('fill', function(d, i) { return col_colours[i]; });
+  } else {
+    cl.attr('fill', '#000');
   }
 
   var rows = svg.selectAll('g.rows')
@@ -149,11 +154,8 @@ MatrixBar.prototype.plot = function(mat, row_labels, row_colours, col_labels, co
     .append('svg:g')
     .attr('class', 'rows')
     .attr('transform', function(d, i) { return 'translate(' + row_label_width + ',' + (col_label_height + (i * cell_size)) + ')'; });
-  if(typeof row_colours !== 'undefined' && row_colours.length === num_rows) {
-    rows.attr('fill', function(d, i) { return row_colours[i]; });
-  }
 
-  rows.append('text')
+  let rl = rows.append('text')
     .attr('x', -label_padding)
     .attr('y', 0.5 * cell_size)
     .attr('dominant-baseline', 'middle')
@@ -161,13 +163,25 @@ MatrixBar.prototype.plot = function(mat, row_labels, row_colours, col_labels, co
     .attr('font-size', font_size)
     .attr('font-weight', 'bold')
     .text(function(d, i) { return row_labels[i]; });
+  if(row_colours && row_colours.length === num_rows) {
+    rl.attr('fill', function(d, i) { return row_colours[i]; });
+  }
+
   rows.selectAll('rect')
-    .data(function(d) { return d; })
+    .data((d, i) => d.map(function(val, col_idx) { return { val: val, col_idx: col_idx, row_idx: i}; }))
     .enter()
     .append('svg:rect')
     .attr('width', cell_size)
-    .attr('height', function(d, i) { return d*cell_size; })
-    .attr('x', function(d, i) { return i * cell_size; })
-    .attr('y', function(d, i) { return (1 - d)*cell_size; })
-    .attr('fill-opacity', function(d) { return 1.0; });
+    .attr('height', function(d) { return d.val*cell_size; })
+    .attr('x', function(d) { return d.col_idx * cell_size; })
+    .attr('y', function(d) { return (1 - d.val)*cell_size; })
+    .attr('fill', function(d) {
+      // col_colours overrides row_colours.
+      if(col_colours && col_colours.length == num_cols) {
+        return col_colours[d.col_idx];
+      } else if(row_colours && row_colours.length == num_rows) {
+        return row_colours[d.row_idx];
+      }
+      return '#000';
+    }).attr('fill-opacity', function(d) { return 1.0; });
 }

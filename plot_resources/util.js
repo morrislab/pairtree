@@ -29,6 +29,21 @@ Util.blend_colours = function(base_colour, alpha, bgcolour) {
   return hex;
 }
 
+Util.transpose = function(mat) {
+  let M = mat.length;
+  let N = mat[0].length;
+  let T = [];
+
+  for(let n = 0; n < N; n++) {
+    T.push([]);
+    for(let m = 0; m < M; m++) {
+      T[n].push(mat[m][n]);
+    }
+  }
+  return T;
+}
+
+
 function ColourAssigner() {
 }
 
