@@ -51,9 +51,13 @@ def _discard_garbage(clusters, mutrel_posterior, mutrel_evidence):
 def _make_supervar(name, variants):
   assert len(variants) > 0
   N = np.array([var['total_reads'] for var in variants])
-  M, S = N.shape
   V = np.array([var['var_reads'] for var in variants])
   omega_v = np.array([var['omega_v'] for var in variants])
+
+  M, S = N.shape
+  N_hat = 2*N*omega_v
+  V_hat = np.minimum(V, N_hat)
+  omega_v_hat = 0.5 * np.ones(S)
 
   # In creating a supervariant, we must rescale either `V` or `N` (the variant
   # or total read counts, respectively), as we're fixing the supervariant's
@@ -84,9 +88,6 @@ def _make_supervar(name, variants):
   # `omega_v` is. If `omega_v` is small and we observe a couple variant reads,
   # we can assume those are solely noise. So, we shouldn't rescale `V` to be
   # really large, which is what we formerly did under solution 1.
-  N_hat = 2*N*omega_v
-  V_hat = np.minimum(V, N_hat)
-  omega_v_hat = 0.5 * np.ones(S)
 
   svar = {
     'id': name,
@@ -94,7 +95,7 @@ def _make_supervar(name, variants):
     'chrom': None,
     'pos': None,
     'omega_v': omega_v_hat,
-    'var_reads': np.round(np.sum(V_hat, axis=0)).astype(np.int),
+    'var_reads':   np.round(np.sum(V_hat, axis=0)).astype(np.int),
     'total_reads': np.round(np.sum(N_hat, axis=0)).astype(np.int),
   }
   svar['ref_reads'] = svar['total_reads'] - svar['var_reads']
