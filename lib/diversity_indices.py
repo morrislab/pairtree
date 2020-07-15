@@ -3,7 +3,11 @@ import numpy.ma as ma
 import util
 
 def _fix_eta(eta):
+  # Remove non-cancerous population from eta.
   eta = eta[1:]
+  eta = eta / np.sum(eta, axis=0)
+  assert np.allclose(1, np.sum(eta, axis=0))
+
   eta = ma.masked_equal(eta, 0)
   return eta
 
