@@ -156,8 +156,10 @@ def _rprop(var_reads, ref_reads, omega, A, Z, psi, iterations, convergence_thres
     last_sign = sign
 
     delta = 1.2*sign_agree + 0.5*sign_disagree
-    delta = np.minimum(50, delta)
+    # These limits are chosen according to the slides above.
     step *= delta
+    step = np.minimum(50, step)
+    step = np.maximum(1e-6, step)
     psi += sign * step
 
   return psi
