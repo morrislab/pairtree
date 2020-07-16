@@ -19,7 +19,7 @@ PhiMatrix.prototype._calc_ccf = function(phi) {
   return ccf;
 }
 
-PhiMatrix.prototype.plot = function(phi, sampnames, container, convert_to_ccf, orientation) {
+PhiMatrix.prototype.plot = function(phi, sampnames, container, convert_to_ccf, orientation, remove_pop0=false) {
   if(convert_to_ccf) {
     phi = this._calc_ccf(phi);
   }
@@ -27,6 +27,12 @@ PhiMatrix.prototype.plot = function(phi, sampnames, container, convert_to_ccf, o
   var popnames = phi.map(function(d, i) { return 'Pop. ' + i; });
   var popcolours = ColourAssigner.assign_colours(phi.length);
   var sampcolours = null;
+
+  if(remove_pop0) {
+    phi = phi.slice(1);
+    popnames = popnames.slice(1);
+    popcolours = popcolours.slice(1);
+  }
 
   if(orientation === 'samples_as_rows') {
     let phi_T = Util.transpose(phi);
