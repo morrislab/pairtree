@@ -65,8 +65,8 @@ def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colour
 
   if(results.visible_sampidxs !== null) {
     results.visible_eta = results.eta.map(function(E) { return results.visible_sampidxs.map(function(idx) { return E[idx]; }); });
-    results.visible_cdi = results.cdi.map(function(E) { return results.visible_sampidxs.map(function(idx) { return E[idx]; }); });
-    results.visible_cmdi = results.cmdi.map(function(E) { return results.visible_sampidxs.map(function(idx) { return E[idx]; }); });
+    results.visible_cdi = results.visible_sampidxs.map(function(idx) { return results.cdi[idx]; });
+    results.visible_cmdi = results.visible_sampidxs.map(function(idx) { return results.cmdi[idx]; });
     results.visible_phi = results.phi.map(function(P) { return results.visible_sampidxs.map(function(idx) { return P[idx]; }); });
     results.visible_samps = results.visible_sampidxs.map(function(idx) { return results.samples[idx]; });
   } else {
