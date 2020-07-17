@@ -70,7 +70,7 @@ TreePlotter.prototype._label_node = function(node_id) {
   return letters[node_id - 1];
 }
 
-TreePlotter.prototype._draw_tree = function(root, container, num_pops, sampnames, samp_colours, pop_colours, bg_colour) {
+TreePlotter.prototype._draw_tree = function(root, container, sampnames, samp_colours, pop_colours, bg_colour) {
   // horiz_padding should be set to the maximum radius of a node, so a node
   // drawn on a boundry won't go over the canvas edge. Since max_area = 8000,
   // we have horiz_padding = sqrt(8000 / pi) =~ 51.
@@ -221,13 +221,12 @@ TreePlotter.prototype._generate_tree_struct = function(parents, phi, root_id) {
   return root;
 }
 
-TreePlotter.prototype.plot = function(root, parents, phi, sampnames, samp_colours, pop_colours, container) {
-  var K = phi.length;
+TreePlotter.prototype.plot = function(root_id, parents, phi, sampnames, samp_colours, pop_colours, remove_normal, container) {
   container = d3.select(container).append('div');
   var bg_colour = '#ffffff';
 
-  var root = this._generate_tree_struct(parents, phi, root);
-  this._draw_tree(root, container, K, sampnames, samp_colours, pop_colours, bg_colour);
+  var root = this._generate_tree_struct(parents, phi, root_id);
+  this._draw_tree(root, container, sampnames, samp_colours, pop_colours, bg_colour);
   resize_svg(container.selectAll('svg'));
 }
 

@@ -258,10 +258,11 @@ EtaPlotter.prototype._renormalize_eta = function(eta) {
   }
 }
 
-EtaPlotter.prototype.plot = function(eta, cdi, cmdi, samp_labels, container, remove_small_pop_threshold=0.01, remove_pop0=false) {
+EtaPlotter.prototype.plot = function(eta, cdi, cmdi, samp_labels, container, remove_small_pop_threshold=0, remove_normal=false) {
   let self = this;
   let pop_labels =  Array.from(Array(eta.length).keys()).map(idx => 'Pop. ' + idx);
-  if(remove_pop0) {
+
+  if(remove_normal) {
     eta = eta.slice(1);
     pop_labels = pop_labels.slice(1);
   }

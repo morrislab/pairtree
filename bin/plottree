@@ -53,10 +53,24 @@ def write_header(runid, tidx, outf):
 def write_footer(outf):
   print('</main></body></html>', file=outf)
 
-def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colours, plot_eta, plot_diversity_indices, plot_phi, plot_phi_hat, plot_phi_interleaved, phi_orientation, outf):
+def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colours, plot_eta, plot_diversity_indices, plot_phi, plot_phi_hat, plot_phi_interleaved, phi_orientation, remove_normal, outf):
   tree_data['visible_sampidxs'] = visible_sampidxs
   tree_data['samp_colours'] = samp_colours
   tree_data['pop_colours'] = pop_colours
+
+  if remove_normal:
+    orig_root = 0
+    clonal = np.flatnonzero(np.array(tree_data['parents']) == orig_root)
+    # Note that the JS code for PhiMatrix and EtaPlotter can handle
+    # polyprimaries, as both will remove the root population zero, then
+    # normalize the other frequencies to the *sum of* frequencies for all
+    # clonal populations. However, modifying the tree to remove the root for a
+    # polyprimary doesn't make sense, so throw an error in this isntance.
+    assert len(clonal) == 1, 'This tree represents a polyprimary, and so `remove_normal=True` would make the tree invalid'
+    root = clonal[0] + 1
+  else:
+    root = 0
+  remove_normal = 'true' if remove_normal else 'false'
 
   print('''
   <script type="text/javascript">
@@ -90,38 +104,39 @@ def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colour
       results.samp_colours.forEach(function(pair) { colour_list.append('li').style('color', pair[1]).text(pair[0]); });
     }
     (new TreePlotter()).plot(
-      0,
+      %s,
       results.parents,
       results.phi,
       results.samples,
       results.samp_colours,
       results.pop_colours,
+      '%s',
       container
     );
-  ''' % tidx), file=outf)
+  ''' % (tidx, root, remove_normal)), file=outf)
 
   if plot_eta:
     print('''
     <div id="eta_matrix" class="container"><h2>Subpopulation frequencies</h2></div>
     %s
     ''' % plotutil.js_on_load('''
-    (new EtaPlotter()).plot(results.visible_eta, results.visible_cdi, results.visible_cmdi, results.visible_samps, '#eta_matrix', 0, true);
-    '''), file=outf)
+    (new EtaPlotter()).plot(results.visible_eta, results.visible_cdi, results.visible_cmdi, results.visible_samps, '#eta_matrix', 0, %s);
+    ''' % remove_normal), file=outf)
 
   if plot_phi:
     print('''
     <div id="phi_matrix" class="container"><h2>Tree-constrained subclonal frequencies</h2></div>
     %s
     ''' % plotutil.js_on_load('''
-      (new PhiMatrix()).plot(results.visible_phi, results.visible_samps, '#phi_matrix', false, '%s');
-    ''' % phi_orientation), file=outf)
+      (new PhiMatrix()).plot(results.visible_phi, results.parents, results.visible_samps, '#phi_matrix', '%s', %s);
+    ''' % (phi_orientation, remove_normal)), file=outf)
 
   if plot_phi_hat:
     print('''
     <div id="phi_hat_matrix" class="container"><h2>Data-implied subclonal frequencies</h2></div>
     %s
     ''' % plotutil.js_on_load('''
-      (new PhiMatrix()).plot(results.phi_hat, results.samples, '#phi_hat_matrix', false, '%s');
+      (new PhiMatrix()).plot(results.phi_hat, results.parents, results.samples, '#phi_hat_matrix', '%s', false, false);
     ''' % phi_orientation), file=outf)
 
   if plot_phi_interleaved:
@@ -273,6 +288,8 @@ def main():
   parser.add_argument('--colour-eta-uniquely', action='store_true',
     help='Choose unique colours for each population in eta plot')
   parser.add_argument('--phi-orientation', choices=('samples_as_rows', 'populations_as_rows'), default='populations_as_rows')
+  parser.add_argument('--remove-normal', action='store_true',
+    help='Remove normal (non-cancerous) population 0 from tree, phi, and eta plots.')
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
   parser.add_argument('results_fn')
@@ -349,6 +366,7 @@ def main():
         'phi_hat' in plot_choices,
         'phi_interleaved' in plot_choices,
         args.phi_orientation,
+        args.remove_normal,
         outf,
       )
       if args.tree_json_fn is not None:

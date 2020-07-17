@@ -1,35 +1,19 @@
 function PhiMatrix() {
 }
 
-PhiMatrix.prototype._calc_ccf = function(phi) {
-  var ccf = [];
-  // Set clonalidx=0 if you want the phi matrix plots to be unnormalized.
-  // Set clonalidx=1 if you want the phi matrix plots to be normalized relative
-  // to population 1's phi. (This is only sensible if you don't have any
-  // polyclonal trees.)
-  var clonalidx = 0;
-
-  for(var rowidx = clonalidx; rowidx < phi.length; rowidx++) {
-    ccf[rowidx - 1] = [];
-    for(var sampidx = 0; sampidx < phi[rowidx].length; sampidx++) {
-      ccf[rowidx - 1].push(phi[rowidx][sampidx] / phi[clonalidx][sampidx]);
-    }
-  }
-
-  return ccf;
-}
-
-PhiMatrix.prototype.plot = function(phi, sampnames, container, convert_to_ccf, orientation, remove_pop0=false) {
-  if(convert_to_ccf) {
-    phi = this._calc_ccf(phi);
-  }
+PhiMatrix.prototype.plot = function(phi, parents, sampnames, container, orientation, remove_normal=false) {
+  // Note that if `remove_normal = false`, you can set `parents = null` when
+  // calling this function.
 
   var popnames = phi.map(function(d, i) { return 'Pop. ' + i; });
   var popcolours = ColourAssigner.assign_colours(phi.length);
   var sampcolours = null;
 
-  if(remove_pop0) {
-    phi = phi.slice(1);
+  // By doing this operation after initializing `popnames` and `popcolours`, we
+  // keep colours and names consistent regardless of whether `remove_normal` is
+  // set.
+  if (remove_normal) {
+    phi = Util.calc_ccf(phi, parents);
     popnames = popnames.slice(1);
     popcolours = popcolours.slice(1);
   }

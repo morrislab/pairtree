@@ -43,6 +43,34 @@ Util.transpose = function(mat) {
   return T;
 }
 
+Util.find_clonal = function(parents) {
+  let clonal = [];
+  for(var idx = 0; idx < parents.length; idx++) {
+    if(parents[idx] === 0) {
+      clonal.push(idx + 1);
+    }
+  }
+  return new Set(clonal);
+}
+
+Util.calc_ccf = function(phi, parents) {
+  let S = phi[0].length;
+  let clonal = Util.find_clonal(parents);
+  let clonal_phi = [];
+
+  for(let sidx = 0; sidx < S; sidx++) {
+    clonal_phi.push(0);
+    clonal.forEach(cidx => clonal_phi[sidx] += phi[cidx][sidx]);
+    console.assert(clonal_phi[sidx] <= 1);
+  }
+
+  let ccf = phi.slice(1).map(P_k => {
+    return P_k.map((P_ks, sidx) => P_ks / clonal_phi[sidx]);
+  });
+
+  return ccf;
+}
+
 
 function ColourAssigner() {
 }
