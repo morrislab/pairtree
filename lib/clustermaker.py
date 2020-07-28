@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.ma as ma
 from numba import njit
 
 import pairwise
@@ -99,7 +100,8 @@ def _make_supervar(name, variants):
     'total_reads': np.round(np.sum(N_hat, axis=0)).astype(np.int),
   }
   svar['ref_reads'] = svar['total_reads'] - svar['var_reads']
-  svar['vaf'] = svar['var_reads'] / svar['total_reads']
+  T = ma.masked_equal(svar['total_reads'], 0)
+  svar['vaf'] = np.array(svar['var_reads'] / T)
 
   return svar
 

@@ -1,6 +1,7 @@
 import csv
 import json
 import numpy as np
+import numpy.ma as ma
 import common
 
 def _extract_nums(S, dtype):
@@ -39,7 +40,8 @@ def load_ssms(ssmfn, max_ssms=None):
       assert np.all(0 <= variant['omega_v']) and np.all(variant['omega_v'] <= 1)
 
       variant['ref_reads'] = variant['total_reads'] - variant['var_reads']
-      variant['vaf'] = variant['var_reads'] / variant['total_reads']
+      T = ma.masked_equal(variant['total_reads'], 0)
+      variant['vaf'] = np.array(variant['var_reads'] / T)
 
       assert variant['id'] not in variants
       variants[variant['id']] = variant

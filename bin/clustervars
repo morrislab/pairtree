@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import numpy as np
+import numpy.ma as ma
 import json
 import multiprocessing
 
@@ -36,13 +37,14 @@ def _make_unique(clusterings, llhs):
 
 def _sort_clusters(clusters, variants):
   vids, V, T, T_prime, omega = inputparser.load_read_counts(variants)
+  T_prime_masked = ma.masked_equal(T_prime, 0)
   assert set(vids) == set([vid for clust in clusters for vid in clust])
   vidmap = {vid: idx for idx, vid in enumerate(vids)}
 
   phi_hat = []
   for C in clusters:
     vidxs = [vidmap[vid] for vid in C]
-    phi_hat.append(np.sum(V[vidxs], axis=0) / np.sum(T_prime[vidxs], axis=0))
+    phi_hat.append(np.sum(V[vidxs], axis=0) / np.sum(T_prime_masked[vidxs], axis=0))
   phi_hat = np.array(phi_hat)
 
   K, S = phi_hat.shape
