@@ -49,3 +49,19 @@ def calc_cmdi(eta, clusters, struct):
   H_joint = -ma.sum(eta * (ma.log2(eta) - np.log2(M_k)), axis=0)
   assert H_joint.shape == (S,)
   return H_joint
+
+def calc_sdi(eta, clusters, eta_threshold=0.01):
+  eta = _fix_eta(eta)
+  K, S = eta.shape
+  assert len(clusters) == K
+
+  sdi = []
+  for sidx in range(S):
+    present = eta[:,sidx] >= eta_threshold
+    present_clusters = [C for is_present, C in zip(present, clusters) if is_present]
+    N_k = np.sum([len(C) for C in present_clusters])
+    p_K = np.array([len(C) / N_k for C in present_clusters])
+    sdi_s = -np.sum(p_K * np.log2(p_K))
+    sdi.append(sdi_s)
+
+  return np.array(sdi)

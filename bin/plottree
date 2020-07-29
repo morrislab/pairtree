@@ -81,12 +81,14 @@ def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colour
     results.visible_eta = results.eta.map(function(E) { return results.visible_sampidxs.map(function(idx) { return E[idx]; }); });
     results.visible_cdi = results.visible_sampidxs.map(function(idx) { return results.cdi[idx]; });
     results.visible_cmdi = results.visible_sampidxs.map(function(idx) { return results.cmdi[idx]; });
+    results.visible_sdi = results.visible_sampidxs.map(function(idx) { return results.sdi[idx]; });
     results.visible_phi = results.phi.map(function(P) { return results.visible_sampidxs.map(function(idx) { return P[idx]; }); });
     results.visible_samps = results.visible_sampidxs.map(function(idx) { return results.samples[idx]; });
   } else {
     results.visible_eta = results.eta;
     results.visible_cdi = results.cdi;
     results.visible_cmdi = results.cmdi;
+    results.visible_sdi = results.sdi;
     results.visible_phi = results.phi;
     results.visible_samps = results.samples;
   }
@@ -150,6 +152,7 @@ def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colour
     _plot_diversity_indices({
       'cdi': tree_data['cdi'],
       'cmdi': tree_data['cmdi'],
+      'sdi': tree_data['sdi'],
     }, tree_data['samples'], outf)
     print('</div>', file=outf)
 
@@ -239,6 +242,7 @@ def _plot_diversity_indices(div_idxs, sampnames, outf):
   titles = {
     'cdi': 'Clone diversity index',
     'cmdi': 'Clone and mutation diversity index',
+    'sdi': 'Shannon diversity index',
   }
 
   for name in div_idxs.keys():

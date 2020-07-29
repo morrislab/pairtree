@@ -143,6 +143,7 @@ def make_tree_struct(struct, count, llh, prob, phi, variants, clusters, sampname
     'samples': sampnames,
     'cdi': di.calc_cdi(eta).tolist(),
     'cmdi': di.calc_cmdi(eta, clusters, struct).tolist(),
+    'sdi': di.calc_sdi(eta, clusters).tolist(),
   }
   return tree
 
