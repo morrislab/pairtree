@@ -4,6 +4,7 @@ function EtaPlotter() {
   this._legend_spacing = 60;
   this._font_size = 16;
   this._legend_font_size = 14;
+  this._bar_label_font_size = 20;
   this._label_padding = 10;
   this._legend_splotch_size = 30;
   this._legend_padding = 5;
@@ -12,6 +13,7 @@ function EtaPlotter() {
   this._diversity_idx_height = 50;
   this._diversity_idx_spacing = 15;
   this._diversity_idx_legend_width = this._legend_splotch_size;
+  this._small_pop_threshold = 0.05;
 }
 
 EtaPlotter.prototype._calc_label_width = function(labels) {
@@ -109,6 +111,27 @@ EtaPlotter.prototype._plot_etas = function(svg, eta, pop_labels, samp_labels, co
     }).on('mouseout', function(d) {
       tooltip.style('opacity', 0);
     });
+
+  let bar_labels = cols.selectAll('text')
+    .data(function(sidx) { return K_range.map(function(k) { return {k: k, s: sidx}; }); })
+    .join('svg:text')
+    // I subtract 0.5*self._bar_label_font_size here to get the vertical
+    // alignment of the two text lines approximately correct. I'm not sure the
+    // math is right, but it produces a (mostly?) correct visual result.
+    .style('pointer-events', 'none') // Pass events through to underlying `rect`.
+    .attr('y', function(d) { return (0.5*eta[d.k][d.s] + eta_cum[d.k][d.s])*self._col_height - 0.5*self._bar_label_font_size; })
+    .attr('display', function(d) { return eta[d.k][d.s]*self._col_height >= 2.5*self._bar_label_font_size ? 'inline' : 'none'})
+    .attr('font-size', this._bar_label_font_size)
+    .attr('dominant-baseline', 'central')
+    .attr('text-anchor', 'middle');
+
+  bar_labels.append('tspan')
+    .attr('x', d => 0.5*col_widths[d.s])
+    .text(function(d, i) { return pop_labels[i] });
+  bar_labels.append('tspan')
+    .attr('x', d => 0.5*col_widths[d.s])
+    .attr('dy', 1.2*this._bar_label_font_size)
+    .text(function(d, i) { return Math.round(100*eta[d.k][d.s]) + '%'; });
 }
 
 EtaPlotter.prototype._add_pop_legend = function(svg, pop_labels, pop_colours, x_offset, y_offset) {
@@ -258,7 +281,7 @@ EtaPlotter.prototype._renormalize_eta = function(eta) {
   }
 }
 
-EtaPlotter.prototype.plot = function(eta, cdi, cmdi, samp_labels, container, remove_small_pop_threshold=0, remove_normal=false) {
+EtaPlotter.prototype.plot = function(eta, cdi, cmdi, samp_labels, container, remove_small_pops=false, remove_normal=false) {
   let self = this;
   let pop_labels =  Array.from(Array(eta.length).keys()).map(idx => 'Pop. ' + idx);
 
@@ -266,8 +289,8 @@ EtaPlotter.prototype.plot = function(eta, cdi, cmdi, samp_labels, container, rem
     eta = eta.slice(1);
     pop_labels = pop_labels.slice(1);
   }
-  if(remove_small_pop_threshold > 0) {
-    this._remove_small_pops(eta, pop_labels, remove_small_pop_threshold);
+  if(remove_small_pops) {
+    this._remove_small_pops(eta, pop_labels, this._small_pop_threshold);
   }
   this._renormalize_eta(eta);
 

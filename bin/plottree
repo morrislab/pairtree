@@ -122,7 +122,7 @@ def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colour
     <div id="eta_matrix" class="container"><h2>Subpopulation frequencies</h2></div>
     %s
     ''' % plotutil.js_on_load('''
-    (new EtaPlotter()).plot(results.visible_eta, results.visible_cdi, results.visible_cmdi, results.visible_samps, '#eta_matrix', 0, %s);
+    (new EtaPlotter()).plot(results.visible_eta, results.visible_cdi, results.visible_cmdi, results.visible_samps, '#eta_matrix', false, %s);
     ''' % remove_normal), file=outf)
 
   if plot_phi:
@@ -289,8 +289,6 @@ def main():
     help='Reorder subclones according to depth-first search through tree structure')
   parser.add_argument('--tree-json', dest='tree_json_fn',
     help='Additional external file in which to store JSON, which is already stored statically in the HTML file')
-  parser.add_argument('--colour-eta-uniquely', action='store_true',
-    help='Choose unique colours for each population in eta plot')
   parser.add_argument('--phi-orientation', choices=('samples_as_rows', 'populations_as_rows'), default='populations_as_rows')
   parser.add_argument('--remove-normal', action='store_true',
     help='Remove normal (non-cancerous) population 0 from tree, phi, and eta plots.')

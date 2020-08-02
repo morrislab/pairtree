@@ -100,7 +100,8 @@ ColourAssigner._assign_from_husl = function(N) {
   let first_hue = 0.01;
   for(let idx = 0; idx < N; idx++) {
     let hue = 360*(first_hue + ((idx+1)/N)*(1 - first_hue));
-    colours.push(hsluv.hsluvToHex([hue, 90, 55]));
+    // Docs: https://github.com/hsluv/hsluv/tree/master/javascript
+    colours.push(hsluv.hsluvToHex([hue, 66, 56]));
   }
   shuffle(colours);
   return colours;
