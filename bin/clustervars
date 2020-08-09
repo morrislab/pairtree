@@ -176,7 +176,7 @@ def main():
     help='Number of Gibbs sampling chains to run')
   parser.add_argument('--concentration', dest='logconc', type=float, default=-2,
     help='log10(alpha) for Chinese restaurant process. The larger this is, the stronger the preference for more clusters.')
-  parser.add_argument('--iterations', type=int, default=100,
+  parser.add_argument('--iterations', type=int, default=1000,
     help='Number of Gibbs sampling iterations')
   parser.add_argument('--parallel', dest='parallel', type=int, default=None,
     help='Number of tasks to run in parallel. By default, this is set to the number of CPU cores on the system. On hyperthreaded systems, this will be twice the number of physical CPUs.')
