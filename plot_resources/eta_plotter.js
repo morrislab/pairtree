@@ -72,6 +72,8 @@ EtaPlotter.prototype._plot_etas = function(svg, eta, pop_labels, samp_labels, co
     .style('opacity', 0);
   let tooltip_inner = tooltip.append('div').attr('class', 'tooltip-inner');
 
+  let _make_percent = V => (V < 0.01 ? '< 1%' : Math.round(100*V) + '%');
+
   let cl = svg.append('svg:g')
     .attr('class', 'col_labels')
     .attr('transform', 'translate(0,' + (col_label_height - self._label_padding) + ')')
@@ -107,7 +109,7 @@ EtaPlotter.prototype._plot_etas = function(svg, eta, pop_labels, samp_labels, co
     .attr('fill', function(d, i) { return pop_colours[i]; })
     .on('mousemove', function(d, i) {
       tooltip.style('opacity', 0.9).style('top', (d3.event.pageY - 10) + 'px').style('left', (d3.event.pageX + 10) + 'px');
-      tooltip_inner.text(pop_labels[i] + ': ' + Math.round(100*eta[d.k][d.s]) + '%')
+      tooltip_inner.text(pop_labels[i] + ': ' + _make_percent(eta[d.k][d.s]));
     }).on('mouseout', function(d) {
       tooltip.style('opacity', 0);
     });
@@ -131,7 +133,7 @@ EtaPlotter.prototype._plot_etas = function(svg, eta, pop_labels, samp_labels, co
   bar_labels.append('tspan')
     .attr('x', d => 0.5*col_widths[d.s])
     .attr('dy', 1.2*this._bar_label_font_size)
-    .text(function(d, i) { return Math.round(100*eta[d.k][d.s]) + '%'; });
+    .text((d, i) => _make_percent(eta[d.k][d.s]));
 }
 
 EtaPlotter.prototype._add_pop_legend = function(svg, pop_labels, pop_colours, x_offset, y_offset) {
