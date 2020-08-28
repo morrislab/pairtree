@@ -319,7 +319,7 @@ def main():
   )}
   data['garbage'] = results.get('garbage')
   data['clusters'] = results.get('clusters')
-  data['samples'] = results.get('sampnames')
+  data['samples'] = params['samples']
   data['clustrel_posterior'] = results.get_mutrel('clustrel_posterior')
   if args.reorder_subclones:
     data, params = _reorder_subclones(data, params)
