@@ -133,6 +133,6 @@ class Results:
             results[name] = self._load(full_name, data_type, F)
             break
         else:
-          results[name] = None
+          raise Exception(f'{name} is not present in {self._fn}')
 
     return results
