@@ -23,9 +23,18 @@
   font-weight: 900;
   font-family: sans-serif;
   paint-order: stroke;
+
+  /* White text with black outline */
   stroke: #0a0a0a;
   fill: #fff;
   stroke-width: 6px;
+
+}
+
+.population text.nooutline {
+  /* Black text */
+  stroke: none;
+  fill: #000;
 }
 
 .link {
