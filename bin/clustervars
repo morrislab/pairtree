@@ -13,6 +13,8 @@ import common
 import cluster_pairwise
 import cluster_linfreq
 import clustermaker
+from resultserializer import Results
+import util
 from progressbar import progressbar
 
 def _convert_assignment_to_clustering(Z, vids):
@@ -165,6 +167,18 @@ def _cluster(model, variants, init_clusters, logconc, coclust_prior, iterations_
   assigns, llhs = _make_unique(assigns, llhs)
   return (vids, assigns, llhs)
 
+def _write_full_results(vids, assigns, llhs, full_results_fn):
+  # Assuming uniform prior, the softmax gets us posterior probabilities from
+  # the LLH, since the prior cancels.
+  post_probs = util.softmax(llhs)
+
+  results = Results(full_results_fn)
+  results.add('vids', vids)
+  results.add('clusterings', assigns)
+  results.add('llhs', llhs)
+  results.add('post_probs', post_probs)
+  results.save()
+
 def main():
   parser = argparse.ArgumentParser(
     description='LOL HI THERE',
@@ -186,6 +200,8 @@ def main():
     help='Initialize clusters from those already provided in `in_params_fn`')
   parser.add_argument('--model', choices=('pairwise', 'linfreq', 'both'), default='linfreq',
     help='Clustering model to use')
+  parser.add_argument('--full-results',
+    help='Path to file where we will write all sampled clusterings')
   parser.add_argument('ssm_fn')
   parser.add_argument('in_params_fn')
   parser.add_argument('out_params_fn')
@@ -230,6 +246,9 @@ def main():
     args.chains,
     args.parallel,
   )
+  if args.full_results:
+    _write_full_results(vids, assigns, llhs, args.full_results)
+
   best_assign = _select_best(assigns, llhs)
   clusters = _convert_assignment_to_clustering(best_assign, vids)
   clusters = _sort_clusters(clusters, variants)
