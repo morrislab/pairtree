@@ -4,7 +4,7 @@ function EtaPlotter() {
   this._legend_spacing = 60;
   this._font_size = 16;
   this._legend_font_size = 14;
-  this._bar_label_font_size = 20;
+  this._bar_label_font_size = 14;
   this._label_padding = 10;
   this._legend_splotch_size = 30;
   this._legend_padding = 5;
@@ -122,7 +122,7 @@ EtaPlotter.prototype._plot_etas = function(svg, eta, pop_labels, samp_labels, co
     // math is right, but it produces a (mostly?) correct visual result.
     .style('pointer-events', 'none') // Pass events through to underlying `rect`.
     .attr('y', function(d) { return (0.5*eta[d.k][d.s] + eta_cum[d.k][d.s])*self._col_height - 0.5*self._bar_label_font_size; })
-    .attr('display', function(d) { return eta[d.k][d.s]*self._col_height >= 2.5*self._bar_label_font_size ? 'inline' : 'none'})
+    .attr('display', function(d) { return eta[d.k][d.s]*self._col_height >= 2.0*self._bar_label_font_size ? 'inline' : 'none'})
     .attr('font-size', this._bar_label_font_size)
     .attr('dominant-baseline', 'central')
     .attr('text-anchor', 'middle');
@@ -283,6 +283,27 @@ EtaPlotter.prototype._renormalize_eta = function(eta) {
   }
 }
 
+EtaPlotter.prototype._add_yaxis = function(svg, height, yoffset) {
+  let scale = d3.scaleLinear()
+    .domain([0, 1])
+    .range([height, 0]);
+  let axis = d3.axisLeft(scale)
+    .tickFormat(x => Math.round(100*x) + '%');
+  let container = svg.append('g')
+    .attr('transform', 'translate(-10,' + yoffset + ')');
+  container.append('text')
+    .attr('text-anchor', 'middle')
+    .attr('transform', 'rotate(-90)')
+    .attr('x', -0.5*height)
+    .attr('y', -60)
+    .attr('font-size', this._bar_label_font_size)
+    .text('Population frequency');
+  container.append('g')
+    .call(axis)
+    .selectAll('text')
+    .attr('font-size', this._bar_label_font_size);
+}
+
 EtaPlotter.prototype.plot = function(eta, cdi, cmdi, samp_labels, container, remove_small_pops=false, remove_normal=false) {
   let self = this;
   let pop_labels =  Array.from(Array(eta.length).keys()).map(idx => 'Pop. ' + idx);
@@ -318,6 +339,7 @@ EtaPlotter.prototype.plot = function(eta, cdi, cmdi, samp_labels, container, rem
   let legend_width = this._legend_splotch_size + this._legend_padding + pop_label_width;
 
   let svg = d3.select(container).append('svg:svg');
+  let bar_y_offset = 2*this._diversity_idx_height + 2*this._diversity_idx_spacing + col_label_height;
 
   let diversity_idx_colour = d3.interpolateViridis;
   this._plot_etas(
@@ -329,7 +351,7 @@ EtaPlotter.prototype.plot = function(eta, cdi, cmdi, samp_labels, container, rem
     col_spacing,
     pop_colours,
     col_label_height,
-    2*this._diversity_idx_height + 2*this._diversity_idx_spacing + col_label_height,
+    bar_y_offset
   );
   this._plot_diversity_indices(
     svg,
@@ -352,6 +374,11 @@ EtaPlotter.prototype.plot = function(eta, cdi, cmdi, samp_labels, container, rem
     diversity_idx_colour,
     legend_x_offset,
     col_label_height,
+  );
+  this._add_yaxis(
+    svg,
+    this._col_height,
+    bar_y_offset
   );
 
   resize_svg(svg);
