@@ -334,12 +334,12 @@ EtaPlotter.prototype.plot = function(eta, cdi, cmdi, samp_labels, container, rem
   col_spacing[S - 1] = 0;
   let total_col_spacing = col_spacing.reduce((sum, cur) => sum + cur, 0);
 
+  let bar_y_offset = 2*this._diversity_idx_height + 2*this._diversity_idx_spacing + col_label_height;
   let legend_x_offset = total_col_widths + this._legend_splotch_spacing + total_col_spacing;
-  let legend_y_offset = col_label_height + 2*this._diversity_idx_height + 2*this._diversity_idx_spacing + 0.5*this._legend_splotch_size;
+  let legend_y_offset = bar_y_offset + 0.5*this._legend_splotch_size;
   let legend_width = this._legend_splotch_size + this._legend_padding + pop_label_width;
 
   let svg = d3.select(container).append('svg:svg');
-  let bar_y_offset = 2*this._diversity_idx_height + 2*this._diversity_idx_spacing + col_label_height;
 
   let diversity_idx_colour = d3.interpolateViridis;
   this._plot_etas(
