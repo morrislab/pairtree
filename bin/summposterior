@@ -13,6 +13,10 @@ import inputparser
 import json
 import util
 import plotutil
+import diversity_indices as di
+
+import plotly.graph_objs as go
+import plotly.io as pio
 
 def write_header(runid, outf):
   if runid is not None:
@@ -107,6 +111,68 @@ def _make_congraph(results):
 
   return graph
 
+def _calc_di(results, samps=1000):
+  structs = results.get('struct')
+  phis = results.get('phi')
+  probs = results.get('prob')
+  clusters = results.get('clusters')
+  assert np.isclose(1, np.sum(probs))
+
+  cdi = []
+  cmdi = []
+  for idx in range(samps):
+    tidx = util.sample_multinom(probs)
+    eta = util.calc_eta(structs[tidx], phis[tidx])
+    cdi.append(di.calc_cdi(eta))
+    cmdi.append(di.calc_cmdi(eta, clusters, structs[tidx]))
+
+  # Size of each array: PxS, given P posterior samples and S tissue samples
+  return (np.array(cdi), np.array(cmdi))
+
+def _plot_di(results, outf):
+  didxs = {K: I for K, I in zip(('cdi', 'cmdi'), _calc_di(results))}
+  sampnames = results.get('sampnames')
+  print('<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>', file=outf)
+  print('<h2>Diversity indices</h2>', file=outf)
+
+  titles = {
+    'cdi': 'Clone diversity index',
+    'cmdi': 'Clone and mutation diversity index',
+  }
+
+  for K in didxs.keys():
+    traces = [dict(
+      type = 'box',
+      name = sampname,
+      y = didxs[K][:,sidx],
+      showlegend = False,
+      boxpoints = 'all',
+      boxmean = True,
+      pointpos = 1.5,
+    ) for sidx, sampname in enumerate(sampnames)]
+    layout = go.Layout(
+      template = 'seaborn',
+      title = '{di_name}'.format(di_name = titles[K]),
+      xaxis = {'title': 'Sample'},
+      yaxis = {'title': '{di_name} (bits)'.format(di_name = K.upper())},
+    )
+    fig = go.Figure(data=traces, layout=layout)
+
+    html = pio.to_html(
+      fig,
+      include_plotlyjs=False,
+      full_html=False,
+      config = {
+        'showLink': True,
+        'toImageButtonOptions': {
+          'format': 'svg',
+          'width': 750,
+          'height': 450,
+        },
+      }
+    )
+    print(html, file=outf)
+
 def _plot_congraph(congraph, outf):
   print('''
   <h2>Consensus graph</h2>
@@ -166,6 +232,7 @@ def main():
   all_plot_choices = (
     'posterior_summ',
     'congraph',
+    'diversity_indices',
   )
 
   parser = argparse.ArgumentParser(
@@ -195,11 +262,17 @@ def main():
 
   with open(args.html_out_fn, 'w') as outf:
     write_header(args.runid, outf)
+
     if 'congraph' in plot_choices:
       congraph = _make_congraph(results)
       _plot_congraph(congraph, outf)
+
     if 'posterior_summ' in plot_choices:
       summarize(results, params, supervars, outf)
+
+    if 'diversity_indices' in plot_choices:
+      _plot_di(results, outf)
+
     write_footer(outf)
 
 if __name__ == '__main__':
