@@ -165,7 +165,7 @@ provide several different algorithms for computing these frequencies that
 strike different balances between computational speed and result accuracy.
 
 * `--phi-fitter=projection`: By default, Pairtree uses the "Efficient
-  Projection onto the Perfect Phylogeny Model" algorithm developed in [Bei et
+  Projection onto the Perfect Phylogeny Model" algorithm developed in [Jia et
   al.](https://arxiv.org/abs/1811.01129) This uses a Gaussian approximation of
   the binomial likelihood we're trying to maximize.
 
