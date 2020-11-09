@@ -37,8 +37,8 @@ Installing Pairtree
     * [Numba](https://numba.pydata.org/) (e.g., install via `pip3 install --user numba`)
     * C compiler (e.g., GCC)
 
-Pairtree has only been tested on Linux systems, but should work on any
-UNIX-like OS (including macOS).
+   Pairtree has only been tested on Linux systems, but should work on any
+   UNIX-like OS (including macOS).
 
 2. Clone the Pairtree repository, then download and build the C code required
    to fit subclone frequencies to the tree. This algorithm was published in
