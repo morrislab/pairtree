@@ -164,15 +164,9 @@ well the tree-constrained subclone frequencies fit the observed VAF data. We
 provide several different algorithms for computing these frequencies that
 strike different balances between computational speed and result accuracy.
 
-By default, Pairtree uses the "Efficient projection onto the perfect phylogeny
-model" algorithm described in Bei et al. (2018) {link} to fit tree-constrained
-subclone frequencies to each sampled phylogeny. This algorithm is usually the
-fastest choice. As alternatives, however, Pairtree also supports three other
-algorithms, which you can specify via the `--phi-fitter=<algorithm>` option.
-
 * `--phi-fitter=projection`: By default, Pairtree uses the "Efficient
   Projection onto the Perfect Phylogeny Model" algorithm developed in [Bei et
-  al.](https://arxiv.org/abs/1811.01129). This uses a Gaussian approximation of
+  al.](https://arxiv.org/abs/1811.01129) This uses a Gaussian approximation of
   the binomial likelihood we're trying to maximize.
 
 * `--phi-fitter=rprop`: Uses the [rprop variant of gradient
