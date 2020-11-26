@@ -24,17 +24,18 @@ relationships](https://www.biorxiv.org/content/10.1101/2020.11.06.372219v1)
 
 Installing Pairtree
 ===================
-1. Install dependencies. To ease installation, you may wish to use
-   [Anaconda](https://www.anaconda.com/products/individual), which includes
-   recent versions of Python 3, NumPy, and SciPy.
+1. Install dependencies. Installation is usually easiest if you use
+   [Anaconda](https://www.anaconda.com/products/individual), which includes the
+   most difficult-to-install dependencies.
    [Miniconda](https://docs.conda.io/en/latest/miniconda.html) also works well.
    You need the following:
 
     * Python 3.6 or greater
-    * NumPy
-    * SciPy
-    * [tqdm](https://github.com/tqdm/tqdm) (e.g., install via `pip3 install --user tqdm`)
-    * [Numba](https://numba.pydata.org/) (e.g., install via `pip3 install --user numba`)
+    * [NumPy](https://numpy.org/) *(included in Anaconda)*
+    * [SciPy](https://www.scipy.org/) *(included in Anaconda)*
+    * [scikit-learn](https://scikit-learn.org/stable/) *(included in Anaconda)*
+    * [tqdm](https://github.com/tqdm/tqdm) (e.g., install via `pip3 install --user tqdm`) *(included in Anaconda)*
+    * [Numba](https://numba.pydata.org/) (e.g., install via `pip3 install --user numba` or `conda install numba`)
     * [colorlover](https://github.com/plotly/colorlover) (e.g., install via `pip3 install --user colorlover`)
     * C compiler (e.g., GCC)
 
