@@ -31,10 +31,10 @@ Installing Pairtree
    You need the following:
 
     * Python 3.6 or greater
-    * [NumPy](https://numpy.org/) *(included in Anaconda)*
-    * [SciPy](https://www.scipy.org/) *(included in Anaconda)*
-    * [scikit-learn](https://scikit-learn.org/stable/) *(included in Anaconda)*
-    * [tqdm](https://github.com/tqdm/tqdm) (e.g., install via `pip3 install --user tqdm`) *(included in Anaconda)*
+    * [NumPy](https://numpy.org/) **(included in Anaconda)**
+    * [SciPy](https://www.scipy.org/) **(included in Anaconda)**
+    * [scikit-learn](https://scikit-learn.org/stable/) **(included in Anaconda)**
+    * [tqdm](https://github.com/tqdm/tqdm) (e.g., install via `pip3 install --user tqdm`) **(included in Anaconda)**
     * [Numba](https://numba.pydata.org/) (e.g., install via `pip3 install --user numba` or `conda install numba`)
     * [colorlover](https://github.com/plotly/colorlover) (e.g., install via `pip3 install --user colorlover`)
     * C compiler (e.g., GCC)
