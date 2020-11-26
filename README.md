@@ -30,7 +30,7 @@ Installing Pairtree
    [Miniconda](https://docs.conda.io/en/latest/miniconda.html) also works well.
    You need the following:
 
-    * Python 3.6 or greater
+    * [Python](https://www.python.org/) 3.6 or greater **(included in Anaconda)**
     * [NumPy](https://numpy.org/) **(included in Anaconda)**
     * [SciPy](https://www.scipy.org/) **(included in Anaconda)**
     * [scikit-learn](https://scikit-learn.org/stable/) **(included in Anaconda)**
