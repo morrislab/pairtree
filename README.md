@@ -57,7 +57,7 @@ Installing Pairtree
         # Run Pairtree.
         ../../bin/pairtree --params ../example.params.json ../example.ssm example.results.npz
         # Plot results in an HTML file.
-        ../../bin/plotpairtree example ../example.ssm ../example.params.json example.results.npz example.results.html
+        ../../bin/plottree example ../example.ssm ../example.params.json example.results.npz example.results.html
         # View the HTML file.
         firefox example.results.html
 
