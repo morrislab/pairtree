@@ -74,6 +74,10 @@ time_exec._ms = None
 
 def remove_rowcol(arr, indices):
   '''Remove rows and columns at `indices`.'''
+  # Calling `np.delete` with `indices` as an empty array produces an exception
+  # in Python 3.8 but not 3.7.
+  if len(indices) == 0:
+    return np.copy(arr)
   # Using a mask requires only creating a new array once (and then presumably
   # another array to apply the mask). Calling np.delete() multiple times would
   # create separate arrays for every element in `indices`.
