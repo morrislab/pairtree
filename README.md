@@ -2,7 +2,7 @@ Pairtree
 ========
 Pairtree infers the phylogeny underlying a cancer using genomic mutation data.
 Pairtree is particularly suited to settings with multiple tissue samples from
-each cancer, providing separate estimates of lineage frequency from each sample
+each cancer, providing separate estimates of subclone frequency from each sample
 that constrain the set of consistent phylogenies.  The Pairtree algorithm is
 described in {insert link to paper}. The algorithm consists of two phases:
 
@@ -12,45 +12,54 @@ described in {insert link to paper}. The algorithm consists of two phases:
 
 2. Use the pairwise relation tensor to sample possible phylogenies, assigning a
    likelihood to each. As each phylogeny is sampled, Pairtree computes the
-   lineage frequency of each mutation (or cluster of mutations) within the
+   subclone frequency of each mutation (or cluster of mutations) within the
    tree, balancing the need to fit the observed mutation data while still
    obeying tree constraints.
+
+The algorithm is described in [Pairtree: fast reconstruction of cancer
+evolutionary history using pairwise mutation
+relationships](https://www.biorxiv.org/content/10.1101/2020.11.06.372219v1)
+(Wintersinger et al.).
 
 
 Installing Pairtree
 ===================
-1. Install dependencies. To ease installation, you may wish to use Anaconda
-   {link}, which includes recent versions of Python 3, NumPy, and SciPy.
+1. Install dependencies. To ease installation, you may wish to use
+   [Anaconda](https://www.anaconda.com/products/individual), which includes
+   recent versions of Python 3, NumPy, and SciPy.
+   [Miniconda](https://docs.conda.io/en/latest/miniconda.html) also works well.
+   You need the following:
 
     * Python 3.6 or greater
     * NumPy
     * SciPy
-    * tqdm {link} (e.g., install via`pip3 install --user tqdm`)
+    * [tqdm](https://github.com/tqdm/tqdm) (e.g., install via `pip3 install --user tqdm`)
+    * [Numba](https://numba.pydata.org/) (e.g., install via `pip3 install --user numba`)
     * C compiler (e.g., GCC)
 
-Pairtree has only been tested on Linux systems, but should work on any
-UNIX-like OS (including macOS).
+   Pairtree has only been tested on Linux systems, but should work on any
+   UNIX-like OS (including macOS).
 
 2. Clone the Pairtree repository, then download and build the C code required
-   to fit lineage frequencies to the tree. This algorithm was published in
-   {Jose paper}, and uses the authors' implementation with minor modifications.
+   to fit subclone frequencies to the tree. This algorithm was published in
+   [Jia et al.](https://arxiv.org/abs/1811.01129), and uses the authors' implementation with minor modifications.
 
-    git clone https://github.com/jwintersinger/pairtree
-    cd pairtree/lib
-    git clone https://github.com/jwintersinger/projectppm
-    cd projectppm
-    bash make.sh
+        git clone https://github.com/jwintersinger/pairtree
+        cd pairtree/lib
+        git clone https://github.com/jwintersinger/projectppm
+        cd projectppm
+        bash make.sh
 
 3. Test your Pairtree installation.
 
-    cd ../../example/
-    mkdir results && cd results
-    # Run Pairtree.
-    ../../bin/pairtree --params ../example.params.json ../example.ssm example.results.npz
-    # Plot results in an HTML file.
-    ../../bin/plotpairtree example ../example.ssm ../example.params.json example.results.npz example.results.html
-    # View the HTML file.
-    firefox example.results.html
+        cd ../../example/
+        mkdir results && cd results
+        # Run Pairtree.
+        ../../bin/pairtree --params ../example.params.json ../example.ssm example.results.npz
+        # Plot results in an HTML file.
+        ../../bin/plotpairtree example ../example.ssm ../example.params.json example.results.npz example.results.html
+        # View the HTML file.
+        firefox example.results.html
 
 
 Interpreting Pairtree output
@@ -86,6 +95,10 @@ Changing number of samples, burn-in, and thinning
 -------------------------------------------------
 Three options control the behaviour of each MCMC chain used to sample trees.
 
+Changing number of samples, burn-in, and thinning
+-------------------------------------------------
+Three options control the behaviour of each MCMC chain used to sample trees.
+
 * Number of MCMC samples: by changing the `--trees-per-chain` option, you can
   make each chain sample more or fewer trees. The more samples each chain
   takes, the more likely it is that those samples will be from a good
@@ -109,7 +122,6 @@ Three options control the behaviour of each MCMC chain used to sample trees.
   computational burden associated with processing the results (e.g., by
   computing summary statistics over the distribution of recorded trees) is
   reduced, alongside the storage burden of writing many samples to disk.
-
 
 Running computations in parallel to reduce runtime
 --------------------------------------------------
@@ -141,26 +153,40 @@ default, which is to run a separate chain for each parallel process. If `M` is
 greater than the number of parallel processes `N`, the chains will execute
 serially, increasing runtime. (Given the serial execution, you should expect
 that tree sampling with `M > N` will take `ceiling(M / N)` times as long as
-sampling with `M = N`.)
 
-Using alternative algorithms to fit lineage frequencies to each tree
---------------------------------------------------------------------
-By default, Pairtree uses the "Efficient projection onto the perfect phylogeny
-model" algorithm described in Bei et al. (2018) {link} to fit tree-constrained
-lineage frequencies to each sampled phylogeny. This algorithm is usually the
-fastest choice. As alternatives, however, Pairtree also supports three other
-algorithms, which you can specify via the `--phi-fitter=<algorithm>` option.
+Fitting subclone frequencies to trees
+-------------------------------------
+Critical to the Pairtree algorithm is the step of fitting subclone frequencies
+to trees. Beyond the user's interpretation of subclone frequencies for
+downstream analysis of Pairtree's results, the subclone frequencies will also
+affect tree structure -- the data likelihood for a tree is determined by how
+well the tree-constrained subclone frequencies fit the observed VAF data. We
+provide several different algorithms for computing these frequencies that
+strike different balances between computational speed and result accuracy.
 
-* `graddesc`: uses gradient descent with an adaptive step size. (I.e., the step
-  size is increased each time a step is accepted, and reduced each time a step
-  is rejected.) Only a single global step size is used.
+* `--phi-fitter=projection`: By default, Pairtree uses the "Efficient
+  Projection onto the Perfect Phylogeny Model" algorithm developed in [Jia et
+  al.](https://arxiv.org/abs/1811.01129) This uses a Gaussian approximation of
+  the binomial likelihood we're trying to maximize.
 
-* `rprop`: uses the rprop variant of gradient descent {link}. Separate step
-  sizes are maintained for each frequency scalar in each tissue sample. Those
-  step sizes are increased when the direction of a step is consistent with the
-  previous step taken, and reduced otherwise.
+* `--phi-fitter=rprop`: Uses the [rprop variant of gradient
+  descent](https://ieeexplore.ieee.org/document/298623). Separate step sizes
+  are maintained for each frequency scalar in each tissue sample. Those step
+  sizes are increased when the direction of a step is consistent with the
+  previous step taken, and reduced otherwise. Generally, this algorithm will
+  produce more accurate results than `projection` (i.e., higher data
+  likelihoods for the same tree), since it is directly optimizing the binomial
+  objective rather than a Gaussian approximation, but at a higher computational
+  cost. The extra computational burden becomes greater with more subclones
+  (e.g., 30 or more), while being insignificant for small trees (e.g., with ten
+  subclones or fewer).
 
-* `proj_rprop`: first run the default `projection` algorithm, then refine its
-  results using `rprop`. While this can produce better lineage frequency values
+* `--phi-fitter=proj_rprop`: First run the default `projection` algorithm, then refine its
+  results using `rprop`. While this can produce better subclone frequency values
   at the cost of more computation, it has in testing demonstrated little
   benefit to accuracy.
+
+* `--phi-fitter=graddesc`: uses gradient descent with an adaptive step size.
+  (I.e., the step size is increased each time a step is accepted, and reduced
+  each time a step is rejected.) Only a single global step size is used for all
+  subclone frequencies across subclones and samples.
