@@ -35,6 +35,7 @@ Installing Pairtree
     * SciPy
     * [tqdm](https://github.com/tqdm/tqdm) (e.g., install via `pip3 install --user tqdm`)
     * [Numba](https://numba.pydata.org/) (e.g., install via `pip3 install --user numba`)
+    * [colorlover](https://github.com/plotly/colorlover) (e.g., install via `pip3 install --user colorlover`)
     * C compiler (e.g., GCC)
 
    Pairtree has only been tested on Linux systems, but should work on any
