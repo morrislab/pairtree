@@ -58,12 +58,13 @@ Test your Pairtree installation
 After installing Pairtree, you can test your installation using provided
 example data.
 
-        cd ../../example/
+        PTDIR=$HOME/path/to/pairtree
+        cd $PTDIR/example
         mkdir results && cd results
         # Run Pairtree.
-        ../../bin/pairtree --params ../example.params.json ../example.ssm example.results.npz
+        $PTDIR/bin/pairtree --params $PTDIR/example/example.params.json $PTDIR/example/example.ssm example.results.npz
         # Plot results in an HTML file.
-        ../../bin/plottree --runid example ../example.ssm ../example.params.json example.results.npz example.results.html
+        $PTDIR/bin/plottree --runid example $PTDIR/example/example.ssm $PTDIR/example/example.params.json example.results.npz example.results.html
         # View the HTML file.
         firefox example.results.html
 
