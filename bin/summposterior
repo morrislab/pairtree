@@ -236,7 +236,7 @@ def main():
   )
 
   parser = argparse.ArgumentParser(
-    description='LOL HI THERE',
+    description='Summarize the posterior distribution over clone trees sampled by Pairtree',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--runid')

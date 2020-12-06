@@ -181,7 +181,7 @@ def _write_full_results(vids, assigns, llhs, full_results_fn):
 
 def main():
   parser = argparse.ArgumentParser(
-    description='LOL HI THERE',
+    description='Cluster variants into subclones suitable for building clone trees',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--seed', dest='seed', type=int,

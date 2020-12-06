@@ -30,7 +30,7 @@ def write_footer(outf):
 
 def main():
   parser = argparse.ArgumentParser(
-    description='LOL HI THERE',
+    description='Plot variants and clusters, typically done before building clone trees',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--parallel', dest='parallel', type=int, default=None)

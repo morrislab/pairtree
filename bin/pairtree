@@ -18,7 +18,7 @@ import util
 
 def _parse_args():
   parser = argparse.ArgumentParser(
-    description='LOL HI THERE',
+    description='Build clone trees',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--verbose', action='store_true',

@@ -52,7 +52,11 @@ Installing Pairtree
         cd projectppm
         bash make.sh
 
-3. Test your Pairtree installation.
+
+Test your Pairtree installation
+===============================
+After installing Pairtree, you can test your installation using provided
+example data.
 
         cd ../../example/
         mkdir results && cd results
@@ -67,13 +71,31 @@ Installing Pairtree
 Pairtree executables
 ====================
 Pairtree provides several executable files to be used at different stages of
-your clone-tree-building pipeline.
+your clone-tree-building pipeline. You can run each executable with the
+`--help` flag to get full usage instructions.
 
-* `bin/plotvars`: something
-* `bin/clustervars`: something
-* `bin/pairtree`: something
-* `bin/plottree`: something
-* `bin/summposterior`: something
+* `bin/clustervars`: cluster variants into subclones suitable for building
+  clone trees with `bin/pairtree`. Please see the [Clustering
+  mutations](#clustering-mutations) section for full instructions.
+
+* `bin/plotvars`: plot information about your variant clusters before
+  proceeding with your Pairtree run. This step is optional. If
+  `--plot-relations` is specified, the pairwise relations between subclones
+  will be computed and plotted, but at a considerable computational cost.
+
+* `bin/pairtree`: the main Pairtree executable, used for building clone trees.
+  See the [Input files](#input-files) and [Tweaking Pairtree
+  options](#tweaking-pairtree-options) sections for more information specific
+  to this step.
+
+* `bin/plottree`: plot results of your Pairtree run. This will plot a single
+  clone tree, which by default will be the one with highest likelihood. See
+  [Interpreting Pairtree output](#interpreting-pairtree-output) for details.
+
+* `bin/summposterior`: summarize the posterior distribution over clone trees
+  from your Pairtree run by representing this distribution as a graph, and by
+  showing the best individual tree samples. See [Interpreting Pairtree
+  output](#interpreting-pairtree-output) for details.
 
 
 Input files

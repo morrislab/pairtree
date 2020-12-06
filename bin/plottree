@@ -275,7 +275,7 @@ def main():
     'diversity_indices',
   ))
   parser = argparse.ArgumentParser(
-    description='LOL HI THERE',
+    description='Plot results corresponding to a single clone tree sampled by Pairtree',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--seed', type=int)
