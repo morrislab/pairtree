@@ -39,7 +39,7 @@ def _parse_args():
     help='Proportion of non-burnin trees to write as output.')
   parser.add_argument('--phi-fitter', dest='phi_fitter', choices=('projection', 'rprop', 'proj_rprop', 'debug', 'graddesc_old', 'rprop_old'), default='projection')
   parser.add_argument('--phi-iterations', dest='phi_iterations', type=int, default=10000,
-    help='Maximum number of iterations of phi-fitting algorithm to run when using iterative phi-fitting algorithms (graddesc, rprop, or proj_rprop).')
+    help='Maximum number of iterations of phi-fitting algorithm to run when using iterative phi-fitting algorithms (rprop or proj_rprop).')
   parser.add_argument('--only-build-tensor', dest='only_build_tensor', action='store_true',
     help='Exit after building pairwise relations tensor, without sampling any trees.')
   parser.add_argument('--sort-by-llh', dest='sort_by_llh', action='store_false',
