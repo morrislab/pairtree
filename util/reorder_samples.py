@@ -30,11 +30,11 @@ def main():
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('ssm_fn')
-  parser.add_argument('json_fn')
+  parser.add_argument('params_fn')
   parser.add_argument('order')
   args = parser.parse_args()
 
-  _process(args.ssm_fn, args.json_fn, args.order)
+  _process(args.ssm_fn, args.params_fn, args.order)
 
 if __name__ == '__main__':
   main()
