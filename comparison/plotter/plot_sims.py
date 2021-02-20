@@ -89,6 +89,8 @@ def _plot_single_vs_others(results, single, methods, method_colours, score_type)
   return fig
 
 def _plot_scores(results, methods, method_colours, score_type, use_same_x_limit=True):
+  use_log_axis = score_type in ('cputime', 'walltime')
+
   score_traces = []
   success_traces = []
   K_vals = sorted(pd.unique(results['K']))
@@ -105,7 +107,7 @@ def _plot_scores(results, methods, method_colours, score_type, use_same_x_limit=
     score_traces.append([{
       'type': 'box',
       'boxmean': False,
-      'x': points[M],
+      'x': np.log10(points[M]) if use_log_axis else points[M],
       'text': runids[M],
       'name': M_happy[M],
       'marker_color': plotter.format_colour(method_colours[M]),
@@ -172,12 +174,20 @@ def _plot_scores(results, methods, method_colours, score_type, use_same_x_limit=
     tickformat='.0%',
     col=1,
   )
-  fig.update_xaxes(
-    zeroline=True,
-    zerolinewidth=1,
-    zerolinecolor='rgba(0,0,0,0.3)',
-    col=2,
-  )
+  if use_log_axis:
+    fig.update_xaxes(
+      tickprefix='10<sup>',
+      ticksuffix='</sup>',
+      col=2,
+    )
+  else:
+    fig.update_xaxes(
+      zeroline=True,
+      zerolinewidth=1,
+      zerolinecolor='rgba(0,0,0,0.3)',
+      col=2,
+    )
+
   fig.update_xaxes(
     title_text = AXIS_TITLES[score_type]['all_scores'],
     row = N,
