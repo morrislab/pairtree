@@ -360,6 +360,14 @@ def _make_W_dests_combined(subtree_head, adj, anc, data_logmutrel):
   return np.vstack((W_dests_uniform, W_dests_mutrel))
 
 def _generate_new_sample(old_samp, data_logmutrel, __calc_phi, __calc_llh_phi):
+  K = len(old_samp.adj)
+  # When a tree consists of two nodes (i.e., one mutation cluster), proceeding with
+  # the normal sample-generating process will produce an error (specifically,
+  # when we try to divide by zero in _make_W_dests_uniform). Circumvent this by
+  # returning the current (trivial) tree structure.
+  if K == 2:
+    return (old_samp, 0., 0.)
+
   # mode == 0: make uniform update
   # mode == 1: make mutrel-informed update
   mode_node_weights = np.array([1 - hparams.gamma, hparams.gamma])
