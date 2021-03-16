@@ -118,6 +118,9 @@ def reorder_rows(mat, start=None, end=None):
   if end is None:
     end = N
 
+  if N < 2:
+    return (mat, np.arange(N))
+
   fullidxs = np.array(range(N))
   submat = mat[start:end]
 
@@ -156,6 +159,7 @@ def reorder_square_matrix(mat):
   # results will obviously be dependent on whether you order the original
   # matrix or its transpose.
   assert mat.shape[0] == mat.shape[1]
+
   mat, idxs = reorder_rows(mat)
   mat = mat.T[idxs,:].T
   return (mat, idxs)
