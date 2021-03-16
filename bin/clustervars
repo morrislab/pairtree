@@ -244,7 +244,7 @@ def main():
     args.iterations,
     seed,
     args.chains,
-    args.parallel,
+    parallel,
   )
   if args.full_results:
     _write_full_results(vids, assigns, llhs, args.full_results)
