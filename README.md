@@ -194,18 +194,23 @@ The `.params.json` file denotes three objects:
 
 Imputing read counts for mutations missing in some samples
 ==========================================================
-(TODO: document imputation)
+* (TODO: document imputation)
 
 
 Clustering mutations
 ====================
-(TODO: write)
+* (TODO: write)
 
 
 Interpreting Pairtree output
 ============================
-(add note about how logs will be written in JSON format if stdout/stderr is directed to a file)
-(add note about summposterior, plottree, etc.)
+* To export Pairtree's visualizations from `bin/plottree` for use in
+  publications, try [SVG Crowbar](https://nytimes.github.io/svg-crowbar/). All
+  figures Pairtree creates should be in SVG format, which should be suitable
+  for use at arbitrarily high resolutions (including print) because of its
+  vector-based nature.
+* (add note about how logs will be written in JSON format if stdout/stderr is directed to a file)
+* (add note about summposterior, plottree, etc.)
 
 
 Tweaking Pairtree options
