@@ -120,17 +120,19 @@ def _calc_di(results, samps=1000):
 
   cdi = []
   cmdi = []
+  cadi = []
   for idx in range(samps):
     tidx = util.sample_multinom(probs)
     eta = util.calc_eta(structs[tidx], phis[tidx])
     cdi.append(di.calc_cdi(eta))
     cmdi.append(di.calc_cmdi(eta, clusters, structs[tidx]))
+    cadi.append(di.calc_cadi(eta, structs[tidx]))
 
   # Size of each array: PxS, given P posterior samples and S tissue samples
-  return (np.array(cdi), np.array(cmdi))
+  return (np.array(cdi), np.array(cmdi), np.array(cadi))
 
 def _plot_di(results, outf):
-  didxs = {K: I for K, I in zip(('cdi', 'cmdi'), _calc_di(results))}
+  didxs = {K: I for K, I in zip(('cdi', 'cmdi', 'cadi'), _calc_di(results))}
   sampnames = results.get('sampnames')
   print('<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>', file=outf)
   print('<h2>Diversity indices</h2>', file=outf)
@@ -138,6 +140,7 @@ def _plot_di(results, outf):
   titles = {
     'cdi': 'Clone diversity index',
     'cmdi': 'Clone and mutation diversity index',
+    'cadi': 'Clone and ancestor diversity index',
   }
 
   for K in didxs.keys():
