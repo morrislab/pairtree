@@ -16,10 +16,10 @@ described in {insert link to paper}. The algorithm consists of two phases:
    tree, balancing the need to fit the observed mutation data while still
    obeying tree constraints.
 
-The algorithm is described in [Pairtree: fast reconstruction of cancer
-evolutionary history using pairwise mutation
-relationships](https://www.biorxiv.org/content/10.1101/2020.11.06.372219v1)
-(Wintersinger et al.).
+The algorithm is described in [Reconstructing complex cancer evolutionary
+histories from multiple bulk DNA samples using
+Pairtree](https://doi.org/10.1101/2020.11.06.372219) (Wintersinger et al.
+(2021)).
 
 
 Installing Pairtree
@@ -206,9 +206,9 @@ Interpreting Pairtree output
 ============================
 * To export Pairtree's visualizations from `bin/plottree` for use in
   publications, try [SVG Crowbar](https://nytimes.github.io/svg-crowbar/). All
-  figures Pairtree creates should be in SVG format, which should be suitable
-  for use at arbitrarily high resolutions (including print) because of its
-  vector-based nature.
+  figures Pairtree creates are in SVG format, which is suitable for use at
+  arbitrarily high resolutions (including in print) because of its vector-based
+  nature.
 * (add note about how logs will be written in JSON format if stdout/stderr is directed to a file)
 * (add note about summposterior, plottree, etc.)
 
