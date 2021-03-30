@@ -324,12 +324,7 @@ def main():
   if args.reorder_subclones:
     data, params = _reorder_subclones(data, params)
 
-  if 'hidden_samples' in params:
-    hidden = set(params['hidden_samples'])
-    assert hidden.issubset(set(data['samples'])) and len(hidden) < len(data['samples'])
-    visible_sampidxs = [idx for idx, samp in enumerate(data['samples']) if samp not in hidden]
-  else:
-    visible_sampidxs = None
+  visible_sampidxs = plotutil.hide_samples(params['samples'], params.get('hidden_samples'))
 
   samp_colours = params.get('samp_colours', None)
   pop_colours = params.get('pop_colours', None)

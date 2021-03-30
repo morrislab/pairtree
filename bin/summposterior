@@ -131,7 +131,12 @@ def _calc_di(results, samps=1000):
   # Size of each array: PxS, given P posterior samples and S tissue samples
   return (np.array(cdi), np.array(cmdi), np.array(cadi))
 
-def _plot_di(results, outf):
+def _test_didxs(didxs, didx_type, sidx1, sidx2, alt, sampnames):
+  import scipy.stats
+  stat, pval = scipy.stats.wilcoxon(didxs[didx_type][:,sidx1], didxs[didx_type][:,sidx2], alternative=alt)
+  print(didx_type, sampnames[sidx1], sampnames[sidx2], alt, pval)
+
+def _plot_di(results, visible_sampidxs, outf):
   didxs = {K: I for K, I in zip(('cdi', 'cmdi', 'cadi'), _calc_di(results))}
   sampnames = results.get('sampnames')
   print('<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>', file=outf)
@@ -152,7 +157,7 @@ def _plot_di(results, outf):
       boxpoints = 'all',
       boxmean = True,
       pointpos = 1.5,
-    ) for sidx, sampname in enumerate(sampnames)]
+    ) for sidx, sampname in enumerate(sampnames) if visible_sampidxs is None or sidx in visible_sampidxs]
     layout = go.Layout(
       template = 'seaborn',
       title = '{di_name}'.format(di_name = titles[K]),
@@ -160,6 +165,12 @@ def _plot_di(results, outf):
       yaxis = {'title': '{di_name} (bits)'.format(di_name = K.upper())},
     )
     fig = go.Figure(data=traces, layout=layout)
+
+    # Example hack showing how you can do Wilcoxon signed-rank test on
+    # diversity indices for two particular samples. Eventually this
+    # functionality should be broken out into its own discrete script.
+    #_test_didxs(didxs, K, 0, 46, 'less', sampnames)
+    #_test_didxs(didxs, K, 70, 72, 'greater', sampnames)
 
     html = pio.to_html(
       fig,
@@ -263,6 +274,8 @@ def main():
   supervars = clustermaker.make_cluster_supervars(results.get('clusters'), variants)
   supervars = [supervars[vid] for vid in common.sort_vids(supervars.keys())]
 
+  visible_sampidxs = plotutil.hide_samples(params['samples'], params.get('hidden_samples'))
+
   with open(args.html_out_fn, 'w') as outf:
     write_header(args.runid, outf)
 
@@ -274,7 +287,7 @@ def main():
       summarize(results, params, supervars, outf)
 
     if 'diversity_indices' in plot_choices:
-      _plot_di(results, outf)
+      _plot_di(results, visible_sampidxs, outf)
 
     write_footer(outf)
 
