@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+import argparse
+import numpy as np
+import numpy.ma as ma
+import json
+import multiprocessing
+
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
+import inputparser
+import pairwise
+import resultserializer
+from common import Models
+import common
+
+def _make_garb_logprior(garb_prior):
+  assert 0 < garb_prior <= 1
+  #logprior = {'garbage': np.log(garb_prior), 'cocluster': -np.inf}
+  logprior = {'garbage': np.log(0.2)}
+  return logprior
+
+def _remove_garbage(variants, garb_prior, max_garb_prob, seed, parallel):
+  epsilon = common._EPSILON
+  assert epsilon < max_garb_prob <= 1
+
+  logprior = _make_garb_logprior(garb_prior)
+
+  resultfn = '/tmp/results.npz'
+  results = resultserializer.Results(resultfn)
+  if results.has_mutrel('posterior'):
+    posterior = results.get_mutrel('posterior')
+    evidence = results.get_mutrel('evidence')
+  else:
+    posterior, evidence = pairwise.calc_posterior(variants, logprior, 'pairwise', parallel)
+    results.add_mutrel('posterior', posterior)
+    results.add_mutrel('evidence', evidence)
+    results.save()
+
+  max_garb_prob = 0.9
+  logprior = _make_garb_logprior(garb_prior)
+  posterior = pairwise.make_full_posterior(evidence, logprior)
+
+  prob_garb = posterior.rels[:,:,Models.garbage]
+  prob_garb = np.maximum(epsilon, prob_garb)
+  logprob_garb = np.log(prob_garb)
+  np.fill_diagonal(logprob_garb, 0.)
+
+  nongarb = list(posterior.vids)
+  garbage = set()
+  worst_garb = np.max(prob_garb)
+
+  while worst_garb > max_garb_prob:
+    print('worst', worst_garb)
+    M = len(nongarb)
+    assert M > 0
+    assert logprob_garb.shape == (M,M)
+
+    joint_garb = np.sum(logprob_garb, axis=1)
+    worst = np.argmax(joint_garb)
+    print('removing', nongarb[worst], joint_garb[worst], np.sort(joint_garb)[-10:])
+    garbage.add(nongarb[worst])
+    del nongarb[worst]
+
+    for axis in (0,1):
+      prob_garb = np.delete(prob_garb, worst, axis=axis)
+      logprob_garb = np.delete(logprob_garb, worst, axis=axis)
+    worst_garb = np.max(prob_garb)
+
+  assert set(nongarb) | set(garbage) == set(posterior.vids)
+  return common.sort_vids(garbage)
+
+def main():
+  parser = argparse.ArgumentParser(
+    description='Cluster variants into subclones suitable for building clone trees',
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter
+  )
+  parser.add_argument('--seed', dest='seed', type=int,
+    help='Integer seed used for pseudo-random number generator. Running with the same seed on the same inputs will produce exactly the same result.')
+  parser.add_argument('--parallel', dest='parallel', type=int, default=None,
+    help='Number of tasks to run in parallel. By default, this is set to the number of CPU cores on the system. On hyperthreaded systems, this will be twice the number of physical CPUs.')
+  parser.add_argument('--prior', type=float, default=0.20,
+    help='Pairwise garbage prior probability.')
+  parser.add_argument('--max-garb-prob', type=float, default=0.1,
+    help='Maximum probability of garbage to permit for any pair.')
+  parser.add_argument('ssm_fn')
+  parser.add_argument('in_params_fn')
+  parser.add_argument('out_params_fn')
+  args = parser.parse_args()
+
+  if args.seed is not None:
+    seed = args.seed
+  else:
+    # Maximum seed is 2**32 - 1.
+    seed = np.random.randint(2**32)
+  np.random.seed(seed)
+
+  np.set_printoptions(linewidth=400, precision=3, threshold=sys.maxsize, suppress=True)
+  np.seterr(divide='raise', invalid='raise', over='raise')
+  parallel = args.parallel if args.parallel is not None else multiprocessing.cpu_count()
+
+  variants = inputparser.load_ssms(args.ssm_fn)
+  params = inputparser.load_params(args.in_params_fn)
+
+  garbage_vids = _remove_garbage(
+    variants,
+    args.prior,
+    args.max_garb_prob,
+    seed,
+    parallel,
+  )
+
+  print(len(garbage_vids))
+  print(garbage_vids)
+  print(common.sort_vids(set(variants.keys()) - set(garbage_vids)))
+
+  params['garbage'] = garbage_vids
+  with open(args.out_params_fn, 'w') as F:
+    json.dump(params, F)
+
+if __name__ == '__main__':
+  main()

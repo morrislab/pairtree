@@ -43,7 +43,6 @@ def _calc_posterior(evidence, logprior):
 def _calc_posterior_full(evidence, logprior):
   # This function is currently used only to double-check the results of
   # `_calc_posterior`.
-  # TODO: remove this function.
   joint = evidence + logprior[None,None,:]
   diag = range(len(joint))
   joint[diag,diag,:] = -np.inf
@@ -125,7 +124,8 @@ def _compute_pairs(pairs, variants, logprior, posterior, evidence, pbar=None, pa
 
   # TODO: only calculate posterior once here, instead of computing it within
   # each worker separately for a given variant pair.
-  assert np.allclose(posterior.rels, _calc_posterior_full(evidence.rels, logprior))
+  other = _calc_posterior_full(evidence.rels, logprior)
+  assert np.allclose(posterior.rels, other)
   return (posterior, evidence)
 
 def calc_posterior(variants, logprior, rel_type, parallel=1):
@@ -185,11 +185,16 @@ def merge_variants(to_merge, evidence, logprior):
     evidence = new_evidence
 
   evidence = mutrel.remove_variants_by_vidx(evidence, already_merged)
+  posterior = make_full_posterior(evidence, logprior)
+  return (posterior, evidence)
+
+def make_full_posterior(evidence, logprior):
+  logprior = _complete_logprior(logprior)
   posterior = mutrel.Mutrel(
     vids = evidence.vids,
     rels = _calc_posterior_full(evidence.rels, logprior),
   )
-  return (posterior, evidence)
+  return posterior
 
 def add_variants(vids_to_add, variants, mutrel_posterior, mutrel_evidence, logprior, pbar, parallel):
   for vid in vids_to_add:
