@@ -35,6 +35,7 @@ def main():
   )
   parser.add_argument('--parallel', dest='parallel', type=int, default=None)
   parser.add_argument('--plot-relations', action='store_true')
+  parser.add_argument('--garbage-prior', type=float, default=0.)
   parser.add_argument('ssm_fn')
   parser.add_argument('params_fn')
   parser.add_argument('html_out_fn')
@@ -44,8 +45,13 @@ def main():
   params = inputparser.load_params(args.params_fn)
 
   if args.plot_relations:
-    logprior = {'garbage': -np.inf}
     parallel = args.parallel if args.parallel is not None else multiprocessing.cpu_count()
+    if args.garbage_prior == 0:
+      loggarb = -np.inf
+    else:
+      assert 0. < args.garbage_prior <= 1.
+      loggarb = np.log(args.garbage_prior)
+    logprior = {'garbage': loggarb}
     supervars, clustrel_posterior, clustrel_evidence, _, _ = clustermaker.use_pre_existing(
       variants,
       logprior,

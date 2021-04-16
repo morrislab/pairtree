@@ -97,7 +97,7 @@ def remove_rowcol(arr, indices):
   return arr
 
 # TODO: remove `find_parents`, since it's the same as
-# `convert_parents_to_adjmatrix`.
+# `convert_adjmatrix_to_parents`.
 def find_parents(adj):
   adj = np.copy(adj)
   np.fill_diagonal(adj, 0)
