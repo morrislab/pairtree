@@ -26,16 +26,17 @@ def _remove_garbage(variants, garb_prior, max_garb_prob, seed, parallel):
 
   logprior = _make_garb_logprior(garb_prior)
 
-  resultfn = '/tmp/results.npz'
-  results = resultserializer.Results(resultfn)
-  if results.has_mutrel('posterior'):
-    posterior = results.get_mutrel('posterior')
-    evidence = results.get_mutrel('evidence')
-  else:
-    posterior, evidence = pairwise.calc_posterior(variants, logprior, 'pairwise', parallel)
-    results.add_mutrel('posterior', posterior)
-    results.add_mutrel('evidence', evidence)
-    results.save()
+  #resultfn = '/tmp/results.npz'
+  #results = resultserializer.Results(resultfn)
+  #if results.has_mutrel('posterior'):
+  #  posterior = results.get_mutrel('posterior')
+  #  evidence = results.get_mutrel('evidence')
+  #else:
+  #  posterior, evidence = pairwise.calc_posterior(variants, logprior, 'pairwise', parallel)
+  #  results.add_mutrel('posterior', posterior)
+  #  results.add_mutrel('evidence', evidence)
+  #  results.save()
+  posterior, evidence = pairwise.calc_posterior(variants, logprior, 'pairwise', parallel)
 
   max_garb_prob = 0.9
   logprior = _make_garb_logprior(garb_prior)
@@ -51,14 +52,21 @@ def _remove_garbage(variants, garb_prior, max_garb_prob, seed, parallel):
   worst_garb = np.max(prob_garb)
 
   while worst_garb > max_garb_prob:
-    print('worst', worst_garb)
     M = len(nongarb)
     assert M > 0
     assert logprob_garb.shape == (M,M)
 
     joint_garb = np.sum(logprob_garb, axis=1)
     worst = np.argmax(joint_garb)
-    print('removing', nongarb[worst], joint_garb[worst], np.sort(joint_garb)[-10:])
+    print(
+      'removing',
+      nongarb[worst],
+      joint_garb[worst],
+      ','.join([nongarb[idx] for idx in range(M) if prob_garb[worst,idx] >= 0.5]),
+      np.sort(prob_garb[worst])[-10:],
+      np.sort(joint_garb)[-10:],
+      worst_garb,
+    )
     garbage.add(nongarb[worst])
     del nongarb[worst]
 
