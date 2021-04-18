@@ -17,7 +17,7 @@ import common
 def _make_garb_logprior(garb_prior):
   assert 0 < garb_prior <= 1
   #logprior = {'garbage': np.log(garb_prior), 'cocluster': -np.inf}
-  logprior = {'garbage': np.log(0.2)}
+  logprior = {'garbage': np.log(garb_prior)}
   return logprior
 
 def _remove_garbage(variants, garb_prior, max_garb_prob, seed, parallel):
@@ -38,7 +38,6 @@ def _remove_garbage(variants, garb_prior, max_garb_prob, seed, parallel):
   #  results.save()
   posterior, evidence = pairwise.calc_posterior(variants, logprior, 'pairwise', parallel)
 
-  max_garb_prob = 0.9
   logprior = _make_garb_logprior(garb_prior)
   posterior = pairwise.make_full_posterior(evidence, logprior)
 
@@ -75,6 +74,7 @@ def _remove_garbage(variants, garb_prior, max_garb_prob, seed, parallel):
       logprob_garb = np.delete(logprob_garb, worst, axis=axis)
     worst_garb = np.max(prob_garb)
 
+  print('worst', worst_garb)
   assert set(nongarb) | set(garbage) == set(posterior.vids)
   return common.sort_vids(garbage)
 
@@ -87,9 +87,9 @@ def main():
     help='Integer seed used for pseudo-random number generator. Running with the same seed on the same inputs will produce exactly the same result.')
   parser.add_argument('--parallel', dest='parallel', type=int, default=None,
     help='Number of tasks to run in parallel. By default, this is set to the number of CPU cores on the system. On hyperthreaded systems, this will be twice the number of physical CPUs.')
-  parser.add_argument('--prior', type=float, default=0.20,
+  parser.add_argument('--prior', type=float, default=0.2,
     help='Pairwise garbage prior probability.')
-  parser.add_argument('--max-garb-prob', type=float, default=0.1,
+  parser.add_argument('--max-garb-prob', type=float, default=0.5,
     help='Maximum probability of garbage to permit for any pair.')
   parser.add_argument('ssm_fn')
   parser.add_argument('in_params_fn')
