@@ -56,6 +56,15 @@ def _calc_posterior_full(evidence, logprior):
   mutrel.check_posterior_sanity(posterior)
   return posterior
 
+def make_full_posterior(evidence, logprior):
+  logprior = _complete_logprior(logprior)
+  posterior = mutrel.Mutrel(
+    vids = evidence.vids,
+    rels = _calc_posterior_full(evidence.rels, logprior),
+  )
+  return posterior
+
+
 def _complete_logprior(logprior):
   '''
   If you don't want to include a certain model in the posterior (e.g., perhaps
@@ -187,14 +196,6 @@ def merge_variants(to_merge, evidence, logprior):
   evidence = mutrel.remove_variants_by_vidx(evidence, already_merged)
   posterior = make_full_posterior(evidence, logprior)
   return (posterior, evidence)
-
-def make_full_posterior(evidence, logprior):
-  logprior = _complete_logprior(logprior)
-  posterior = mutrel.Mutrel(
-    vids = evidence.vids,
-    rels = _calc_posterior_full(evidence.rels, logprior),
-  )
-  return posterior
 
 def add_variants(vids_to_add, variants, mutrel_posterior, mutrel_evidence, logprior, pbar, parallel):
   for vid in vids_to_add:

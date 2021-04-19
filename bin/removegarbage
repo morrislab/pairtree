@@ -11,7 +11,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
 import inputparser
 import pairwise
 import resultserializer
-from common import Models
+from common import Models, debug
 import common
 
 def _make_garb_logprior(garb_prior):
@@ -20,26 +20,29 @@ def _make_garb_logprior(garb_prior):
   logprior = {'garbage': np.log(garb_prior)}
   return logprior
 
-def _remove_garbage(variants, garb_prior, max_garb_prob, seed, parallel):
-  epsilon = common._EPSILON
-  assert epsilon < max_garb_prob <= 1
-
+def _calc_posterior(variants, garb_prior, parallel, pairwisefn=None):
   logprior = _make_garb_logprior(garb_prior)
 
-  #resultfn = '/tmp/results.npz'
-  #results = resultserializer.Results(resultfn)
-  #if results.has_mutrel('posterior'):
-  #  posterior = results.get_mutrel('posterior')
-  #  evidence = results.get_mutrel('evidence')
-  #else:
-  #  posterior, evidence = pairwise.calc_posterior(variants, logprior, 'pairwise', parallel)
-  #  results.add_mutrel('posterior', posterior)
-  #  results.add_mutrel('evidence', evidence)
-  #  results.save()
-  posterior, evidence = pairwise.calc_posterior(variants, logprior, 'pairwise', parallel)
+  if pairwisefn is not None:
+    results = resultserializer.Results(pairwisefn)
+  else:
+    results = None
+
+  if results is not None and results.has_mutrel('evidence'):
+    evidence = results.get_mutrel('evidence')
+  else:
+    _, evidence = pairwise.calc_posterior(variants, logprior, 'pairwise', parallel)
+    if results is not None:
+      results.add_mutrel('evidence', evidence)
+      results.save()
 
   logprior = _make_garb_logprior(garb_prior)
   posterior = pairwise.make_full_posterior(evidence, logprior)
+  return posterior
+
+def _remove_garbage(posterior, max_garb_prob, seed):
+  epsilon = common._EPSILON
+  assert epsilon < max_garb_prob <= 1
 
   prob_garb = posterior.rels[:,:,Models.garbage]
   prob_garb = np.maximum(epsilon, prob_garb)
@@ -57,7 +60,7 @@ def _remove_garbage(variants, garb_prior, max_garb_prob, seed, parallel):
 
     joint_garb = np.sum(logprob_garb, axis=1)
     worst = np.argmax(joint_garb)
-    print(
+    debug(
       'removing',
       nongarb[worst],
       joint_garb[worst],
@@ -74,13 +77,13 @@ def _remove_garbage(variants, garb_prior, max_garb_prob, seed, parallel):
       logprob_garb = np.delete(logprob_garb, worst, axis=axis)
     worst_garb = np.max(prob_garb)
 
-  print('worst', worst_garb)
+  debug('worst', worst_garb)
   assert set(nongarb) | set(garbage) == set(posterior.vids)
   return common.sort_vids(garbage)
 
 def main():
   parser = argparse.ArgumentParser(
-    description='Cluster variants into subclones suitable for building clone trees',
+    description='Detect garbage variants and produce a modified input that excludes them',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--seed', dest='seed', type=int,
@@ -91,11 +94,18 @@ def main():
     help='Pairwise garbage prior probability.')
   parser.add_argument('--max-garb-prob', type=float, default=0.5,
     help='Maximum probability of garbage to permit for any pair.')
+  parser.add_argument('--pairwise-results', dest='pairwise_results_fn',
+    help='Filename to store pairwise evidence in, which allows you to try garbage removal with different parameters without having to repeat the pairwise computations.')
+  parser.add_argument('--verbose', action='store_true',
+    help='Print debugging messages')
   parser.add_argument('ssm_fn')
   parser.add_argument('in_params_fn')
   parser.add_argument('out_params_fn')
   args = parser.parse_args()
 
+  common.debug.DEBUG = args.verbose
+
+  # We don't currently use any PRNG functions, but seed it in case we do in the future.
   if args.seed is not None:
     seed = args.seed
   else:
@@ -110,17 +120,16 @@ def main():
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.in_params_fn)
 
+  posterior = _calc_posterior(variants, args.prior, parallel, args.pairwise_results_fn)
   garbage_vids = _remove_garbage(
-    variants,
-    args.prior,
+    posterior,
     args.max_garb_prob,
     seed,
-    parallel,
   )
 
-  print(len(garbage_vids))
-  print(garbage_vids)
-  print(common.sort_vids(set(variants.keys()) - set(garbage_vids)))
+  debug(len(garbage_vids))
+  debug(garbage_vids)
+  debug(common.sort_vids(set(variants.keys()) - set(garbage_vids)))
 
   params['garbage'] = garbage_vids
   with open(args.out_params_fn, 'w') as F:

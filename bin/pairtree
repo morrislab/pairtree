@@ -42,8 +42,8 @@ def _parse_args():
     help='Maximum number of iterations of phi-fitting algorithm to run when using iterative phi-fitting algorithms (rprop or proj_rprop).')
   parser.add_argument('--only-build-tensor', dest='only_build_tensor', action='store_true',
     help='Exit after building pairwise relations tensor, without sampling any trees.')
-  parser.add_argument('--sort-by-llh', dest='sort_by_llh', action='store_false',
-    help='Sort posterior tree samples by descending-log likelihood. (If false, trees are listed in the order in which they were sampled.)')
+  parser.add_argument('--disable-posterior-sort', dest='sort_by_llh', action='store_false',
+    help='Disable sorting posterior tree samples by descending probability, and instead list them in the order they were sampled)')
   for K in hyperparams.defaults.keys():
     parser.add_argument('--%s' % K, type=float, default=hyperparams.defaults[K], help=hyperparams.explanations[K])
 
