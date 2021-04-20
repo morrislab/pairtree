@@ -26,43 +26,17 @@ def _parse_params(params):
 def _calc_metrics(truth, result):
   notresult = np.logical_not(result)
   nottruth = np.logical_not(truth)
-
-  tp = sum(   truth &    result)
-  fp = sum(nottruth &    result)
-  tn = sum(nottruth & notresult)
-  fn = sum(   truth & notresult)
-  # Allow division by zero and for 0/0.
-  np.seterr(divide='ignore', invalid='ignore')
   mets = {
-    'acc': (tp + tn) / (tp + tn + fp + fn),
-    # prec = p(y=1 | y_hat=1)
-    'prec': tp / (tp + fp),
-    # `recall`, `sensitivity`, and `tpr` are the same
-    # recall = p(y_hat=1 | y=1)
-    'recall': tp / (tp + fn),
-    # `specificity` and `tnr` are the same
-    # spec = 1 - fpr
-    # spec = p(y_hat=0 | y=0)
-    'spec': tn / (tn + fp),
-    'true_garb': tp + fn,
-    'result_garb': tp + fp,
-    'muts': tp + fp + tn + fn,
+    'tp': sum(   truth &    result),
+    'fp': sum(nottruth &    result),
+    'tn': sum(nottruth & notresult),
+    'fn': sum(   truth & notresult),
   }
-
-  for met in ('acc', 'prec', 'recall'):
-    if np.isnan(mets[met]):
-      # NaN arises when we get 0/0.
-      mets[met] = 1.
-  mets['f1'] = 2/(1/mets['recall'] + 1/mets['prec'])
-  if np.isinf(mets['f1']):
-    mets['f1'] = 0.
-
   for K in mets.keys():
     # Convert to native Python type from NumPy to permit JSON serialization.
     # These will exist as a mix of native and NumPy types, so I need to allow
     # for either.
     mets[K] = getattr(mets[K], 'tolist', lambda: mets[K])()
-
   return mets
 
 def main():

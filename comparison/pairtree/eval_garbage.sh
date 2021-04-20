@@ -5,10 +5,10 @@ shopt -s nullglob
 BASEDIR=~/work/pairtree
 PEARSIMDIR=~/work/pearsim
 PAIRTREEDIR=$BASEDIR/bin
-INDIR=$BASEDIR/scratch/inputs/garbdetect
-RESULTSDIR=$BASEDIR/scratch/results/garbdetect
+INDIR=$BASEDIR/scratch/inputs/garbdetect.K10
+RESULTSDIR=$BASEDIR/scratch/results/garbdetect.K10
 JOBDIR=~/jobs
-PARA=40
+PARA=20
 PYTHON=python3
 
 function commafy {
@@ -19,7 +19,7 @@ function commafy {
 function make_inputs {
   mkdir -p $INDIR && cd $INDIR
 
-  for K in 30; do
+  for K in 10; do
   for S in 30; do
   for T in 1000; do
   for M_per_cluster in 20; do
@@ -80,6 +80,10 @@ function init_pairwise {
 
     cmd=""
     cmd+="#!/bin/bash\n"
+
+    cmd+="#SBATCH --qos=nopreemption\n"
+    cmd+="#SBATCH --partition=cpu\n"
+    cmd+="#SBATCH --mem=4GB\n"
     cmd+="#SBATCH --nodes=1\n"
     cmd+="#SBATCH --ntasks=$PARA\n"
     cmd+="#SBATCH --time=23:59:00\n"
@@ -88,6 +92,7 @@ function init_pairwise {
     cmd+="#SBATCH --mail-type=NONE\n"
 
     cmd+="$PYTHON $PAIRTREEDIR/removegarbage"
+    cmd+=" --parallel $PARA"
     cmd+=" --pairwise-results $results/$runid.pairwise.npz"
     cmd+=" $INDIR/$runid.ssm"
     cmd+=" $INDIR/$runid.params.json"
@@ -124,7 +129,7 @@ function detect_garb {
         echo $cmd
       done
     done
-  done
+  done | parallel -j$PARA --halt 2 --eta
 }
 
 function eval_garbdetect {
@@ -143,8 +148,8 @@ function eval_garbdetect {
 
 function main {
   #make_inputs
-  init_pairwise
-  #detect_garb
+  #init_pairwise
+  detect_garb
   #eval_garbdetect
 }
 

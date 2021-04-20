@@ -201,7 +201,7 @@ def main():
   alpha, S, prob_lt = compute_analytic_prob_single(args.K)
   N, eta_sum_var = compute_var(alpha, args.K)
 
-  html = '<h1><marquee>I FUCKING HATE TREES</marquee></h1>'
+  html = '<h1><marquee>I LOVE TREES</marquee></h1>'
   html += plot_prob_single(alpha, args.K, S, prob_lt)
   html += plot_var(alpha, N, args.K, eta_sum_var)
   html += plot_prob_many(alpha=0.1, K=args.K)
