@@ -14,14 +14,16 @@ import resultserializer
 from common import Models, debug
 import common
 
-def _make_garb_logprior(garb_prior):
-  assert 0 < garb_prior <= 1
-  #logprior = {'garbage': np.log(garb_prior), 'cocluster': -np.inf}
-  logprior = {'garbage': np.log(garb_prior)}
+def _make_garb_logprior(garb_neglogprior):
+  assert garb_neglogprior > 0
+  # Convert from log10 to natural log.
+  garb_neglogprior /= np.log10(np.e)
+  #logprior = {'garbage': -garb_neglogprior, 'cocluster': -np.inf}
+  logprior = {'garbage': -garb_neglogprior}
   return logprior
 
-def _calc_posterior(variants, garb_prior, parallel, pairwisefn=None):
-  logprior = _make_garb_logprior(garb_prior)
+def _calc_posterior(variants, garb_neglogprior, parallel, pairwisefn=None):
+  logprior = _make_garb_logprior(garb_neglogprior)
 
   if pairwisefn is not None:
     results = resultserializer.Results(pairwisefn)
@@ -36,7 +38,7 @@ def _calc_posterior(variants, garb_prior, parallel, pairwisefn=None):
       results.add_mutrel('evidence', evidence)
       results.save()
 
-  logprior = _make_garb_logprior(garb_prior)
+  logprior = _make_garb_logprior(garb_neglogprior)
   posterior = pairwise.make_full_posterior(evidence, logprior)
   return posterior
 
@@ -48,6 +50,9 @@ def _remove_garbage(posterior, max_garb_prob, seed):
   prob_garb = np.maximum(epsilon, prob_garb)
   logprob_garb = np.log(prob_garb)
   np.fill_diagonal(logprob_garb, 0.)
+
+  debug('num_garb_pairs', np.sum(prob_garb >= max_garb_prob, axis=1))
+  debug('total_loggarb', np.sum(logprob_garb, axis=1))
 
   nongarb = list(posterior.vids)
   garbage = set()
@@ -90,8 +95,8 @@ def main():
     help='Integer seed used for pseudo-random number generator. Running with the same seed on the same inputs will produce exactly the same result.')
   parser.add_argument('--parallel', dest='parallel', type=int, default=None,
     help='Number of tasks to run in parallel. By default, this is set to the number of CPU cores on the system. On hyperthreaded systems, this will be twice the number of physical CPUs.')
-  parser.add_argument('--prior', type=float, default=0.2,
-    help='Pairwise garbage prior probability.')
+  parser.add_argument('--logprior', type=float, default=1., dest='neglogprior',
+    help='Pairwise garbage negative log10 prior probability.')
   parser.add_argument('--max-garb-prob', type=float, default=0.5,
     help='Maximum probability of garbage to permit for any pair.')
   parser.add_argument('--pairwise-results', dest='pairwise_results_fn',
@@ -120,7 +125,7 @@ def main():
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.in_params_fn)
 
-  posterior = _calc_posterior(variants, args.prior, parallel, args.pairwise_results_fn)
+  posterior = _calc_posterior(variants, args.neglogprior, parallel, args.pairwise_results_fn)
   garbage_vids = _remove_garbage(
     posterior,
     args.max_garb_prob,
