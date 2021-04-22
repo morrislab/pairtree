@@ -178,7 +178,11 @@ The `.params.json` file denotes three objects:
   given tissue sample, with the VAFs of each variant serving as a noisy
   estimate of this subclonal frequency after using `var_read_prob` to correct
   for ploidy. See the [section on clustering mutations](#clustering-mutations)
-  for instructions on how to use Pairtree to build clusters.
+  for instructions on how to use Pairtree to build clusters. Pairtree assumes
+  that all variants within a cluster share the same subclonal frequencies
+  across all cancer samples. Ploidy-corrected estimates of these frequencies
+  can be obtained by dividing a variant's VAF by its variant read probability
+  `omega.
 
 * `garbage` (optional): list of IDs in the `.ssm` file that you do not want
   Pairtree to use in building your clone tree. Specifying variants as `garbage`
@@ -194,12 +198,84 @@ The `.params.json` file denotes three objects:
 
 Imputing read counts for mutations missing in some samples
 ==========================================================
-* (TODO: document imputation)
+When some of your mutations appear in only some of your samples, you must
+impute the total read count for those mutations in the samples where they're
+not present. While the variant read count should clearly be zero in such cases,
+the value the total read count should take is unclear. This task is important,
+however, because it informs Pairtree how confident you are that the variant is
+indeed not present in the sample -- an instance where you have zero variant
+reads amongst ten total reads indicates considerably less confidence than if
+you have zero variant reads for 1000 total reads.
+
+To impute missing read counts, you ahve three options.
 
 
 Clustering mutations
 ====================
-* (TODO: write)
+Pairtree requires mutations be clustered into subclones. These clusters should
+be provided to Pairtree in the `.params.json` file using the `clusters` array,
+described above. Pairtree works best with thirty or fewer subclones, but can
+build (less accurate) clone trees for 100 subclones or more.
+
+To build clusters, you have three options.
+
+1. Don't actually cluster mutations into subclones. That is, instead of
+   building a *clone tree*, you can build  a  *mutation tree* instead in which
+   each cluster contains only a single variant. You must still specify the
+   clusters in your `.params.json` file, but you simply list a separate cluster
+   for each variant. This works best for a small number of mutations (30 or
+   fewer), and so is most suitable for sequencing data obtained from WES or
+   targetted sequencing rather than WGS.
+
+2. Use one of many published clustering methods, such as
+   [PyClone-VI](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-020-03919-2).
+   You must translate these methods' outputs into Pairtree's format, but this
+   is typically easy.
+
+3. Use Pairtree to cluster the variants.
+
+Pairtree provides two clustering models. As Pairtree's focus is not on variant
+clustering, its clustering algorithms are less well-validated than its tree
+building, and so you may obtain better results with other algorithms.
+Nevertheless, Pairtree's authors have had reasonably good success with its
+cluster-building methods. Pairtree's two clustering models both use a Dirichlet
+process mixture model (DPMM), but differ in how they use the model.
+
+You can use Pairtree to cluster variants through the `bin/clustervars`
+executable. Run with `--help` to obtain full usage instructions. Several
+options are of particular interest.
+
+* `--model linfreq`: This uses the default "lineage frequency" clustering model.
+  This is the most computationally efficient choice, and is the most
+  straightforwrd application of the DPMM to the clustering problem.
+
+* `--model pairwise`: This uses the alternative "pairwise relationships"
+  clustering model. In some instances, it may produce better results than
+  `linfreq`. This model is typically slower to use, as it requires computing
+  pairwise relationships between mutation pairs. For `M` mutations, there are
+  `(M choose 2)` such pairs, and so this may become frustratingly slow for more
+  than 1000 mutations.
+
+* `--prior <value>`. This is used only with `--model pairwise`. This option
+  specifies the prior probability for the coclustering relationship. The
+  default of `0.25` corresponds to a uniform relationship over the four
+  relationship types (i.e., coclustering, `A` is ancestral to `B`, `B` is
+  ancestral to `A`, and `A` and `B` are on different branches). Higher values
+  typically result in fewer, larger clusters. Valid values range between 0 and 1.
+
+* `--concentraton <value>`. This is the `log_10{alpha}` used in the DPMM.
+  Larger values typically result in more, smaller clusters.
+
+Clustering results are sensitive to the model and parameters used. The best
+choice of parameters depends on the nature of your data, including the number
+of variants, read depth, and other characteristics. It is often prudent to try
+a range of different parameters, plot the results for each using the
+`bin/plotvars` executable, and select the clustering that best represents your
+data. The best clustering can depend on your application -- for some uses, you
+may want more granular clusters that produce a detailed tree with many
+subclones, while in other uses, you may want to collapse together similar
+subclones to create a simpler tree in which it is easier to discern major
+structural differences.
 
 
 Interpreting Pairtree output
@@ -211,6 +287,10 @@ Interpreting Pairtree output
   nature.
 * (add note about how logs will be written in JSON format if stdout/stderr is directed to a file)
 * (add note about summposterior, plottree, etc.)
+
+Removing garbage mutations
+==========================
+(TODO: write)
 
 
 Tweaking Pairtree options
