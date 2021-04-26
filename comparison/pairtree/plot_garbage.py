@@ -7,6 +7,20 @@ import re
 import json
 import numpy as np
 
+GARB_TYPES = ('acquiredtwice', 'wildtypebackmut', 'missedcna', 'uniform')
+GARB_NAMES = {
+  'wildtypebackmut': 'Wildtype back mutation',
+  'acquiredtwice': 'Homoplasy',
+  'uniform': 'Uniform',
+  'missedcna': 'Missed CNA',
+}
+MET_NAMES = {
+  'prec': 'Precision',
+  'recall': 'Recall',
+  'spec': 'Specificity',
+  'f1': 'F1',
+}
+
 def to_html(fig):
   return pio.to_html(
     fig,
@@ -32,14 +46,14 @@ def _load_results(garbresults_fns):
     params = {'garb_type': tokens[1]}
 
     for T in tokens[2:]:
-      M = re.match(r'^([a-z]+)([,0-9]+)$', T)
+      M = re.match(r'^([A-Za-z]+)([,0-9]+)$', T)
       assert len(M.groups()) == 2
       K, V = M.groups()
       params[K] = V.replace(',', '.')
 
     with open(fn) as F:
       J = json.load(F)
-    results.append(J | params)
+    results.append((params, J))
 
   return results
 
@@ -47,8 +61,11 @@ def _combine(results):
   combined = {}
   conf_types = ('tp', 'tn', 'fp', 'fn')
 
-  for res in results:
-    key = tuple([res[K] for K in ('garb_type', 'alpha', 'prior', 'maxgarb')])
+  param_names = set(results[0][0].keys())
+  param_names.discard('run')
+
+  for params, res in results:
+    key = frozenset([(K, params[K]) for K in param_names])
     if key not in combined:
       combined[key] = {K: 0 for K in conf_types}
     for K in conf_types:
@@ -99,37 +116,7 @@ def _calc_metrics(confusion):
     mets[K] = getattr(mets[K], 'tolist', lambda: mets[K])()
   return mets
 
-def _make_ann_heatmap(results, met):
-  priors   = set([K[0] for K in results.keys()])
-  maxgarbs = set([K[1] for K in results.keys()])
-  X = sorted(priors,   key = lambda V: float(V))
-  Y = sorted(maxgarbs, key = lambda V: float(V))
-  Z = [ [results[(prior,mg)][met] for prior in X] for mg in Y ]
-  labels = [ [f'{100*V:.0f}%' for V in row] for row in Z ]
-
-  fig = ff.create_annotated_heatmap(
-    Z,
-    annotation_text=labels,
-    x = ['%s' % x for x in X],
-    y = ['%s' % y for y in Y],
-    colorscale = 'Viridis',
-    zmin = 0.,
-    zmax = 1.,
-    showscale = True,
-    colorbar = {'tickformat': ',.0%'},
-  )
-  fig.update_xaxes(title = 'Garbage prior', type='category')
-  fig.update_yaxes(title = 'Max pairwise garbage', type='category')
-  fig.update_layout(title = met)
-  return to_html(fig)
-
-def _make_heatmap(results, met):
-  priors   = set([K[0] for K in results.keys()])
-  maxgarbs = set([K[1] for K in results.keys()])
-  X = sorted(priors,   key = lambda V: float(V))
-  Y = sorted(maxgarbs, key = lambda V: float(V))
-  Z = [ [results[(prior,mg)][met] for prior in X] for mg in Y ]
-
+def _make_heatmap(X, Y, Z, title, xtitle, ytitle):
   fig = {
     'data': go.Heatmap(
       x = X,
@@ -141,31 +128,104 @@ def _make_heatmap(results, met):
       zmax = 1.,
     ),
     'layout': {
-      'xaxis': {'title': 'Garbage prior', 'type': 'category'},
-      'yaxis': {'title': 'Max pairwise garbage', 'type': 'category'},
-      'title': met,
+      'xaxis': {'title': xtitle, 'type': 'category'},
+      'yaxis': {'title': ytitle, 'type': 'category'},
+      'title': title,
     },
   }
 
   return to_html(fig)
 
-def _plot(results):
+def _write_header():
+  html = '<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">'
+  html += '<h1><marquee>I LOVE TREES</marquee></h1>'
+  return html
+
+#def _partition(results):
+#  first_key = list(results.keys())[0]
+#  param_names = set([K for K,V in first_key])
+#
+#  partition_on = set(('K', 'mindelta'))
+#  other_keys = set(('prior', 'maxgarb'))
+#  assert (set(partition_on) | set(other_keys)) == param_names
+#
+#  parted = {}
+#  for param_set in results.keys():
+#    params = dict(param_set)
+#    part_key = frozenset([(K, params[K]) for K in partition_on])
+#    if part_key not in parted:
+#      parted[part_key] = {}
+#    sub_key = frozenset([(K, params[K]) for K in other_keys])
+#    parted[part_key][sub_key] = results[param_set]
+#
+#  return parted
+
+def _partition(results, partition_on):
+  param_sets = [dict(ps) for ps in results.keys()]
+  parted_vals = set([tuple([ps[K] for K in partition_on]) for ps in param_sets])
+  parted_vals = sorted(parted_vals, key = lambda A: [float(e) for e in A])
+  return parted_vals
+
+def _plot_2dhist(results):
+  #parted = _partition(results)
   mets = ('prec', 'recall', 'f1', 'spec')
-  garb_types = set([K[0] for K in results.keys()])
-  alphas     = set([K[1] for K in results.keys()])
+  partition_on = ('K', 'mindelta')
+  parted_vals = _partition(results, partition_on)
 
   html = ''
-  html += '<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">'
-  for gt in garb_types:
-    html += f'<h1>{gt}</h1>'
-    for alpha in alphas:
-      html += f'<h2>&alpha;={alpha}</h2>'
-      html += '<table class="table"><thead><tr>' + ''.join(['<th style="text-align: center" class="w-25">%s</th>' % met for met in mets]) + '</tr></thead><tbody><tr>'
+  for gt in GARB_TYPES:
+    html += f'<h1>{GARB_NAMES[gt]}</h1>'
+    for pv in parted_vals:
+      result_key = dict(zip(partition_on, pv))
+      html += '<h2>' + ', '.join([f'{K}={V}' for K,V in result_key.items()]) + '</h2>'
+      html += '<table class="table"><thead><tr>' + ''.join(['<th style="text-align: center" class="w-25">%s</th>' % MET_NAMES[met] for met in mets]) + '</tr></thead><tbody><tr>'
+
+      result_key['garb_type'] = gt
+      subresults = {K: V for K,V in results.items() if frozenset(result_key.items()).issubset(K)}
+      priors   = sorted([dict(K)['prior'] for K in subresults.keys()],   key = lambda A: float(A))
+      maxgarbs = sorted([dict(K)['maxgarb'] for K in subresults.keys()], key = lambda A: float(A))
+
       for met in mets:
-        # Index on 
-        subresults = {K[2:]: V for K, V in results.items() if K[:2] == (gt, alpha)}
-        html += '<td>%s</td>' % _make_heatmap(subresults, met)
+        Z = [ [results[frozenset([
+          ('prior', prior),
+          ('maxgarb', mg),
+        ]) | frozenset(result_key.items())][met] for prior in priors] for mg in maxgarbs ]
+        html += '<td>%s</td>' % _make_heatmap(
+          priors,
+          maxgarbs,
+          Z,
+          MET_NAMES[met],
+          'Garbage prior',
+          'Max pairwise garbage',
+        )
       html += '</tr></tbody></table>'
+
+  return html
+
+def _plot_bar(results, prior, max_garbage):
+  mets = ('prec', 'recall')
+  partition_on = ('K', 'mindelta')
+  parted_vals = _partition(results, partition_on)
+
+  html = ''
+  for pv in parted_vals:
+    result_key = dict(zip(partition_on, pv))
+    title = ', '.join([f'{K}={V}' for K,V in result_key.items()])
+    html += '<h1>%s</h1>' % title
+
+    result_key['prior'] = prior
+    result_key['maxgarb'] = max_garbage
+
+    bars = [go.Bar(
+      name = MET_NAMES[met],
+      x = [GARB_NAMES[name] for name in GARB_TYPES],
+      y = [results[frozenset((result_key | {'garb_type': gt}).items())][met] for gt in GARB_TYPES],
+    ) for met in mets]
+    fig = go.Figure(data = bars, layout = go.Layout(
+      barmode = 'group',
+      title = title,
+    ))
+    html += to_html(fig)
   return html
 
 def main():
@@ -180,8 +240,9 @@ def main():
   combined = _combine(results)
   print(json.dumps({str(K): V for K,V in combined.items()}))
 
-  html = '<h1><marquee>I LOVE TREES</marquee></h1>'
-  html += _plot(combined)
+  html = _write_header()
+  html += _plot_bar(combined, prior='30', max_garbage='0.01')
+  html += _plot_2dhist(combined)
   with open(args.plot_fn, 'w') as F:
     print(html, file=F)
 
