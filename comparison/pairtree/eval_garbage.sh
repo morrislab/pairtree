@@ -5,32 +5,28 @@ shopt -s nullglob
 BASEDIR=~/work/pairtree
 PEARSIMDIR=~/work/pearsim
 PAIRTREEDIR=$BASEDIR/bin
-INDIR=$BASEDIR/scratch/inputs/garbdetect.K10
-RESULTSDIR=$BASEDIR/scratch/results/garbdetect.K10
 JOBDIR=~/jobs
-PARA=20
 PYTHON=python3
+
+S=30
+T=1000
+M_per_cluster=20
+G_per_cluster=2
+ALPHA=0.1
+PARA=30
+INDIR=$BASEDIR/scratch/inputs/garbdetect
+RESULTSDIR=$BASEDIR/scratch/results/garbdetect
 
 function commafy {
   echo $(echo $1 | sed 's/\./,/g')
 }
 
-
 function make_inputs {
   mkdir -p $INDIR && cd $INDIR
 
-  for K in 10; do
-  for S in 30; do
-  for T in 1000; do
-  for M_per_cluster in 20; do
-  for G_frac in 0.02; do
+  for garbtype in wildtype_backmut missed_cna acquired_twice uniform;  do
   for run in $(seq 20); do
-  for alpha in 1 0.1; do
-  for garbtype in uniform acquired_twice wildtype_backmut missed_cna; do
-    M=$(echo "$K * $M_per_cluster" | bc)
-    G=$(echo "(($G_frac * $M) + 0.5) / 1" | bc)
-
-    jobname="sim_$(echo $garbtype | sed 's/_//')_alpha$(commafy $alpha)_run${run}"
+    jobname="sim_$(echo $garbtype | sed 's/_//')_K${K}_mindelta$(commafy $MIN_GARB_PHI_DELTA)_run${run}"
     (
       echo "$PYTHON $PEARSIMDIR/make_simulated_data.py" \
         "--seed $run" \
@@ -40,20 +36,17 @@ function make_inputs {
         "-T $T" \
         "-M $M" \
         "-G $G" \
-        "--alpha $alpha" \
+        "--alpha $ALPHA" \
         "--garbage-type $garbtype" \
+        "--min-garb-phi-delta $MIN_GARB_PHI_DELTA" \
+        "--min-garb-pairs 3" \
+        "--min-garb-samps 3" \
         "$INDIR/$jobname.truth.pickle" \
         "$INDIR/$jobname.params.json" \
         "$INDIR/$jobname.ssm" \
         "> $INDIR/$jobname.stdout" \
-        "2>$INDIR/$jobname.stderr" \
+        "2>$INDIR/$jobname.stderr"
     )
-  done
-  done
-  done
-  done
-  done
-  done
   done
   done | parallel -j$PARA --halt 2 --eta
 }
@@ -75,12 +68,16 @@ function init_pairwise {
   for ssmfn in $INDIR/*.ssm; do
     runid=$(basename $ssmfn | cut -d. -f1)
     results=$RESULTSDIR/$runid
+    pairwisefn=$results/$runid.pairwise.npz
+
+    #[[ $runid == sim_wildtypebackmut_alpha0,1_run1 ]] || continue
+    [[ -f $pairwisefn ]] && continue
+    #[[ $(basename $RESULTSDIR) =~ "phidelta0,05" ]] || continue
+
     mkdir -p $results && cd $results
     jobfn=$(mktemp)
-
     cmd=""
     cmd+="#!/bin/bash\n"
-
     cmd+="#SBATCH --qos=nopreemption\n"
     cmd+="#SBATCH --partition=cpu\n"
     cmd+="#SBATCH --mem=4GB\n"
@@ -93,7 +90,7 @@ function init_pairwise {
 
     cmd+="$PYTHON $PAIRTREEDIR/removegarbage"
     cmd+=" --parallel $PARA"
-    cmd+=" --pairwise-results $results/$runid.pairwise.npz"
+    cmd+=" --pairwise-results $pairwisefn"
     cmd+=" $INDIR/$runid.ssm"
     cmd+=" $INDIR/$runid.params.json"
     cmd+=" $results/$runid.params.json"
@@ -105,7 +102,7 @@ function init_pairwise {
     echo -e $cmd > $jobfn
     sbatch $jobfn
     rm $jobfn
-  done #| parallel -j$PARA --halt 2 --eta
+  done
 }
 
 function detect_garb {
@@ -113,14 +110,15 @@ function detect_garb {
     results=$(dirname $pairwisefn)
     runid_base=$(basename $results)
 
-    for garb_prior in 0.001 0.01 0.1 0.2 0.5; do
-      for max_garb in 0.001 0.01 0.1 0.2 0.5; do
+    for garb_prior in 1 2 5 10 30 60; do
+      for max_garb in 0.001 0.01 0.1 0.2 0.5 0.75 0.9; do
         runid="${runid_base}_prior$(commafy $garb_prior)_maxgarb$(commafy $max_garb)"
         cmd=""
         cmd+="$PYTHON $PAIRTREEDIR/removegarbage"
-        cmd+=" --prior $garb_prior"
+        cmd+=" --logprior $garb_prior"
         cmd+=" --max-garb-prob $max_garb"
         cmd+=" --pairwise-results $pairwisefn"
+        cmd+=" --verbose"
         cmd+=" $INDIR/$runid_base.ssm"
         cmd+=" $INDIR/$runid_base.params.json"
         cmd+=" $results/$runid.params.json"
@@ -143,14 +141,30 @@ function eval_garbdetect {
       cmd+=" >$results/$runid.eval.json"
       echo $cmd
     done
-  done #| parallel -j$PARA --halt 2 --eta
+  done | parallel -j$PARA --halt 2 --eta
+}
+
+function plot_garbdetect {
+  cd $RESULTSDIR
+  $PYTHON $BASEDIR/comparison/pairtree/plot_garbage.py \
+    --plot $RESULTSDIR/garb.K$K.html \
+    $RESULTSDIR/sim*/*.eval.json \
+    > $RESULTSDIR/garb.K$K.json
 }
 
 function main {
-  #make_inputs
+  #for K in 10 30; do
+  #  M=$(echo "$K * $M_per_cluster" | bc)
+  #  G=$(echo "$K * $G_per_cluster" | bc)
+  #  for MIN_GARB_PHI_DELTA in 0.0005 0.001 0.01; do
+  #    make_inputs
+  #  done
+  #done
+
   #init_pairwise
   detect_garb
-  #eval_garbdetect
+  eval_garbdetect
+  #plot_garbdetect
 }
 
 main
