@@ -94,7 +94,7 @@ def main():
     help='Integer seed used for pseudo-random number generator. Running with the same seed on the same inputs will produce exactly the same result.')
   parser.add_argument('--parallel', dest='parallel', type=int, default=None,
     help='Number of tasks to run in parallel. By default, this is set to the number of CPU cores on the system. On hyperthreaded systems, this will be twice the number of physical CPUs.')
-  parser.add_argument('--prior', type=float, default=1., dest='garb_prior',
+  parser.add_argument('--prior', type=float, default=0.2, dest='garb_prior',
     help='Pairwise garbage prior probability.')
   parser.add_argument('--max-garb-prob', type=float, default=0.5,
     help='Maximum probability of garbage to permit for any pair.')
