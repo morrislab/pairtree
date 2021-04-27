@@ -35,7 +35,7 @@ def _calc_logbf(ssm, omega1=1):
 
   return logbf
 
-def _remove_bad(ssms, logbf_thresh, print_bad=False):
+def _remove_bad(ssms, logbf_thresh, verbose=False):
   bad = []
   bad_count = 0
   total_count = 0
@@ -60,7 +60,7 @@ def _remove_bad(ssms, logbf_thresh, print_bad=False):
 
     if np.any(is_samp_bad):
       bad.append(vid)
-    if print_bad and np.any(is_samp_bad):
+    if verbose and np.any(is_samp_bad):
       print(vid, np.vstack((
         V['var_reads'],
         V['total_reads'],
@@ -84,7 +84,7 @@ def main():
   )
   parser.add_argument('--logbf-threshold', type=float, default=10.,
     help='Blah')
-  parser.add_argument('--print-bad', action='store_true')
+  parser.add_argument('--verbose', action='store_true')
   parser.add_argument('--keep-existing-garbage', action='store_true')
   parser.add_argument('in_ssm_fn')
   parser.add_argument('in_params_fn')
@@ -101,7 +101,7 @@ def main():
   else:
     ssms = inputparser.remove_garbage(ssms, params['garbage'])
 
-  bad_vids, bad_samp_prop = _remove_bad(ssms, args.logbf_threshold, args.print_bad)
+  bad_vids, bad_samp_prop = _remove_bad(ssms, args.logbf_threshold, args.verbose)
   bad_ssm_prop = len(bad_vids) / len(ssms)
   if len(bad_vids) > 0:
     params['garbage'] = common.sort_vids(params['garbage'] + bad_vids)
@@ -109,6 +109,7 @@ def main():
       json.dump(params, F)
 
   stats = {
+    'num_bad_ssms': len(bad_vids),
     'bad_ssms': common.sort_vids(bad_vids),
     'bad_samp_prop': '%.3f' % bad_samp_prop,
     'bad_ssm_prop': '%.3f' % bad_ssm_prop,
