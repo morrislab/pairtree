@@ -13,7 +13,7 @@ T=1000
 M_per_cluster=20
 G_per_cluster=2
 ALPHA=0.1
-PARA=80
+PARA=20
 INDIR=$BASEDIR/scratch/inputs/garbdetect
 RESULTSDIR=$BASEDIR/scratch/results/garbdetect
 
@@ -24,29 +24,33 @@ function commafy {
 function make_inputs {
   mkdir -p $INDIR && cd $INDIR
 
+  for K in 10 30; do
+  M=$(echo "$K * $M_per_cluster" | bc)
+  G=$(echo "$K * $G_per_cluster" | bc)
+  for MIN_GARB_PHI_DELTA in 0.0005 0.001 0.01 0.05 0.1; do
   for garbtype in wildtype_backmut missed_cna acquired_twice uniform;  do
   for run in $(seq 20); do
     jobname="sim_$(echo $garbtype | sed 's/_//')_K${K}_mindelta$(commafy $MIN_GARB_PHI_DELTA)_run${run}"
-    (
-      echo "$PYTHON $PEARSIMDIR/make_simulated_data.py" \
-        "--seed $run" \
-        "--write-clusters" \
-        "-K $K" \
-        "-S $S" \
-        "-T $T" \
-        "-M $M" \
-        "-G $G" \
-        "--alpha $ALPHA" \
-        "--garbage-type $garbtype" \
-        "--min-garb-phi-delta $MIN_GARB_PHI_DELTA" \
-        "--min-garb-pairs 3" \
-        "--min-garb-samps 3" \
-        "$INDIR/$jobname.truth.pickle" \
-        "$INDIR/$jobname.params.json" \
-        "$INDIR/$jobname.ssm" \
-        "> $INDIR/$jobname.stdout" \
-        "2>$INDIR/$jobname.stderr"
-    )
+    echo "$PYTHON $PEARSIMDIR/make_simulated_data.py" \
+      "--seed $run" \
+      "--write-clusters" \
+      "-K $K" \
+      "-S $S" \
+      "-T $T" \
+      "-M $M" \
+      "-G $G" \
+      "--alpha $ALPHA" \
+      "--garbage-type $garbtype" \
+      "--min-garb-phi-delta $MIN_GARB_PHI_DELTA" \
+      "--min-garb-pairs 3" \
+      "--min-garb-samps 3" \
+      "$INDIR/$jobname.truth.pickle" \
+      "$INDIR/$jobname.params.json" \
+      "$INDIR/$jobname.ssm" \
+      "> $INDIR/$jobname.stdout" \
+      "2>$INDIR/$jobname.stderr"
+  done
+  done
   done
   done
 }
@@ -99,8 +103,8 @@ function init_pairwise {
     # Remove unused params.json file.
     cmd+=" && rm $results/$runid.params.json"
 
-    echo -e $cmd > $jobfn
-    sbatch $jobfn
+    echo -e $cmd #> $jobfn
+    #sbatch $jobfn
     rm $jobfn
   done
 }
@@ -153,15 +157,8 @@ function plot_garbdetect {
 }
 
 function main {
-  for K in 10 30; do
-    M=$(echo "$K * $M_per_cluster" | bc)
-    G=$(echo "$K * $G_per_cluster" | bc)
-    for MIN_GARB_PHI_DELTA in 0.0005 0.001 0.01 0.05 0.1; do
-      make_inputs
-    done
-  done | parallel -j$PARA --halt 2 --eta
-
-  #init_pairwise
+  #make_inputs
+  init_pairwise
   #detect_garb
   #eval_garbdetect
   #plot_garbdetect
