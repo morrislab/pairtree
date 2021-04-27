@@ -13,7 +13,7 @@ T=1000
 M_per_cluster=20
 G_per_cluster=2
 ALPHA=0.1
-PARA=10
+PARA=60
 INDIR=$BASEDIR/scratch/inputs/garbdetect
 RESULTSDIR=$BASEDIR/scratch/results/garbdetect
 
@@ -110,12 +110,12 @@ function detect_garb {
     results=$(dirname $pairwisefn)
     runid_base=$(basename $results)
 
-    for garb_prior in 1 2 5 10 30 60; do
-      for max_garb in 0.001 0.01 0.1 0.2 0.5 0.75 0.9; do
+    for garb_prior in 0.01 0.1 0.2 0.5; do
+      for max_garb in 0.001 0.01 0.1 0.5 0.75; do
         runid="${runid_base}_prior$(commafy $garb_prior)_maxgarb$(commafy $max_garb)"
         cmd=""
         cmd+="$PYTHON $PAIRTREEDIR/removegarbage"
-        cmd+=" --logprior $garb_prior"
+        cmd+=" --prior $garb_prior"
         cmd+=" --max-garb-prob $max_garb"
         cmd+=" --pairwise-results $pairwisefn"
         cmd+=" --verbose"
@@ -161,8 +161,8 @@ function main {
   #  done
   #done
 
-  init_pairwise
-  #detect_garb
+  #init_pairwise
+  detect_garb
   #eval_garbdetect
   #plot_garbdetect
 }
