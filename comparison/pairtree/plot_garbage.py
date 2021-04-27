@@ -166,7 +166,7 @@ def _partition(results, partition_on):
   parted_vals = sorted(parted_vals, key = lambda A: [float(e) for e in A])
   return parted_vals
 
-def _plot_2dhist(results):
+def _plot_2dhist(results, mindelta=None):
   #parted = _partition(results)
   mets = ('prec', 'recall', 'f1', 'spec')
   partition_on = ('K', 'mindelta')
@@ -177,6 +177,8 @@ def _plot_2dhist(results):
     html += f'<h1>{GARB_NAMES[gt]}</h1>'
     for pv in parted_vals:
       result_key = dict(zip(partition_on, pv))
+      if mindelta is not None and result_key['mindelta'] != mindelta:
+        continue
       html += '<h2>' + ', '.join([f'{K}={V}' for K,V in result_key.items()]) + '</h2>'
       html += '<table class="table"><thead><tr>' + ''.join(['<th style="text-align: center" class="w-25">%s</th>' % MET_NAMES[met] for met in mets]) + '</tr></thead><tbody><tr>'
 
@@ -241,8 +243,8 @@ def main():
   print(json.dumps({str(K): V for K,V in combined.items()}))
 
   html = _write_header()
-  html += _plot_bar(combined, prior='30', max_garbage='0.01')
-  html += _plot_2dhist(combined)
+  html += _plot_bar(combined, prior='0.2', max_garbage='0.01')
+  html += _plot_2dhist(combined, mindelta='0.01')
   with open(args.plot_fn, 'w') as F:
     print(html, file=F)
 
