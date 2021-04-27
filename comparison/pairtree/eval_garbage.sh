@@ -13,7 +13,7 @@ T=1000
 M_per_cluster=20
 G_per_cluster=2
 ALPHA=0.1
-PARA=30
+PARA=10
 INDIR=$BASEDIR/scratch/inputs/garbdetect
 RESULTSDIR=$BASEDIR/scratch/results/garbdetect
 
@@ -156,14 +156,14 @@ function main {
   #for K in 10 30; do
   #  M=$(echo "$K * $M_per_cluster" | bc)
   #  G=$(echo "$K * $G_per_cluster" | bc)
-  #  for MIN_GARB_PHI_DELTA in 0.0005 0.001 0.01; do
+  #  for MIN_GARB_PHI_DELTA in 0.0005 0.001 0.01 0.05 0.1; do
   #    make_inputs
   #  done
   #done
 
-  #init_pairwise
-  detect_garb
-  eval_garbdetect
+  init_pairwise
+  #detect_garb
+  #eval_garbdetect
   #plot_garbdetect
 }
 
