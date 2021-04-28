@@ -41,8 +41,7 @@ function make_inputs {
       "-M $M" \
       "-G $G" \
       "--alpha $ALPHA" \
-      "--garbage-type missed_cna" \
-      "--make-missed-cna-obvious" \
+      "--garbage-type obvs_missed_cna" \
       "--min-garb-phi-delta $MIN_GARB_PHI_DELTA" \
       "--min-garb-pairs 3" \
       "--min-garb-samps 3" \
@@ -101,9 +100,9 @@ function plot_missedcna {
 }
 
 function main {
-  #make_inputs
-  #detect_missedcna
-  #eval_missedcna
+  make_inputs
+  detect_missedcna
+  eval_missedcna
   plot_missedcna
 }
 
