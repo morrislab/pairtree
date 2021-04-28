@@ -13,7 +13,7 @@ T=1000
 M_per_cluster=20
 G_per_cluster=2
 ALPHA=0.1
-PARA=20
+PARA=80
 INDIR=$BASEDIR/scratch/inputs/garbdetect
 RESULTSDIR=$BASEDIR/scratch/results/garbdetect
 
@@ -150,18 +150,23 @@ function eval_garbdetect {
 
 function plot_garbdetect {
   cd $RESULTSDIR
-  $PYTHON $BASEDIR/comparison/pairtree/plot_garbage.py \
-    --plot $RESULTSDIR/garb.html \
-    $RESULTSDIR/sim*/*.eval.json \
-    > $RESULTSDIR/garb.json
+  echo "$PYTHON $BASEDIR/comparison/pairtree/plot_garbage.py" \
+    "--plot-fn $RESULTSDIR/garb.html" \
+    "--plot-bars" \
+    "--plot-2dhist" \
+    "--filter-maxgarb 0.01" \
+    "--filter-prior 0.2" \
+    "--filter-mindelta 0.01" \
+    "sim*/*.eval.json" \
+    "> $RESULTSDIR/garb.json" | parallel -j$PARA --halt 2 --eta
 }
 
 function main {
   #make_inputs
-  init_pairwise
+  #init_pairwise
   #detect_garb
   #eval_garbdetect
-  #plot_garbdetect
+  plot_garbdetect
 }
 
 main

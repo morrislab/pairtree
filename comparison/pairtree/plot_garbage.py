@@ -141,25 +141,6 @@ def _write_header():
   html += '<h1><marquee>I LOVE TREES</marquee></h1>'
   return html
 
-#def _partition(results):
-#  first_key = list(results.keys())[0]
-#  param_names = set([K for K,V in first_key])
-#
-#  partition_on = set(('K', 'mindelta'))
-#  other_keys = set(('prior', 'maxgarb'))
-#  assert (set(partition_on) | set(other_keys)) == param_names
-#
-#  parted = {}
-#  for param_set in results.keys():
-#    params = dict(param_set)
-#    part_key = frozenset([(K, params[K]) for K in partition_on])
-#    if part_key not in parted:
-#      parted[part_key] = {}
-#    sub_key = frozenset([(K, params[K]) for K in other_keys])
-#    parted[part_key][sub_key] = results[param_set]
-#
-#  return parted
-
 def _partition(results, partition_on):
   param_sets = [dict(ps) for ps in results.keys()]
   parted_vals = set([tuple([ps[K] for K in partition_on]) for ps in param_sets])
@@ -167,7 +148,6 @@ def _partition(results, partition_on):
   return parted_vals
 
 def _plot_2dhist(results, mindelta=None):
-  #parted = _partition(results)
   mets = ('prec', 'recall', 'f1', 'spec')
   partition_on = ('K', 'mindelta')
   parted_vals = _partition(results, partition_on)
@@ -204,7 +184,7 @@ def _plot_2dhist(results, mindelta=None):
 
   return html
 
-def _plot_bar(results, prior, max_garbage):
+def _plot_bar(results, prior=None, max_garbage=None):
   mets = ('prec', 'recall')
   partition_on = ('K', 'mindelta')
   parted_vals = _partition(results, partition_on)
@@ -215,17 +195,39 @@ def _plot_bar(results, prior, max_garbage):
     title = ', '.join([f'{K}={V}' for K,V in result_key.items()])
     html += '<h1>%s</h1>' % title
 
-    result_key['prior'] = prior
-    result_key['maxgarb'] = max_garbage
+    if prior is not None:
+      result_key['prior'] = prior
+    if max_garbage is not None:
+      result_key['maxgarb'] = max_garbage
 
-    bars = [go.Bar(
-      name = MET_NAMES[met],
-      x = [GARB_NAMES[name] for name in GARB_TYPES],
-      y = [results[frozenset((result_key | {'garb_type': gt}).items())][met] for gt in GARB_TYPES],
-    ) for met in mets]
+    bars = []
+    for met in mets:
+      X = []
+      Y = []
+      labels = []
+      for gt in GARB_TYPES:
+        key = frozenset((result_key | {'garb_type': gt}).items())
+        if key not in results:
+          continue
+        X.append(GARB_NAMES[gt])
+        Y.append(results[key][met])
+        labels.append('%.0f%%' % (100*Y[-1]))
+      bars.append(go.Bar(
+        name = MET_NAMES[met],
+        x = X,
+        y = Y,
+        text = labels,
+        textposition = 'inside',
+        textfont = {'size': 15},
+      ))
     fig = go.Figure(data = bars, layout = go.Layout(
       barmode = 'group',
       title = title,
+      yaxis = {
+        'tickformat': ',.0%',
+        'range': (0,1),
+      },
+      template = 'seaborn',
     ))
     html += to_html(fig)
   return html
@@ -234,7 +236,12 @@ def main():
   parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('--plot', dest='plot_fn', required=True)
+  parser.add_argument('--plot-fn', required=True)
+  parser.add_argument('--plot-bars', action='store_true')
+  parser.add_argument('--plot-2dhist', action='store_true')
+  parser.add_argument('--filter-prior')
+  parser.add_argument('--filter-maxgarb')
+  parser.add_argument('--filter-mindelta')
   parser.add_argument('garbresults_fns', nargs='+')
   args = parser.parse_args()
 
@@ -243,8 +250,10 @@ def main():
   print(json.dumps({str(K): V for K,V in combined.items()}))
 
   html = _write_header()
-  html += _plot_bar(combined, prior='0.2', max_garbage='0.01')
-  html += _plot_2dhist(combined, mindelta='0.01')
+  if args.plot_bars:
+    html += _plot_bar(combined, args.filter_prior, args.filter_maxgarb)
+  if args.plot_2dhist:
+    html += _plot_2dhist(combined, args.filter_mindelta)
   with open(args.plot_fn, 'w') as F:
     print(html, file=F)
 
