@@ -21,7 +21,7 @@ MET_NAMES = {
   'f1': 'F1',
 }
 
-def to_html(fig):
+def to_html(fig, width=750, height=450):
   return pio.to_html(
     fig,
     full_html = False,
@@ -31,8 +31,8 @@ def to_html(fig):
       'showLink': True,
       'toImageButtonOptions': {
         'format': 'svg',
-        'width': 750,
-        'height': 450,
+        'width': width,
+        'height': height,
       },
     },
   )
@@ -134,7 +134,7 @@ def _make_heatmap(X, Y, Z, title, xtitle, ytitle):
     },
   }
 
-  return to_html(fig)
+  return to_html(fig, width=450, height=450)
 
 def _write_header():
   html = '<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">'
@@ -159,7 +159,8 @@ def _plot_2dhist(results, mindelta=None):
       result_key = dict(zip(partition_on, pv))
       if mindelta is not None and result_key['mindelta'] != mindelta:
         continue
-      html += '<h2>' + ', '.join([f'{K}={V}' for K,V in result_key.items()]) + '</h2>'
+      subhead =  ', '.join([f'{K}={V}' for K,V in result_key.items()])
+      html += '<h2>%s</h2>' % subhead
       html += '<table class="table"><thead><tr>' + ''.join(['<th style="text-align: center" class="w-25">%s</th>' % MET_NAMES[met] for met in mets]) + '</tr></thead><tbody><tr>'
 
       result_key['garb_type'] = gt
@@ -176,7 +177,7 @@ def _plot_2dhist(results, mindelta=None):
           priors,
           maxgarbs,
           Z,
-          MET_NAMES[met],
+          '%s for %s, %s' % (MET_NAMES[met], GARB_NAMES[gt].lower(), subhead),
           'Garbage prior',
           'Max pairwise garbage',
         )
