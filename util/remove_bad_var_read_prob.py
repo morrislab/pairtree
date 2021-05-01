@@ -85,7 +85,7 @@ def main():
   parser.add_argument('--logbf-threshold', type=float, default=10.,
     help='Blah')
   parser.add_argument('--verbose', action='store_true')
-  parser.add_argument('--keep-existing-garbage', action='store_true')
+  parser.add_argument('--ignore-existing-garbage', action='store_true')
   parser.add_argument('in_ssm_fn')
   parser.add_argument('in_params_fn')
   parser.add_argument('out_params_fn')
@@ -96,7 +96,7 @@ def main():
 
   ssms = inputparser.load_ssms(args.in_ssm_fn)
   params = inputparser.load_params(args.in_params_fn)
-  if args.keep_existing_garbage:
+  if args.ignore_existing_garbage:
     params['garbage'] = []
   else:
     ssms = inputparser.remove_garbage(ssms, params['garbage'])

@@ -96,7 +96,7 @@ def main():
     help='Number of tasks to run in parallel. By default, this is set to the number of CPU cores on the system. On hyperthreaded systems, this will be twice the number of physical CPUs.')
   parser.add_argument('--prior', type=float, default=0.2, dest='garb_prior',
     help='Pairwise garbage prior probability.')
-  parser.add_argument('--max-garb-prob', type=float, default=0.5,
+  parser.add_argument('--max-garb-prob', type=float, default=0.01,
     help='Maximum probability of garbage to permit for any pair.')
   parser.add_argument('--pairwise-results', dest='pairwise_results_fn',
     help='Filename to store pairwise evidence in, which allows you to try garbage removal with different parameters without having to repeat the pairwise computations.')
