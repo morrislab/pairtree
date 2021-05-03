@@ -95,16 +95,21 @@ def main():
   parser.add_argument('--parallel', dest='parallel', type=int, default=None,
     help='Number of tasks to run in parallel. By default, this is set to the number of CPU cores on the system. On hyperthreaded systems, this will be twice the number of physical CPUs.')
   parser.add_argument('--prior', type=float, default=0.2, dest='garb_prior',
-    help='Pairwise garbage prior probability.')
+    help='Pairwise garbage prior probability. The default value of 0.2 represents a uniform prior over pairwise relationship types.')
   parser.add_argument('--max-garb-prob', type=float, default=0.01,
-    help='Maximum probability of garbage to permit for any pair.')
+    help='Maximum probability of garbage to permit for any pair when the algorithm terminates.')
   parser.add_argument('--pairwise-results', dest='pairwise_results_fn',
     help='Filename to store pairwise evidence in, which allows you to try garbage removal with different parameters without having to repeat the pairwise computations.')
+  parser.add_argument('--ignore-existing-garbage', action='store_true',
+    help='Ignore any existing garbage variants listed in in_params_fn and test all variants. If not specified, any existing garbage variants will be kept as garbage and not tested again.')
   parser.add_argument('--verbose', action='store_true',
     help='Print debugging messages')
-  parser.add_argument('ssm_fn')
-  parser.add_argument('in_params_fn')
-  parser.add_argument('out_params_fn')
+  parser.add_argument('ssm_fn',
+    help='Input SSM file with mutations')
+  parser.add_argument('in_params_fn',
+    help='Input params file listing sample names and any existing garbage mutations')
+  parser.add_argument('out_params_fn',
+    help='Output params file with modified list of garbage mutations')
   args = parser.parse_args()
 
   common.debug.DEBUG = args.verbose
@@ -121,8 +126,11 @@ def main():
   np.seterr(divide='raise', invalid='raise', over='raise')
   parallel = args.parallel if args.parallel is not None else multiprocessing.cpu_count()
 
-  variants = inputparser.load_ssms(args.ssm_fn)
-  params = inputparser.load_params(args.in_params_fn)
+  if args.ignore_existing_garbage:
+    variants, params = inputparser.load_ssms_and_params(args.ssm_fn, args.in_params_fn, remove_garb=False)
+    params['garbage'] = []
+  else:
+    variants, params = inputparser.load_ssms_and_params(args.ssm_fn, args.in_params_fn)
 
   posterior = _calc_posterior(variants, args.garb_prior, parallel, args.pairwise_results_fn)
   garbage_vids = _remove_garbage(
@@ -135,7 +143,7 @@ def main():
   debug(garbage_vids)
   debug(common.sort_vids(set(variants.keys()) - set(garbage_vids)))
 
-  params['garbage'] = garbage_vids
+  params['garbage'] = common.sort_vids(set(garbage_vids) | set(params['garbage']))
   with open(args.out_params_fn, 'w') as F:
     json.dump(params, F)
 

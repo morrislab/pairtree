@@ -68,6 +68,15 @@ def load_params(paramsfn):
   with open(paramsfn) as P:
     return json.load(P)
 
+def load_ssms_and_params(ssmfn, paramsfn, remove_garb=True):
+  variants = load_ssms(ssmfn)
+  params = load_params(paramsfn)
+  if 'garbage' not in params:
+    params['garbage'] = []
+  if remove_garb:
+    variants = remove_garbage(variants, params['garbage'])
+  return (variants, params)
+
 def write_ssms(variants, ssm_fn):
   keys = ('id', 'name', 'var_reads', 'total_reads', 'var_read_prob')
 

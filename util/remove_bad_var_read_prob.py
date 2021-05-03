@@ -79,32 +79,36 @@ def _remove_bad(ssms, logbf_thresh, verbose=False):
 
 def main():
   parser = argparse.ArgumentParser(
-    description='LOL HI THERE',
+    description='Find variants with likely incorrect var_read_prob by comparing model with provided var_read_prob to haploid (LOH) model using Bayes factors',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--logbf-threshold', type=float, default=10.,
-    help='Blah')
-  parser.add_argument('--verbose', action='store_true')
-  parser.add_argument('--ignore-existing-garbage', action='store_true')
-  parser.add_argument('in_ssm_fn')
-  parser.add_argument('in_params_fn')
-  parser.add_argument('out_params_fn')
+    help='Logarithm of Bayes factor threshold at which the haploid model is accepted as more likely model than the model using the provided var_read_prob')
+  parser.add_argument('--verbose', action='store_true',
+    help='Print debugging messages')
+  parser.add_argument('--ignore-existing-garbage', action='store_true',
+    help='Ignore any existing garbage variants listed in in_params_fn and test all variants. If not specified, any existing garbage variants will be kept as garbage and not tested again.')
+  parser.add_argument('ssm_fn',
+    help='Input SSM file with mutations')
+  parser.add_argument('in_params_fn',
+    help='Input params file listing sample names and any existing garbage mutations')
+  parser.add_argument('out_params_fn',
+    help='Output params file with modified list of garbage mutations')
   args = parser.parse_args()
 
   np.set_printoptions(linewidth=400, precision=3, threshold=sys.maxsize, suppress=True)
   np.seterr(divide='raise', invalid='raise', over='raise')
 
-  ssms = inputparser.load_ssms(args.in_ssm_fn)
-  params = inputparser.load_params(args.in_params_fn)
   if args.ignore_existing_garbage:
+    variants, params = inputparser.load_ssms_and_params(args.ssm_fn, args.in_params_fn, remove_garb=False)
     params['garbage'] = []
   else:
-    ssms = inputparser.remove_garbage(ssms, params['garbage'])
+    variants, params = inputparser.load_ssms_and_params(args.ssm_fn, args.in_params_fn)
 
-  bad_vids, bad_samp_prop = _remove_bad(ssms, args.logbf_threshold, args.verbose)
-  bad_ssm_prop = len(bad_vids) / len(ssms)
+  bad_vids, bad_samp_prop = _remove_bad(variants, args.logbf_threshold, args.verbose)
+  bad_ssm_prop = len(bad_vids) / len(variants)
   if len(bad_vids) > 0:
-    params['garbage'] = common.sort_vids(params['garbage'] + bad_vids)
+    params['garbage'] = common.sort_vids(set(bad_vids) | set(params['garbage']))
     with open(args.out_params_fn, 'w') as F:
       json.dump(params, F)
 
