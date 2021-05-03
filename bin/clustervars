@@ -15,7 +15,7 @@ import cluster_linfreq
 import clustermaker
 from resultserializer import Results
 import util
-from progressbar import progressbar
+import tqdm
 
 def _convert_assignment_to_clustering(Z, vids):
   uniq_Z  = set(list(Z))
@@ -83,7 +83,7 @@ def _launch_parallel(run_chain, args, iter_per_chain, nchains, parallel, seed):
   manager = multiprocessing.Manager()
   progress_queue = manager.Queue()
 
-  with progressbar(total=total, desc='Clustering variants', unit='iter', dynamic_ncols=True) as pbar:
+  with tqdm.tqdm(total=total, desc='Clustering variants', unit='iter', dynamic_ncols=True) as pbar:
     with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
       for C in range(nchains):
         jobs.append(ex.submit(run_chain, *args, seed + C + 1, progress_queue))
