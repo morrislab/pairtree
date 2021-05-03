@@ -39,6 +39,24 @@ Installing Pairtree
     * [colorlover](https://github.com/plotly/colorlover) (e.g., install via `pip3 install --user colorlover`)
     * C compiler (e.g., GCC)
 
+
+   These requirements are bundled in the `requirements.txt` file. To install all requirements
+   using the `conda` package manager, first clone the `pairtree` repository and then create a new
+   virtual environment with the dependencies:
+   
+        git clone https://github.com/jwintersinger/pairtree
+        conda create --name pairtree --file requirements.txt
+
+   Or install the dependencies in your current environment:
+   
+        git clone https://github.com/jwintersinger/pairtree   
+        conda install --list requirements.txt
+
+   This can also be accomplished using Python's `pip` package manager:
+
+        git clone https://github.com/jwintersinger/pairtree
+        pip3 install -r requirements.txt
+
    Pairtree has only been tested on Linux systems, but should work on any
    UNIX-like OS (including macOS).
 
