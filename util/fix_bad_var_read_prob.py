@@ -88,10 +88,10 @@ def main():
     help='Print debugging messages')
   parser.add_argument('--ignore-existing-garbage', action='store_true',
     help='Ignore any existing garbage variants listed in in_params_fn and test all variants. If not specified, any existing garbage variants will be kept as garbage and not tested again.')
-  parser.add_argument('ssm_fn',
-    help='Input SSM file with mutations')
   parser.add_argument('--action', choices=('add_to_garbage', 'modify_var_read_prob'), default='add_to_garbage')
   parser.add_argument('--var-read-prob-alt', type=float, default=1.)
+  parser.add_argument('in_ssm_fn',
+    help='Input SSM file with mutations')
   parser.add_argument('in_params_fn',
     help='Input params file listing sample names and any existing garbage mutations')
   parser.add_argument('out_ssm_fn',
