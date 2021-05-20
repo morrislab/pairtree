@@ -43,6 +43,8 @@ def main():
 
   variants = inputparser.load_ssms(args.ssm_fn)
   params = inputparser.load_params(args.params_fn)
+  if 'clusters' not in params or len(params['clusters']) == 0:
+    params['clusters'] = [[vid] for vid in variants.keys()]
 
   if args.plot_relations:
     parallel = args.parallel if args.parallel is not None else multiprocessing.cpu_count()
