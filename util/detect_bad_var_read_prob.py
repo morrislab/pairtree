@@ -35,7 +35,7 @@ def _calc_logbf(ssm, omega1=1):
 
   return logbf
 
-def _remove_bad(ssms, logbf_thresh, verbose=False):
+def _remove_bad(ssms, logbf_thresh, var_read_prob_alt, verbose=False):
   bad = []
   bad_count = 0
   total_count = 0
@@ -45,7 +45,7 @@ def _remove_bad(ssms, logbf_thresh, verbose=False):
   phi_hat_threshold = 1 - 1e-2
 
   for vid, V in ssms.items():
-    logbfs = _calc_logbf(V)
+    logbfs = _calc_logbf(V, omega1=var_read_prob_alt)
     is_samp_bad = logbfs > logbf_thresh
 
     bad_count   += np.sum(is_samp_bad)
@@ -90,8 +90,12 @@ def main():
     help='Ignore any existing garbage variants listed in in_params_fn and test all variants. If not specified, any existing garbage variants will be kept as garbage and not tested again.')
   parser.add_argument('ssm_fn',
     help='Input SSM file with mutations')
+  parser.add_argument('--action', choices=('add_to_garbage', 'modify_var_read_prob'), default='add_to_garbage')
+  parser.add_argument('--var-read-prob-alt', type=float, default=1.)
   parser.add_argument('in_params_fn',
     help='Input params file listing sample names and any existing garbage mutations')
+  parser.add_argument('out_ssm_fn',
+    help='Output SSM file with modified list of garbage mutations')
   parser.add_argument('out_params_fn',
     help='Output params file with modified list of garbage mutations')
   args = parser.parse_args()
@@ -105,12 +109,20 @@ def main():
   else:
     variants, params = inputparser.load_ssms_and_params(args.ssm_fn, args.in_params_fn)
 
-  bad_vids, bad_samp_prop = _remove_bad(variants, args.logbf_threshold, args.verbose)
+  bad_vids, bad_samp_prop = _remove_bad(variants, args.logbf_threshold, args.var_read_prob_alt, args.verbose)
   bad_ssm_prop = len(bad_vids) / len(variants)
-  if len(bad_vids) > 0:
+
+  if args.action == 'add_to_garbage':
     params['garbage'] = common.sort_vids(set(bad_vids) | set(params['garbage']))
-    with open(args.out_params_fn, 'w') as F:
-      json.dump(params, F)
+  elif args.action == 'modify_var_read_prob':
+    for vid in bad_vids:
+      variants[vid]['omega_v'][:] = args.var_read_prob_alt
+  else:
+    raise Exception('Unknown action: %s' % args.action)
+
+  inputparser.write_ssms(variants, args.out_ssm_fn)
+  with open(args.out_params_fn, 'w') as F:
+    json.dump(params, F)
 
   stats = {
     'num_bad_ssms': len(bad_vids),
