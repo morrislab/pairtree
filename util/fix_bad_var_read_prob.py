@@ -104,10 +104,10 @@ def main():
   np.seterr(divide='raise', invalid='raise', over='raise')
 
   if args.ignore_existing_garbage:
-    variants, params = inputparser.load_ssms_and_params(args.ssm_fn, args.in_params_fn, remove_garb=False)
+    variants, params = inputparser.load_ssms_and_params(args.in_ssm_fn, args.in_params_fn, remove_garb=False)
     params['garbage'] = []
   else:
-    variants, params = inputparser.load_ssms_and_params(args.ssm_fn, args.in_params_fn)
+    variants, params = inputparser.load_ssms_and_params(args.in_ssm_fn, args.in_params_fn)
 
   bad_vids, bad_samp_prop = _remove_bad(variants, args.logbf_threshold, args.var_read_prob_alt, args.verbose)
   bad_ssm_prop = len(bad_vids) / len(variants)
