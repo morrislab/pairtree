@@ -86,4 +86,5 @@ def main():
     write_footer(outf)
 
 if __name__ == '__main__':
+  multiprocessing.set_start_method('fork')
   main()
