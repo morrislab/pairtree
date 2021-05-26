@@ -1,7 +1,7 @@
 import os
 import sys
 for name in ('comparison', 'lib'):
-  sys.path.append(os.path.join(os.path.dirname(__file__), '..', name))
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', name))
 
 import argparse
 import mutphi
