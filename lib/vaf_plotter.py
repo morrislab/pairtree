@@ -13,7 +13,8 @@ def make_random_id(K=8):
   return ''.join(random.choices(string.ascii_letters, k=K))
 
 def munge_samp_names(sampnames):
-  return [S.replace('Diagnosis Xeno ', 'DX').replace('Relapse Xeno ', 'RX') for S in sampnames]
+  return list(sampnames)
+  #return [S.replace('Diagnosis Xeno ', 'DX').replace('Relapse Xeno ', 'RX') for S in sampnames]
 
 def euclid_dist(A, B):
   return np.sqrt(np.sum((B - A)**2))
