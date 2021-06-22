@@ -15,7 +15,7 @@ import relation_plotter
 import plotutil
 
 def write_header(outf):
-  print('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Clusters</title>', file=outf)
+  print('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Variants</title>', file=outf)
   print('<script src="https://d3js.org/d3.v5.min.js"></script>', file=outf)
   for jsfn in ('util.js', 'highlight_table_labels.js', 'vaf_matrix.js'):
     print('<script>%s</script>' % plotutil.read_file(jsfn), file=outf)
