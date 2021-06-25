@@ -201,6 +201,8 @@ def calc_lh_mc_1D(V1, V2):
   return logprob_models
 
 def quad(*args, **kwargs):
+  if 'limit' not in kwargs:
+    kwargs['limit'] = 50
   with warnings.catch_warnings():
     warnings.simplefilter('ignore', category=scipy.integrate.IntegrationWarning)
     return scipy.integrate.quad(*args, **kwargs)
@@ -208,7 +210,6 @@ def quad(*args, **kwargs):
 def calc_lh_quad(V1, V2, use_numba=True):
   if not NUMBA_AVAIL:
     use_numba = False
-  max_splits = 50
   S = len(V1.total_reads) # S
   logprob_models = np.nan * np.ones((S, NUM_MODELS)) # SxM
 
@@ -231,11 +232,11 @@ def calc_lh_quad(V1, V2, use_numba=True):
       if modelidx == Models.cocluster:
         if not use_numba:
           logmaxP = np.log(lhmath_native.integral_same_cluster(V1_phi_mle, V1, V2, sidx, 0) + _EPSILON)
-          P, P_error = quad(lhmath_native.integral_same_cluster, 0, 1, args=(V1, V2, sidx, logmaxP), limit=max_splits)
+          P, P_error = quad(lhmath_native.integral_same_cluster, 0, 1, args=(V1, V2, sidx, logmaxP))
         else:
           logmax_args = np.array((V1_phi_mle, *args, 0)).astype(np.float64)
           logmaxP = np.log(lhmath_numba._integral_same_cluster(logmax_args) + _EPSILON)
-          P, P_error = quad(lhmath_numba.integral_same_cluster, 0, 1, args + (logmaxP,), limit=max_splits)
+          P, P_error = quad(lhmath_numba.integral_same_cluster, 0, 1, args + (logmaxP,))
 
         P = np.maximum(_EPSILON, P)
         logP = np.log(P) + logmaxP
@@ -243,11 +244,11 @@ def calc_lh_quad(V1, V2, use_numba=True):
       else:
         if not use_numba:
           logmaxP = np.log(lhmath_native.integral_separate_clusters(V1_phi_mle, V1, V2, sidx, modelidx, 0) + _EPSILON)
-          P, P_error = quad(lhmath_native.integral_separate_clusters, 0, 1, args=(V1, V2, sidx, modelidx, logmaxP), limit=max_splits)
+          P, P_error = quad(lhmath_native.integral_separate_clusters, 0, 1, args=(V1, V2, sidx, modelidx, logmaxP))
         else:
           logmax_args = np.array((V1_phi_mle, *args, modelidx, 0)).astype(np.float64)
           logmaxP = np.log(lhmath_numba._integral_separate_clusters(logmax_args) + _EPSILON)
-          P, P_error = quad(lhmath_numba.integral_separate_clusters, 0, 1, args + (modelidx, logmaxP), limit=max_splits)
+          P, P_error = quad(lhmath_numba.integral_separate_clusters, 0, 1, args + (modelidx, logmaxP))
 
         logdenorm = scipy.special.betaln(V2.var_reads[sidx] + 1, V2.ref_reads[sidx] + 1)
         P = np.maximum(_EPSILON, P)
