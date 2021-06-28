@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.special
 import concurrent.futures
-from progressbar import progressbar
+import tqdm
 import itertools
 
 from common import Models, NUM_MODELS, ALL_MODELS
@@ -158,7 +158,7 @@ def calc_posterior(variants, logprior, rel_type, parallel=1):
   )
 
   if parallel > 0:
-    with progressbar(total=len(pairs), desc='Computing %s relations' % rel_type, unit='pair', dynamic_ncols=True) as pbar:
+    with tqdm.tqdm(total=len(pairs), desc='Computing %s relations' % rel_type, unit='pair', dynamic_ncols=True) as pbar:
       posterior, evidence =_compute(pbar)
   else:
     posterior, evidence =_compute(None)

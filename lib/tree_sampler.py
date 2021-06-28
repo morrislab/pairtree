@@ -2,7 +2,7 @@ import numpy as np
 import scipy.stats
 import common
 import mutrel
-from progressbar import progressbar
+import tqdm
 import phi_fitter
 import hyperparams as hparams
 import math
@@ -599,7 +599,7 @@ def sample_trees(data_mutrel, supervars, superclusters, trees_per_chain, burnin,
     # the main process to update the progress bar.
     progress_queue = manager.Queue()
 
-    with progressbar(total=total, desc='Sampling trees', unit='tree', dynamic_ncols=True) as pbar:
+    with tqdm.tqdm(total=total, desc='Sampling trees', unit='tree', dynamic_ncols=True) as pbar:
       with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as ex:
         for C in range(nchains):
           # Ensure each chain's random seed is different from the seed used to
