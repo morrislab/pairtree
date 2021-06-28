@@ -1,0 +1,6 @@
+numpy
+scipy
+scikit-learn
+tqdm
+numba
+colorlover
