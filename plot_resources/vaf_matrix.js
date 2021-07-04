@@ -14,7 +14,7 @@ VafMatrix.prototype._configure_toggles = function(container) {
         }
       }
 
-      var targets = container.querySelectorAll('.matrix tr.' + toggle_type);
+      var targets = container.querySelectorAll('.matrix tbody tr.' + toggle_type);
       var is_active = E.classList.contains('active');
       if(is_active) {
         E.classList.remove('active');
@@ -35,14 +35,14 @@ VafMatrix.prototype._configure_toggles = function(container) {
 }
 
 VafMatrix.prototype._filter_rows = function(container, targets) {
-  var rows = container.querySelectorAll('.matrix tr');
+  var rows = container.querySelectorAll('.matrix tbody tr');
   if(targets.length === 0) {
     for(let row of rows) { row.style.display = ''; }
     return;
   }
 
   rows.forEach((row) => {
-    var tid = row.querySelector('.id').text().trim();
+    var tid = row.querySelector('.id').textContent.trim();
     if(targets.includes(tid)) {
       row.style.display = '';
     } else {
@@ -53,7 +53,7 @@ VafMatrix.prototype._filter_rows = function(container, targets) {
 
 VafMatrix.prototype._configure_filter = function(container) {
   var filter = container.querySelector('.filter');
-  //var self = this;
+  var self = this;
   filter.addEventListener('keydown', (E) => {
     if(E.which === 13) {
       E.preventDefault();

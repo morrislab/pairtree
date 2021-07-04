@@ -13,7 +13,8 @@ def make_random_id(K=8):
   return ''.join(random.choices(string.ascii_letters, k=K))
 
 def munge_samp_names(sampnames):
-  return [S.replace('Diagnosis Xeno ', 'DX').replace('Relapse Xeno ', 'RX') for S in sampnames]
+  return list(sampnames)
+  #return [S.replace('Diagnosis Xeno ', 'DX').replace('Relapse Xeno ', 'RX') for S in sampnames]
 
 def euclid_dist(A, B):
   return np.sqrt(np.sum((B - A)**2))
@@ -77,7 +78,7 @@ def print_vaftable_header(sampnames, show_cluster_members, outf):
   container_id = 'vafmatrix_' + make_random_id()
   container = f'#{container_id}'
 
-  print('<style>{container} .matrix td, {container} .matrix {{ padding: 5px; margin: 0; border-collapse: collapse; }} {container} .matrix th {{ transform: rotate(45deg); font-weight: normal !important; }} {container} .matrix span {{ visibility: hidden; }} {container} .matrix td:hover > span {{ visibility: visible; }}</style>'.format(container=container), file=outf)
+  print('<style>{container} .matrix td, {container} .matrix {{ padding: 5px; margin: 0; border-collapse: collapse; }} {container} .matrix th {{ writing-mode: vertical-lr; transform: rotate(180deg); font-weight: normal !important; }} {container} .matrix span {{ visibility: hidden; }} {container} .matrix td:hover > span {{ visibility: visible; }}</style>'.format(container=container), file=outf)
 
   print(f'<div id="{container_id}">', file=outf)
   print('<p><input type="text" class="filter" placeholder="s0,s1,..."></p>', file=outf)

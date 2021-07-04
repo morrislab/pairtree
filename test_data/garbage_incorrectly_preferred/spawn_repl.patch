@@ -1,0 +1,14 @@
+diff --git a/bin/removegarbage b/bin/removegarbage
+index 3f2e849..018f84c 100755
+--- a/bin/removegarbage
++++ b/bin/removegarbage
+@@ -132,6 +132,9 @@ def main():
+   else:
+     variants, params = inputparser.load_ssms_and_params(args.ssm_fn, args.in_params_fn)
+
++  from IPython import embed
++  embed()
++
+   posterior = _calc_posterior(variants, args.garb_prior, parallel, args.pairwise_results_fn)
+   garbage_vids = _remove_garbage(
+     posterior,
