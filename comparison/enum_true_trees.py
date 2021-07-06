@@ -182,6 +182,7 @@ def main():
   )
   parser.add_argument('--check-delta', action='store_true')
   parser.add_argument('--only-count', action='store_true')
+  parser.add_argument('--only-write-truth', action='store_true', help='Write only the single true tree structure')
   parser.add_argument('sim_data_fn')
   parser.add_argument('results_fn')
   args = parser.parse_args()
@@ -198,17 +199,22 @@ def main():
   if args.only_count:
     num_trees, _ = enum_trees(tau, phi, order, 'dfs', store_trees=False)
     print(num_trees)
+    return
+  elif args.only_write_truth:
+    num_trees = 1
+    structs = np.array(simdata['structure'])
   else:
     num_trees, structs = enum_trees(tau, phi, order, 'dfs')
     structs = np.array(structs)
-    ensure_truth_found(simdata['structure'], structs)
-    write_truth(
-      structs,
-      simdata['phi'],
-      simdata['clusters'],
-      simdata['vids_garbage'],
-      args.results_fn,
-    )
+
+  ensure_truth_found(simdata['structure'], structs)
+  write_truth(
+    structs,
+    simdata['phi'],
+    simdata['clusters'],
+    simdata['vids_garbage'],
+    args.results_fn,
+  )
 
 if __name__ == '__main__':
   main()
