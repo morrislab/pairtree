@@ -207,7 +207,7 @@ indeed not present in the sample -- an instance where you have zero variant
 reads amongst ten total reads indicates considerably less confidence than if
 you have zero variant reads for 1000 total reads.
 
-To impute missing read counts, you ahve three options.
+To impute missing read counts, you have three options.
 
 
 Clustering mutations
@@ -288,9 +288,56 @@ Interpreting Pairtree output
 * (add note about how logs will be written in JSON format if stdout/stderr is directed to a file)
 * (add note about summposterior, plottree, etc.)
 
+
+Fixing incorrect ploidy
+==========================
+There are cases of incorrect ploidy that are unable to be detected using the pairwise framework.
+This can result in an implied subclonal frequency being greater than 1. This is often due to missed
+copy number calls, such as an uncalled loss of heterozygosity (LOH) event which removes the wildtype
+allele in a lineage and leaves only the variant allele.
+
+In order to find these mutations such that they can be corrected, we provide the script `util/fix_bad_var_read_prob.py`. There are several options for this script which are of particular interest.
+
+* `--logbf-threshold`: Logarithm of Bayes factor threshold at which the haploid model is accepted as more likely model than the model using the provided var_read_prob.
+* `--ignore-existing-garbage`: Ignore any existing garbage variants listed in `in_params_fn` and test all variants. If not specified, any existing garbage variants will be kept as garbage and not tested again.
+* `--action (add_to_garbage, modify_var_read_prob)`: Action to take after script has completed. `add_to_garbage` will add the resulting 'bad_ssms' to the list of garbage samples in the params.json file provided. `modify_var_read_prob` will overwrite the var_read_prob in the params.json file with the value provided by the `--var-read-prob-alt` option of this script.
+* `--var-read-prob-alt`: Value that will be used to overwrite the var_read_prob of any garbage variants found if `--action` is set to `modify_var_read_prob`.
+* `in_ssm_fn`: Input SSM file with mutations.
+* `in_params_fn`: Input params file listing sample names and any existing garbage mutations.
+* `out_ssm_fn`: Output SSM file with modified list of LOH mutations.
+* `out_params_fn`: Output params file with modified list of garbage mutations.
+
+
+The terminal output of this script will be in the following format:
+
+`num_bad_ssms`: Number of variants which have an incorrect variant read probability estimate
+
+`bad_ssms`: List of variant names which were found to have an incorrect variant read probability estimate
+
+
+`bad_samp_prop`: Percent of variants out of all samples which were found to have an incorrect variant read probability estimate
+
+
+`bad_ssm_prop`: Percent of variants which were found to have an incorrect variant read probability estimate in at least one sample
+
+
+<br>
+
+
 Removing garbage mutations
 ==========================
-(TODO: write)
+Pairtree relies on the infinite sites assumption (ISA) when converting mutation allele frequencies to subclonal frequencies, and building clone trees. Pairtree is also sensitive to other factors such as missed CNA calls, or technical noise which can skew the subclonal frequency conversion. Therefore, it is necessary to detect and remove such mutations before building the clone tree. Pairwise relationships between mutations reveal both ISA violations and other types of erroneous mutations, which we refer to collectively as _garbage mutations_.
+
+In order to find these mutations such that they can be added to our list of garbage mutations, we provide the script `bin/removegarbage`. There are several options for this script which are of particular interest.
+
+* `--prior`: Pairwise garbage prior probability. The default value of 0.2 represents a uniform prior over pairwise relationship types.
+* `--max-garb-prob`: Maximum probability of a garbage relationship to permit for any pair in order for the algorithm to terminate.
+* `--ignore-existing-garbage`: Ignore any existing garbage variants listed in `in_params_fn` and test all variants. If not specified, any existing garbage variants will be kept as garbage and not tested again.
+* `--pairwise-results`: Filename to store pairwise evidence in, which allows you to try garbage removal with different parameters without having to repeat the pairwise computations.
+* `in_ssm_fn`: Input SSM file with mutations.
+* `in_params_fn`: Input params file listing sample names and any existing garbage mutations.
+* `out_params_fn`: Output params file with modified list of garbage mutations.
+
 
 
 Tweaking Pairtree options
