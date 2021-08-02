@@ -288,6 +288,53 @@ Interpreting Pairtree output
 * (add note about how logs will be written in JSON format if stdout/stderr is directed to a file)
 * (add note about summposterior, plottree, etc.)
 
+Understanding the html file format outputted by `bin/plottree`
+---------------------------------------------------------------
+The `bin/plottree` script uses the .npz file outputted by `bin/pairtree`
+to produce an html of plots and figures describing the results.
+
+The title and description for each plot/figure are provided below.
+
+* `Tree`: shows a graphical representation of the clonal evolution tree based on the
+variant clusters provided to `bin/pairtree` in the parameter file. These clusters are each labeled as their own
+subclone population (`S0`, `S1`, ...). There are three different additional values provided with the tree.
+`tidx` is the tree index of which tree from the .npz file is being displayed.
+`nlglh` is the negative log-likelihood of the tree.
+`prob` is posterior softmax probability of the tree.
+
+* `Population frequencies`: shows the ratio of optimal subclone population frequencies when constrained by the proposed tree for each
+sample specified in the `.params.json` file provided to `bin/pairtree`.
+There are two additional values for each sample: `Clone diversity index` and `Clone and mutation diversity index`.
+The `Clone diversity index` is the entropy of subclone population frequency for a given sample.
+This is a value from 0 to 1, where 1 means a sample has many different subclone populations (and as a result, a higher entropy), and 0 means a sample has no diversity (or a single subclone, and a lower entropy). The `Clone and mutation diversity index` is the joint entropy of the subclone population frequency and the number of mutations present in a clone.
+
+* `Tree-constrained subclonal frequencies`: shows the optimal subclone population frequency when constrained by the proposed tree.
+
+* `Data-implied subclonal frequencies`: shows the implied subclone population frequency per sample based on the variant data provided.
+
+* `Interleaved subclonal frequencies`: shows the `tree-constrained subclonal frequencies`, as well as the error between the `tree-constrained subclonal frequencies` and the `data-implied subclonal frequencies` for each subclone in a given sample. The `Total Error` value shown is the sum of all errors across subclones and samples.
+
+* `Diversity Indices`: shows the `Clone diversity index`, `Clone and mutation diversity index`,
+and `Shannon diversity index` in bits for each sample. The `Clone diversity index`, and
+`Clone and mutation diversity index` are described above. The `Shannon diversity index` is
+the entropy of the proportion of mutations in each cluster.
+
+* `VAFs (corrected)`: shows a table of variant allele frequencies (VAFs) per sample for the following: tree-constrained subclones (`Φ`), `Supervariants`, `Cluster members`, and `Garbage`. The current selections for the table are highlighted in blue. The `Φ` values are the optimal tree-constrained subclones VAFs (or pseudo-variants denoted by P1, ... ,P_n). The `Supervariants` are the supervariants created for each cluster defined in the `.params.json` file provided to Pairtree. The `Cluster members` are the individual variants in each supervariant or cluster. The `Garbage` variants are those listed as garbage in the `.params.json` file provided to Pairtree. There is also a search bar which allows you to list comma delimited ID values that specify which IDs should be shown in the VAF table (e.g. `s0,s1` will show only these two IDs if there is a match).
+
+* `ML relations`: shows a matrix of the pairwise relationships between all of the different subclone populations. Each relationship is with respect to the subclone on the left hand side of the matrix, to the subclone listed on top of the matrix.
+
+* `garbage`: shows a pairwise relationship matrix of which subclone populations have a garbage relationships.
+
+* `cocluster`: shows a pairwise relationship matrix of which subclone populations are clustered together (or have a cocluster relationship).
+
+* `A_B`: shows a pairwise relationship matrix of which subclone populations have an ancestral relationship to other subclone populations.
+
+* `B_A`: shows a pairwise relationship matrix of which subclone populations have a descendant relationship to other subclone populations.
+
+* `diff_branches`: shows a pairwise relationship matrix of which subclone populations are not on the same branch (i.e. are not ancestors or descendants of each other).
+
+* `Cluster stats`: shows a table of statistics for each cluster. The columns are `Cluster`, `Members`, and `Deviation`. The `Cluster` column lists the ID number for the cluster or subclone. `Members` lists the number of variants in a cluster. `Deviation` lists the median absolute difference between the subclone frequency of the supervariant, and its related cluster of variants.
+
 
 Fixing incorrect ploidy
 ==========================
