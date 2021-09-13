@@ -58,5 +58,6 @@ def integral_same_cluster(phi1, V1, V2, sidx, logsub):
   # The `log(sqrt(2))` comes from computing the line integral. See theorem 6.3
   # ("Evaluating a Scalar Line Integral") at
   # https://openstax.org/books/calculus-volume-3/pages/6-2-line-integrals.
-  logP = np.log(np.sqrt(2)) + B[0] + B[1] - logsub
+  # ... except I've now removed it because my external pointed out it was wrong.
+  logP = B[0] + B[1] - logsub
   return np.exp(logP)

@@ -83,7 +83,7 @@ def _integral_same_cluster(args):
   P = np.array([V1_omega * phi1, V2_omega * phi1])
 
   B = binom.logpmf(X, N, P)
-  logP = np.log(np.sqrt(2)) + B[0] + B[1] - logsub
+  logP = B[0] + B[1] - logsub
   return np.exp(logP)
 
 # See:
