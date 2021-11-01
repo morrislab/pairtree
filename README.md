@@ -25,44 +25,35 @@ Pairtree](https://doi.org/10.1101/2020.11.06.372219) (Wintersinger et al.
 Installing Pairtree
 ===================
 1. Install dependencies. Installation is usually easiest if you use
-   [Anaconda](https://www.anaconda.com/products/individual), which includes the
-   most difficult-to-install dependencies.
-   [Miniconda](https://docs.conda.io/en/latest/miniconda.html) also works well.
-   You need the following:
+   [Mambaforge](https://github.com/conda-forge/miniforge#mambaforge), which
+   includes a recent version of Python alongside the
+   [Mamba](https://github.com/mamba-org/mamba) package manager. As Mamba is a
+   faster reimplementation of Conda, you can alternatively use Conda or
+   Miniconda.
 
-    * [Python](https://www.python.org/) 3.6 or greater **(included in Anaconda)**
-    * [NumPy](https://numpy.org/) **(included in Anaconda)**
-    * [SciPy](https://www.scipy.org/) **(included in Anaconda)**
-    * [scikit-learn](https://scikit-learn.org/stable/) **(included in Anaconda)**
-    * [tqdm](https://github.com/tqdm/tqdm) (e.g., install via `pip3 install --user tqdm`) **(included in Anaconda)**
-    * [Numba](https://numba.pydata.org/) (e.g., install via `pip3 install --user numba` or `conda install numba`)
-    * [colorlover](https://github.com/plotly/colorlover) (e.g., install via `pip3 install --user colorlover`)
-    * C compiler (e.g., GCC)
+   Refer to [requirements.txt](environment.yml) for the full list of
+   dependencies. These can be installed in a new environment with the following
+   commands. If you're using Anaconda instead of Mamba, replace `mamba` with
+   `conda` below.
 
-
-   These requirements are bundled in the `requirements.txt` file. To install all requirements
-   using the `conda` package manager, first clone the `pairtree` repository and then create a new
-   virtual environment with the dependencies:
+   To install all requirements using the `conda` package manager, first clone
+   the Pairtree repository and then create a new virtual environment with the
+   dependencies.
    
         git clone https://github.com/jwintersinger/pairtree
-        conda create --name pairtree --file requirements.txt
+        mamba create --name pairtree --file requirements.txt
 
    Or install the dependencies in your current environment:
    
         git clone https://github.com/jwintersinger/pairtree   
         conda install --list requirements.txt
 
-   This can also be accomplished using Python's `pip` package manager:
-
-        git clone https://github.com/jwintersinger/pairtree
-        pip3 install -r requirements.txt
-
    Pairtree has only been tested on Linux systems, but should work on any
    UNIX-like OS (including macOS).
 
-2. Clone the Pairtree repository, then download and build the C code required
-   to fit subclone frequencies to the tree. This algorithm was published in
-   [Jia et al.](https://arxiv.org/abs/1811.01129), and uses the authors' implementation with minor modifications.
+2. Download and build the C code required to fit subclone frequencies to the
+   tree. This algorithm was published in [Jia et al.](https://arxiv.org/abs/1811.01129),
+   and uses the authors' implementation with minor modifications.
 
         git clone https://github.com/jwintersinger/pairtree
         cd pairtree/lib
