@@ -31,7 +31,7 @@ Installing Pairtree
    faster reimplementation of Conda, you can alternatively use Conda or
    Miniconda.
 
-   Refer to [requirements.txt](environment.yml) for the full list of
+   Refer to [requirements.txt](requirements.txt) for the full list of
    dependencies. These can be installed in a new environment with the following
    commands. If you're using Anaconda instead of Mamba, replace `mamba` with
    `conda` below.
