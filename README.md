@@ -36,7 +36,7 @@ Installing Pairtree
    commands. If you're using Anaconda instead of Mamba, replace `mamba` with
    `conda` below.
 
-   To install all requirements using the `conda` package manager, first clone
+   To install all requirements using `mamba` (or `conda`), first clone
    the Pairtree repository and then create a new virtual environment with the
    dependencies.
    
