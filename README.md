@@ -216,7 +216,14 @@ indeed not present in the sample -- an instance where you have zero variant
 reads amongst ten total reads indicates considerably less confidence than if
 you have zero variant reads for 1000 total reads.
 
-To impute missing read counts, you have three options.
+To impute missing read counts, the best option is to refer to the original
+sequencing data (e.g., the BAM file) to determine how many reads were present
+at the locus in the given sample. As this task can be arduous, you may
+alternatively wish to take the mean read count across samples for that genomic
+locus, or the mean read count for all loci in that sample. More complex
+strategies that try to correct for variable depth across loci (e.g., because of
+GC bias) or differing depths across samples (e.g., because some samples were
+more deeply sequenced than others) are also possible.
 
 
 Clustering mutations
@@ -294,8 +301,19 @@ Interpreting Pairtree output
   figures Pairtree creates are in SVG format, which is suitable for use at
   arbitrarily high resolutions (including in print) because of its vector-based
   nature.
-* (add note about how logs will be written in JSON format if stdout/stderr is directed to a file)
-* (add note about summposterior, plottree, etc.)
+
+* If `stderr` is redirected to a file (e.g., via `bin/pairtree ... 2>
+  stderr.log`), instead of rendering a progress bar, Pairtree will report its
+  progress by writing to `stderr` a series of JSON objects, with one per line.
+  An example line follows:
+
+    ```json
+    {"desc": "Sampling trees", "count": 11457, "total": 12000, "unit": "tree", "started_at": "2021-11-01 02:45:37.226015", "timestamp": "2021-11-01 02:46:12.625482"}
+    ```
+
+* Use `bin/summposterior` to summarize the posterior distribution over trees
+  and `bin/plottree` to plot all details corresponding to an individual tree.
+  See the [Pairtree executables](#pairtree-executables) section for details.
 
 Understanding the html file format outputted by `bin/plottree`
 ---------------------------------------------------------------
