@@ -261,6 +261,12 @@ You can use Pairtree to cluster variants through the `bin/clustervars`
 executable. Run with `--help` to obtain full usage instructions. Several
 options are of particular interest.
 
+* `ssm_fn`: Input SSM file with mutations.
+
+* `in_params_fn`: Input params file listing sample names and any existing garbage mutations.
+
+* `out_params_fn`: Output params file with cluster assignments for each mutation (excluding those listed in garbage mutations).
+
 * `--model linfreq`: This uses the default "lineage frequency" clustering model.
   This is the most computationally efficient choice, and is the most
   straightforwrd application of the DPMM to the clustering problem.
