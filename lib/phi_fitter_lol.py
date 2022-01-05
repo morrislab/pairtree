@@ -42,9 +42,16 @@ def _fit_etas(adj, A, ref_reads, var_reads, omega, method, iterations, parallel,
   # Numba only supports dot products on float arrays, not int arrays.
   A = A.astype(np.float64)
   Z = Z.astype(np.float64)
+  
+  # we want to operate on float arrays when computing phi_implied 
+  var_reads = var_reads.astype(np.float64)
+  ref_reads = ref_reads.astype(np.float64)
 
   if isinstance(eta_init, str) and eta_init == 'mle':
-    phi_implied = (var_reads / (ref_reads + var_reads)) / omega
+
+    # To prevent the true_divide error, we use numpy divide with the condition to only perform division if omega and var_reads are not zero.
+    tmp_vaf = np.divide(var_reads, (ref_reads + var_reads), out=np.zeros_like(var_reads), where=var_reads!=0)
+    phi_implied = np.divide(tmp_vaf, omega, out=np.zeros_like(tmp_vaf), where=omega!=0)
     phi_implied = np.minimum(1, phi_implied)
     phi_implied = np.maximum(0, phi_implied)
     # Make first row 1 to account for normal root.

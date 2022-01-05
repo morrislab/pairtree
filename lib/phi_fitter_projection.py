@@ -24,13 +24,14 @@ def _convert_adjm_to_adjlist(adjm):
 
 def fit_etas(adj, superclusters, supervars):
   svids = common.extract_vids(supervars)
-  R = np.array([supervars[svid]['ref_reads'] for svid in svids])
-  V = np.array([supervars[svid]['var_reads'] for svid in svids])
+  R = np.array([supervars[svid]['ref_reads'] for svid in svids], dtype=np.float64)
+  V = np.array([supervars[svid]['var_reads'] for svid in svids], dtype=np.float64)
   T = R + V
-  omega = np.array([supervars[svid]['omega_v'] for svid in svids])
+  omega = np.array([supervars[svid]['omega_v'] for svid in svids], dtype=np.float64)
   M, S = T.shape
 
-  phi_hat = V / (omega * T)
+  # To prevent the true_divide error, we use numpy divide with the condition to only perform division if omega * T is not zero.
+  phi_hat = np.divide(V, omega * T, out=np.zeros_like(V), where=(omega * T)!=0)
   phi_hat = np.maximum(0, phi_hat)
   phi_hat = np.minimum(1, phi_hat)
   phi_hat = np.insert(phi_hat, 0, 1, axis=0)
