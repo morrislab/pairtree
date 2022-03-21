@@ -419,7 +419,7 @@ In order to find these mutations such that they can be corrected, we provide the
 
 * `--logbf-threshold`: Logarithm of Bayes factor threshold at which the haploid model is accepted as more likely model than the model using the provided var_read_prob.
 * `--ignore-existing-garbage`: Ignore any existing garbage variants listed in `in_params_fn` and test all variants. If not specified, any existing garbage variants will be kept as garbage and not tested again.
-* `--action (add_to_garbage, modify_var_read_prob)`: Action to take after script has completed. `add_to_garbage` will add the resulting 'bad_ssms' to the list of garbage samples in the params.json file provided. `modify_var_read_prob` will overwrite the var_read_prob in the params.json file with the value provided by the `--var-read-prob-alt` option of this script.
+* `--action (add_to_garbage, modify_var_read_prob)`: Action to take after script has completed. `add_to_garbage` will add the resulting 'bad_ssms' to the list of garbage samples in the params.json file provided. `modify_var_read_prob` will overwrite the var_read_prob in the .ssm file with the value provided by the `--var-read-prob-alt` option of this script.
 * `--var-read-prob-alt`: Value that will be used to overwrite the var_read_prob of any garbage variants found if `--action` is set to `modify_var_read_prob`.
 * `in_ssm_fn`: Input SSM file with mutations.
 * `in_params_fn`: Input params file listing sample names and any existing garbage mutations.
