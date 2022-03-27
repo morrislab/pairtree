@@ -491,7 +491,7 @@ Three options control the behaviour of each MCMC chain used to sample trees.
 
 * Burn-in: each chain will take some number of samples to reach high-density
   regions of tree space, such that those trees come from a good approximation
-  of the true posterior. The `--burnin` paramemter controls what proportion of
+  of the true posterior. The `--burnin` parameter controls what proportion of
   trees Pairtree will discard from the beginning of each chain, so as to avoid
   including poor-quality trees in your results. By default, Pairtree discards
   the first one-third of samples from each chain.
