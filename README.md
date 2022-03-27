@@ -477,7 +477,7 @@ space.
 By default, Pairtree will run a separate MCMC chain for each CPU core (logical
 or physical) present. As these chains are run in parallel, using multiple
 chains does not increase runtime. For more details, please refer to the
-"Running computatins in parallel to reduce runtime" section below.
+"Running computations in parallel to reduce runtime" section below.
 
 Changing number of samples, burn-in, and thinning
 -------------------------------------------------
