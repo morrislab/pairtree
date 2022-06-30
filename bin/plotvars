@@ -88,5 +88,12 @@ def main():
     write_footer(outf)
 
 if __name__ == '__main__':
-  multiprocessing.set_start_method('fork')
+  # This is default on Unix but not macOS. Without this, resources aren't
+  # inherited by subprocesses on macOS and various things break. However, on
+  # macOS, it can cause crashes. See
+  # https://docs.python.org/3/library/multiprocessing.html#contexts-and-start-methods
+  # On top of this, MacOS throws an exception since set_start_method is called elsewhere, 
+  # adding the argument 'force=True' resolves the exception.
+  if sys.platform == "darwin":
+    multiprocessing.set_start_method('fork', force=True)
   main()
