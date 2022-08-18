@@ -21,7 +21,7 @@ described in {insert link to paper}. The algorithm consists of two phases:
    Pairtree](https://doi.org/10.1158/2643-3230.BCD-21-0092) (Wintersinger et al.
    (2022)).
 
-
+[![DOI](https://zenodo.org/badge/140898706.svg)](https://zenodo.org/badge/latestdoi/140898706)
 
 Installing Pairtree
 ===================
