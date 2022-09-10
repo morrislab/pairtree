@@ -6,8 +6,14 @@ def _fix_eta(eta):
   assert np.allclose(1, np.sum(eta, axis=0))
   # Remove non-cancerous population from eta.
   eta = eta[1:]
-  eta = eta / np.sum(eta, axis=0)
-  assert np.allclose(1, np.sum(eta, axis=0))
+
+  # prevents divide by zero error if a sample contains only the non-cancerous populuation
+  eta = np.divide(eta, np.sum(eta, axis=0), out=np.zeros_like(eta), where=eta!=0.0)
+  eta_sum = np.sum(eta, axis=0)
+
+  # ensure that all samples which contain at least one subclone 
+  # now have subclone population frequencies which sum to 1
+  assert np.allclose(1, eta_sum[eta_sum.nonzero()[0]])
 
   eta = ma.masked_equal(eta, 0)
   return eta
