@@ -20,6 +20,8 @@ described in {insert link to paper}. The algorithm consists of two phases:
    histories from multiple bulk DNA samples using
    Pairtree](https://doi.org/10.1158/2643-3230.BCD-21-0092) (Wintersinger et al.
    (2022)).
+   
+   The practical aspects of using Pairtree are described in our STAR protocol paper [Reconstructing cancer phylogenies using Pairtree, a clone tree reconstruction algorithm](https://pubmed.ncbi.nlm.nih.gov/36129821/).
 
 [![DOI](https://zenodo.org/badge/140898706.svg)](https://zenodo.org/badge/latestdoi/140898706)
 
