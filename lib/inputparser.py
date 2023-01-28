@@ -52,7 +52,6 @@ def load_ssms(ssmfn, max_ssms=None):
       assert len(V[K]) == S, '%s for %s is of length %s, but %s expected' % (K, vid, len(V[K]), S)
 
   vids = set([int(vid[1:]) for vid in variants.keys()])
-  assert vids == set(range(len(variants)))
   return variants
 
 def remove_garbage(variants, garbage):
