@@ -29,10 +29,11 @@ described in {insert link to paper}. The algorithm consists of two phases:
 Table of Contents
 =================
 1. [Installation](#installing-pairtree)
-2. [Pairtree Executables](#pairtree-executables)
-3. [Pairtree Inputs](#input-files)
-4. [Clustering mutations](#clustering-mutations)
-5. [Pairtree outputs](#interpreting-and-manipulating-pairtree-output)
+2. [Examples](#examples)
+3. [Pairtree Executables](#pairtree-executables)
+4. [Pairtree Inputs](#input-files)
+5. [Clustering mutations](#clustering-mutations)
+6. [Pairtree outputs](#interpreting-and-manipulating-pairtree-output)
 
 
 Installing Pairtree
@@ -76,8 +77,9 @@ For more details on installation, please see [here](https://www.sciencedirect.co
         bash make.sh
 
 
-Test your Pairtree installation
-===============================
+Examples
+=========
+
 After installing Pairtree, you can test your installation using provided
 example data.
 
@@ -90,6 +92,8 @@ example data.
         $PTDIR/bin/plottree --runid example $PTDIR/example/example.ssm $PTDIR/example/example.params.json example.results.npz example.results.html
         # View the HTML file.
         firefox example.results.html
+        
+For a more detailed example of how to run Pairtree and interpret the results, please see our STAR Protocols paper [Reconstructing cancer phylogenies using Pairtree, a clone tree reconstruction algorithm](https://www.sciencedirect.com/science/article/pii/S266616672200586X).
 
 
 Pairtree executables
