@@ -102,8 +102,10 @@ def print_vaftable_row(V, cls, bgcolour, should_correct_vaf, outf, visible=True)
   V = dict(V)
   if should_correct_vaf:
     # Don't change underlying Numpy array by avoiding `/=`.
-    V['vaf'] = V['vaf'] / V['omega_v']
-
+    V['vaf'] = np.divide(V['vaf'], 
+                         V['omega_v'], 
+                         out=np.zeros_like(V['vaf']), 
+                         where=(np.logical_not(np.isclose(V['omega_v'], 0))))
   if V['cluster'] is not None:
     # Increment cluster number to correct off-by-one error relative to tree nodes.
     V['cluster'] += 1

@@ -121,7 +121,11 @@ def _calc_phi_hat(variants):
   V = _extract_mat('var_reads')
   T = _extract_mat('total_reads')
   omega = _extract_mat('omega_v')
-  phi_hat = (V / T) / omega
+
+  # avoid division by zero
+  phi_hat = np.zeros_like(V, dtype=np.float64)
+  bool_mask = np.logical_and(np.logical_not(np.isclose(omega, 0)), T != 0)
+  phi_hat[bool_mask] = (V[bool_mask] / T[bool_mask]) / omega[bool_mask]
   phi_hat = np.minimum(1, phi_hat)
   phi_hat = np.insert(phi_hat, 0, 1, axis=0)
   assert np.all(phi_hat >= 0)

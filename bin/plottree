@@ -159,8 +159,17 @@ def _write_tree_html(tree_data, tidx, visible_sampidxs, samp_colours, pop_colour
 def write_cluster_stats(clusters, garbage, supervars, variants, outf):
   cluster_dev = []
   for C, S in zip(clusters, supervars):
-    S_freq = S['vaf'] / (2*S['omega_v'])[None,:] # 1xS
-    cluster_freq = np.array([variants[V]['vaf'] / (2*variants[V]['omega_v']) for V in C]) # |C|xS
+    S_freq = np.divide(S['vaf'], 
+                       (2*S['omega_v'])[None,:], 
+                       out=np.zeros_like((2*S['omega_v'])[None,:]),
+                       where=np.logical_not(np.isclose((2*S['omega_v'])[None,:], 0))) # 1xS
+    cluster_freq = np.array([
+                        np.divide(variants[V]['vaf'], 
+                                  (2*variants[V]['omega_v']), 
+                                  out=np.zeros_like(variants[V]['vaf']),
+                                  where=np.logical_not(np.isclose(variants[V]['omega_v'], 0)))
+                        for V in C
+                        ]) # |C|xS
     absdev = np.abs(cluster_freq - S_freq)
     cluster_dev.append(np.median(absdev))
 
