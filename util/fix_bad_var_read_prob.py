@@ -52,7 +52,10 @@ def _remove_bad(ssms, logbf_thresh, var_read_prob_alt, verbose=False):
     total_count += len(is_samp_bad)
 
     # Following is just used for diagnostics and is not part of decision for bad vs. good.
-    phi_mle = V['var_reads'] / (V['omega_v'] * V['total_reads'])
+    # Avoid dividing by 0 if omega or total reads are 0
+    corrected_total_reads = V['omega_v'] * V['total_reads']
+    phi_mle = np.divide(V['var_reads'], corrected_total_reads, 
+                        out=np.zeros_like(V['var_reads']), where=corrected_total_reads!=0)
     phi_alpha = alpha0 + V['var_reads']
     phi_beta = beta0 + np.maximum(0, V['omega_v']*V['total_reads'] - V['var_reads'])
     # How much mass in our phi_hat posterior is in the region [phi_hat_threshold, 1]?
