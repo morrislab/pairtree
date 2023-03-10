@@ -3,8 +3,7 @@ Pairtree
 Pairtree infers the phylogeny underlying a cancer using genomic mutation data.
 Pairtree is particularly suited to settings with multiple tissue samples from
 each cancer, providing separate estimates of subclone frequency from each sample
-that constrain the set of consistent phylogenies.  The Pairtree algorithm is
-described in {insert link to paper}. The algorithm consists of two phases:
+that constrain the set of consistent phylogenies. The algorithm consists of two phases:
 
 1. Compute pairwise relation tensor over all mutations (or clusters of
    mutations). This provides the probability over each of four possible
