@@ -27,7 +27,7 @@ def _parse_args():
     help='Integer seed used for pseudo-random number generator. Running Pairtree with the same seed on the same inputs will produce exactly the same result.')
   parser.add_argument('--parallel', dest='parallel', type=int, default=None,
     help='Number of tasks to run in parallel. By default, this is set to the number of CPU cores on the system. On hyperthreaded systems, this will be twice the number of physical CPUs.')
-  parser.add_argument('--params', dest='params_fn',
+  parser.add_argument('--params', dest='params_fn', required=True,
     help='Path to JSON-formatted parameters (including mutation clusters and sample names).')
   parser.add_argument('--trees-per-chain', dest='trees_per_chain', type=int, default=3000,
     help='Total number of trees to sample in each MCMC chain.')
