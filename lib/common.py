@@ -130,7 +130,7 @@ def reorder_rows(mat, start=None, end=None):
     # between data points.
     agglo = sklearn.cluster.AgglomerativeClustering(
       n_clusters = len(submat),
-      affinity = 'l2',
+      metric = 'l2',
       linkage = 'average',
       compute_full_tree = True,
     )

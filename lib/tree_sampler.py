@@ -39,13 +39,13 @@ def _calc_llh_phi(phi, V, N, omega_v, epsilon=1e-5):
   return phi_llh
 
 def _init_cluster_adj_linear(K):
-  cluster_adj = np.eye(K, dtype=np.int)
+  cluster_adj = np.eye(K, dtype=np.int32)
   for k in range(1, K):
     cluster_adj[k-1,k] = 1
   return cluster_adj
 
 def _init_cluster_adj_branching(K):
-  cluster_adj = np.eye(K, dtype=np.int)
+  cluster_adj = np.eye(K, dtype=np.int32)
   # Every node comes off node 0, which will always be the tree root. Note that
   # we don't assume that the first cluster (node 1, cluster 0) is the clonal
   # cluster -- it's not treated differently from any other nodes/clusters.
@@ -59,13 +59,13 @@ def _init_cluster_adj_random(K):
   # This prevents cycles.
   for idx in range(1, K):
     parents.append(np.random.randint(0, idx))
-  cluster_adj = np.eye(K, dtype=np.int)
+  cluster_adj = np.eye(K, dtype=np.int32)
   cluster_adj[parents, range(1,K)] = 1
   return cluster_adj
 
 def _init_cluster_adj_mutrels(data_logmutrel):
   K = len(data_logmutrel.rels) + 1
-  adj = np.eye(K, dtype=np.int)
+  adj = np.eye(K, dtype=np.int32)
   in_tree = set((0,))
   remaining = set(range(1, K))
 

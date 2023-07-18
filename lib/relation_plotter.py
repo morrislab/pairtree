@@ -16,7 +16,7 @@ def make_colour_from_category(cat):
   return scale[cat]
 
 def make_colour_from_intensity(intensity):
-  val = np.int(np.round(255*(1 - intensity)))
+  val = np.int16(np.round(255*(1 - intensity)))
   return 'rgb(255, %s, %s)' % (2*(val,))
 
 def make_colour_matrix(vals, colour_maker):

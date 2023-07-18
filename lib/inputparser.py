@@ -31,9 +31,9 @@ def load_ssms(ssmfn, max_ssms=None):
       variant = {
         'id': row['id'],
         'name': row['name'],
-        'var_reads': _extract_nums(row['var_reads'], np.int),
-        'total_reads': _extract_nums(row['total_reads'], np.int),
-        'omega_v': _extract_nums(row['var_read_prob'], np.float),
+        'var_reads': _extract_nums(row['var_reads'], np.int32),
+        'total_reads': _extract_nums(row['total_reads'], np.int32),
+        'omega_v': _extract_nums(row['var_read_prob'], np.float32),
       }
 
       assert np.all(variant['total_reads'] >= variant['var_reads'])

@@ -96,8 +96,8 @@ def _make_supervar(name, variants):
     'chrom': None,
     'pos': None,
     'omega_v': omega_v_hat,
-    'var_reads':   np.round(np.sum(V_hat, axis=0)).astype(np.int),
-    'total_reads': np.round(np.sum(N_hat, axis=0)).astype(np.int),
+    'var_reads':   np.round(np.sum(V_hat, axis=0)).astype(np.int32),
+    'total_reads': np.round(np.sum(N_hat, axis=0)).astype(np.int32),
   }
   svar['ref_reads'] = svar['total_reads'] - svar['var_reads']
   T = ma.masked_equal(svar['total_reads'], 0)
