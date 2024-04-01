@@ -60,12 +60,13 @@ For more details on installation, please see [here](https://www.sciencedirect.co
    Or install the dependencies in your current environment:
    
         git clone https://github.com/jwintersinger/pairtree   
-        conda install --list requirements.txt
+        conda create -n pairtree --file requirements.txt --yes
+        conda activate pairtree
 
    Pairtree has only been tested on Linux systems, but should work on any
    UNIX-like OS (including macOS).
 
-2. Download and build the C code required to fit subclone frequencies to the
+3. Download and build the C code required to fit subclone frequencies to the
    tree. This algorithm was published in [Jia et al.](https://arxiv.org/abs/1811.01129),
    and uses the authors' implementation with minor modifications.
 
@@ -74,6 +75,11 @@ For more details on installation, please see [here](https://www.sciencedirect.co
         git clone https://github.com/jwintersinger/projectppm
         cd projectppm
         bash make.sh
+
+4. Download plotting requirements. Unfortunately, not all plotting requirements Pairtree uses are available via conda.
+   Instead, we recommend downloading them via pip.  (optional)
+
+        pip3 install -r plot_requirements.txt
 
 
 Examples
@@ -90,7 +96,7 @@ example data.
         # Plot results in an HTML file.
         $PTDIR/bin/plottree --runid example $PTDIR/example/example.ssm $PTDIR/example/example.params.json example.results.npz example.results.html
         # View the HTML file.
-        firefox example.results.html
+        open example.results.html
         
 For a more detailed example of how to run Pairtree and interpret the results, please see our STAR Protocols paper [Reconstructing cancer phylogenies using Pairtree, a clone tree reconstruction algorithm](https://www.sciencedirect.com/science/article/pii/S266616672200586X).
 
