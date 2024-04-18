@@ -72,7 +72,7 @@ For more details on installation, please see [here](https://www.sciencedirect.co
 
         git clone https://github.com/jwintersinger/pairtree
         cd pairtree/lib
-        git clone https://github.com/jwintersinger/projectppm
+        git clone https://github.com/ethanumn/projectppm
         cd projectppm
         bash make.sh
 
